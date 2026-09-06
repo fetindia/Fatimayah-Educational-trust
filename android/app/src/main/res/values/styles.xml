@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base application theme. -->
+    <style name="Theme.FETIndia" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">@color/fet_emerald_green</item>
+        <item name="colorPrimaryDark">@color/fet_deep_blue</item>
+        <item name="colorAccent">@color/fet_amber</item>
+        <item name="android:statusBarColor">@color/fet_deep_blue</item>
+        <item name="android:navigationBarColor">@color/fet_deep_blue</item>
+    </style>
+
+    <style name="Theme.FETIndia.Splash" parent="Theme.FETIndia">
+        <item name="android:windowBackground">@color/fet_deep_blue</item>
+    </style>
+</resources>

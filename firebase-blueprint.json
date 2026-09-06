@@ -1,0 +1,673 @@
+{
+  "entities": {
+    "organization_config": {
+      "title": "Organization Global Configuration & CMS",
+      "description": "Stores dynamic platform branding, CMS settings, theme colors, and protected institutional metadata",
+      "type": "object",
+      "properties": {
+        "legalName": { "type": "string", "description": "Protected legal name: Fatimyah Educational Trust" },
+        "displayName": { "type": "string", "description": "Platform display name: Fatimyah Educational Trust India" },
+        "shortBrand": { "type": "string", "description": "Public short brand: FET India" },
+        "tagline": { "type": "string", "description": "Education • Service • Empowerment" },
+        "websiteUrl": { "type": "string", "description": "FETIndia.com" },
+        "contactEmail": { "type": "string" },
+        "contactPhone": { "type": "string" },
+        "address": { "type": "string" },
+        "registrationNumber": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "faviconUrl": { "type": "string" },
+        "appIconUrl": { "type": "string" },
+        "primaryColor": { "type": "string" },
+        "secondaryColor": { "type": "string" },
+        "accentColor": { "type": "string" },
+        "heroSliders": { "type": "array" },
+        "updatedAt": { "type": "string" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["legalName", "displayName", "shortBrand", "tagline"]
+    },
+    "users": {
+      "title": "User Profiles & Access",
+      "description": "User profiles, roles, permissions, contact details, KYC, and account status",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "fullLegalName": { "type": "string" },
+        "mobileNumber": { "type": "string" },
+        "country": { "type": "string" },
+        "roles": { "type": "array", "description": "List of assigned roles: super_admin, administrator, core_member, member, volunteer, donor, student, user, etc." },
+        "primaryRole": { "type": "string" },
+        "permissions": { "type": "array", "description": "Effective list of granted permissions: users.view, users.manage, roles.manage, volunteers.manage, donors.manage, members.manage, modules.manage, settings.manage" },
+        "customPermissions": { "type": "array" },
+        "status": { "type": "string", "enum": ["active", "pending", "suspended"] },
+        "accountStatus": { "type": "string", "enum": ["active", "pending_verification", "pending", "suspended"] },
+        "emailVerified": { "type": "boolean" },
+        "profileCompleted": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "lastLoginAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "roles", "status"]
+    },
+    "modules": {
+      "title": "27-Chapter Module Activation Matrix",
+      "description": "Module registration, series metadata, status (active/disabled/beta), and permission rules",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "name": { "type": "string" },
+        "series": { "type": "number", "enum": [1, 2, 3] },
+        "chapterNumber": { "type": "number" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "maintenance", "private_beta", "disabled"] },
+        "requiredRole": { "type": "string" },
+        "isPubliclyVisible": { "type": "boolean" },
+        "enabledInApp": { "type": "boolean" },
+        "updatedAt": { "type": "string" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["code", "name", "series", "chapterNumber", "status"]
+    },
+    "audit_logs": {
+      "title": "System Audit Logs",
+      "description": "Immutable security log of administrative actions, config edits, and module state changes",
+      "type": "object",
+      "properties": {
+        "actorUid": { "type": "string" },
+        "actorEmail": { "type": "string" },
+        "actorRole": { "type": "string" },
+        "action": { "type": "string" },
+        "targetEntity": { "type": "string" },
+        "targetId": { "type": "string" },
+        "details": { "type": "object" },
+        "ipAddress": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["actorUid", "actorEmail", "action", "timestamp"]
+    },
+    "notifications": {
+      "title": "Platform Notifications & Broadcasts",
+      "description": "Global announcements, role-specific notices, and user alerts",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "announcement", "warning", "success", "critical"] },
+        "targetAudience": { "type": "string", "enum": ["all", "admins", "members", "volunteers", "donors", "specific_users"] },
+        "targetUserIds": { "type": "array" },
+        "isPublished": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "readBy": { "type": "array" }
+      },
+      "required": ["title", "message", "type", "createdAt"]
+    },
+    "volunteerApplications": {
+      "title": "Volunteer Applications Queue",
+      "description": "Official intake applications submitted by authenticated members seeking to join the FET India Volunteer Corps",
+      "type": "object",
+      "properties": {
+        "applicantUid": { "type": "string" },
+        "applicantEmail": { "type": "string" },
+        "fullLegalName": { "type": "string" },
+        "mobileNumber": { "type": "string" },
+        "country": { "type": "string" },
+        "state": { "type": "string" },
+        "district": { "type": "string" },
+        "fullAddress": { "type": "string" },
+        "dateOfBirth": { "type": "string" },
+        "educationQualification": { "type": "string" },
+        "skills": { "type": "array" },
+        "areasOfInterest": { "type": "array" },
+        "previousExperience": { "type": "string" },
+        "availability": { "type": "string" },
+        "preferredLocation": { "type": "string" },
+        "statementOfPurpose": { "type": "string" },
+        "declarationAccepted": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["pending", "under_review", "approved", "rejected"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "reviewedByUid": { "type": "string" },
+        "reviewedByEmail": { "type": "string" },
+        "reviewedAt": { "type": "string" },
+        "reviewNotes": { "type": "string" }
+      },
+      "required": ["applicantUid", "applicantEmail", "fullLegalName", "mobileNumber", "country", "status", "declarationAccepted", "createdAt"]
+    },
+    "donorApplications": {
+      "title": "Donor Applications Queue",
+      "description": "Intake filings submitted by authenticated members expressing patronage, regular pledge support, or institutional donor partnership with FET India",
+      "type": "object",
+      "properties": {
+        "applicantUid": { "type": "string" },
+        "applicantEmail": { "type": "string" },
+        "fullLegalName": { "type": "string" },
+        "mobileNumber": { "type": "string" },
+        "country": { "type": "string" },
+        "state": { "type": "string" },
+        "district": { "type": "string" },
+        "fullAddress": { "type": "string" },
+        "donorType": { "type": "string", "enum": ["individual", "organization"] },
+        "organizationName": { "type": "string" },
+        "areasOfSupport": { "type": "array" },
+        "preferredFrequency": { "type": "string", "enum": ["one_time", "monthly", "quarterly", "yearly"] },
+        "donationInterestAmount": { "type": "string" },
+        "additionalNotes": { "type": "string" },
+        "declarationAccepted": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["pending", "under_review", "approved", "rejected"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "approvedBy": { "type": "string" },
+        "reviewedByUid": { "type": "string" },
+        "reviewedByEmail": { "type": "string" },
+        "reviewedAt": { "type": "string" },
+        "reviewNotes": { "type": "string" }
+      },
+      "required": ["applicantUid", "applicantEmail", "fullLegalName", "mobileNumber", "country", "state", "district", "fullAddress", "donorType", "areasOfSupport", "preferredFrequency", "declarationAccepted", "status", "createdAt"]
+    },
+    "user_notifications": {
+      "title": "User In-App Notifications",
+      "description": "Targeted notifications for individual users regarding application progress, status updates, and announcements",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string" },
+        "severity": { "type": "string" },
+        "module": { "type": "string" },
+        "actionUrl": { "type": "string" },
+        "actionLabel": { "type": "string" },
+        "read": { "type": "boolean" },
+        "readAt": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "broadcastId": { "type": "string" },
+        "targetGroup": { "type": "string" },
+        "emailTriggered": { "type": "boolean" },
+        "emailDeliveryStatus": { "type": "string" },
+        "emailDeliveryNote": { "type": "string" }
+      },
+      "required": ["userId", "title", "message", "type", "read", "createdAt"]
+    },
+    "admin_broadcasts": {
+      "title": "Admin Broadcast Dispatch Records",
+      "description": "Log of official institutional broadcasts dispatched by administrators across user cohorts",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string" },
+        "severity": { "type": "string" },
+        "targetGroups": { "type": "array" },
+        "targetUserIds": { "type": "array" },
+        "recipientCount": { "type": "number" },
+        "sentByUid": { "type": "string" },
+        "sentByEmail": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "emailTriggerRequested": { "type": "boolean" },
+        "emailDeliveryStatus": { "type": "string" },
+        "emailDeliveryNote": { "type": "string" }
+      },
+      "required": ["title", "message", "type", "targetGroups", "recipientCount", "sentByUid", "sentByEmail", "createdAt"]
+    },
+    "crowdfunding_campaigns": {
+      "title": "Crowdfunding Appeals & Drives",
+      "description": "Verified charitable appeals and fundraising cases submitted by members and verified by the Trust Board",
+      "type": "object",
+      "properties": {
+        "campaignNumber": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string", "enum": ["education", "medical_assistance", "emergency_assistance", "food_basic_needs", "community_development", "other_charitable"] },
+        "categoryLabel": { "type": "string" },
+        "description": { "type": "string" },
+        "beneficiaryName": { "type": "string" },
+        "beneficiaryDescription": { "type": "string" },
+        "targetAmount": { "type": "number" },
+        "requiredAmount": { "type": "number" },
+        "raisedAmount": { "type": "number" },
+        "remainingAmount": { "type": "number" },
+        "progressPercentage": { "type": "number" },
+        "verifiedDonationsCount": { "type": "number" },
+        "location": { "type": "string" },
+        "state": { "type": "string" },
+        "district": { "type": "string" },
+        "city": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "coverImageUrl": { "type": "string" },
+        "supportingImages": { "type": "array" },
+        "supportingDocuments": { "type": "array" },
+        "contactPersonName": { "type": "string" },
+        "contactPhone": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "creatorFullName": { "type": "string" },
+        "creatorParentage": { "type": "string" },
+        "creatorContactPhone": { "type": "string" },
+        "creatorAlternatePhone": { "type": "string" },
+        "creatorEmailAddress": { "type": "string" },
+        "creatorResidentialLocation": { "type": "string" },
+        "creatorState": { "type": "string" },
+        "creatorDistrict": { "type": "string" },
+        "creatorCityTownVillage": { "type": "string" },
+        "creatorMemberId": { "type": "string" },
+        "relationshipToBeneficiary": { "type": "string" },
+        "declarationAccepted": { "type": "boolean" },
+        "termsAccepted": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["draft", "pending_review", "approved", "active", "paused", "completed", "rejected", "closed"] },
+        "isVerifiedByFET": { "type": "boolean" },
+        "creatorUid": { "type": "string" },
+        "creatorEmail": { "type": "string" },
+        "creatorName": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "submittedAt": { "type": "string" },
+        "approvedAt": { "type": "string" },
+        "approvedByUid": { "type": "string" },
+        "approvedByEmail": { "type": "string" },
+        "reviewedAt": { "type": "string" },
+        "reviewedByUid": { "type": "string" },
+        "reviewedByEmail": { "type": "string" },
+        "reviewNotes": { "type": "string" },
+        "rejectionReason": { "type": "string" }
+      },
+      "required": ["title", "category", "description", "targetAmount", "creatorUid", "creatorEmail", "status", "declarationAccepted", "createdAt"]
+    },
+    "campaign_donations": {
+      "title": "Campaign Contribution Records",
+      "description": "Financial donations pledged or verified towards specific crowdfunding appeals",
+      "type": "object",
+      "properties": {
+        "donationId": { "type": "string" },
+        "campaignId": { "type": "string" },
+        "campaignTitle": { "type": "string" },
+        "donorUid": { "type": "string" },
+        "donorName": { "type": "string" },
+        "donorEmail": { "type": "string" },
+        "donorPhone": { "type": "string" },
+        "donorPan": { "type": "string" },
+        "amount": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "paymentStatus": { "type": "string", "enum": ["initiated", "pending_verification", "verified", "failed", "cancelled", "refunded"] },
+        "transactionReference": { "type": "string" },
+        "isAnonymous": { "type": "boolean" },
+        "razorpayOrderId": { "type": "string" },
+        "razorpayPaymentId": { "type": "string" },
+        "razorpaySignature": { "type": "string" },
+        "gatewayMode": { "type": "string", "enum": ["test", "live"] },
+        "paymentMethod": { "type": "string" },
+        "receiptNumber": { "type": "string" },
+        "financialYear": { "type": "string" }
+      },
+      "required": ["donationId", "campaignId", "donorName", "donorEmail", "amount", "paymentStatus", "createdAt"]
+    },
+    "financial_records": {
+      "title": "Central Trust Financial Records & Expenses",
+      "description": "Central ledger for institutional income, school/madrasa fees, expense requisitions, and payment vouchers",
+      "type": "object",
+      "properties": {
+        "transactionId": { "type": "string" },
+        "voucherNumber": { "type": "string" },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "status": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "referenceNumber": { "type": "string" },
+        "payerPayeeName": { "type": "string" },
+        "payerPayeeEmail": { "type": "string" },
+        "payerPayeePhone": { "type": "string" },
+        "payerPan": { "type": "string" },
+        "description": { "type": "string" },
+        "department": { "type": "string" },
+        "fundType": { "type": "string" },
+        "campaignId": { "type": "string" },
+        "financialYear": { "type": "string" },
+        "createdByUid": { "type": "string" },
+        "createdByEmail": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["transactionId", "type", "category", "amount", "date", "status", "payerPayeeName", "description", "createdByUid", "createdByEmail", "createdAt"]
+    },
+    "public_memberships": {
+      "title": "Public Membership Verification Records",
+      "description": "Publicly readable non-sensitive member accreditation for QR card verification",
+      "type": "object",
+      "properties": {
+        "memberId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "membershipType": { "type": "string" },
+        "membershipStatus": { "type": "string" },
+        "approvedAt": { "type": "string" },
+        "issueDate": { "type": "string" },
+        "validUntil": { "type": "string" },
+        "trustName": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "verifiedAt": { "type": "string" }
+      },
+      "required": ["memberId", "fullName", "isVerified"]
+    },
+    "public_volunteers": {
+      "title": "Public Volunteer Verification Records",
+      "description": "Publicly readable non-sensitive volunteer accreditation for QR badge verification",
+      "type": "object",
+      "properties": {
+        "volunteerId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "volunteerWing": { "type": "string" },
+        "status": { "type": "string" },
+        "issueDate": { "type": "string" },
+        "validUntil": { "type": "string" },
+        "district": { "type": "string" },
+        "state": { "type": "string" },
+        "country": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["volunteerId", "fullName", "status"]
+    },
+    "public_donors": {
+      "title": "Public Donor Verification Records",
+      "description": "Publicly readable non-sensitive donor accreditation for verification",
+      "type": "object",
+      "properties": {
+        "donorId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "donorType": { "type": "string" },
+        "donorStatus": { "type": "string" },
+        "issueDate": { "type": "string" },
+        "validUntil": { "type": "string" },
+        "trustName": { "type": "string" },
+        "isVerified": { "type": "boolean" }
+      },
+      "required": ["donorId", "fullName", "isVerified"]
+    },
+    "public_staff": {
+      "title": "Public Staff Verification Records",
+      "description": "Publicly readable staff employment credentials for QR card verification",
+      "type": "object",
+      "properties": {
+        "staffId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "department": { "type": "string" },
+        "designation": { "type": "string" },
+        "employmentStatus": { "type": "string" },
+        "trustName": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "joiningDate": { "type": "string" },
+        "verifiedAt": { "type": "string" },
+        "validUntil": { "type": "string" }
+      },
+      "required": ["staffId", "fullName", "department", "designation", "isVerified"]
+    },
+    "public_certificates": {
+      "title": "Public Certificate Verification Records",
+      "description": "Publicly readable competition and educational certificate credentials for QR verification",
+      "type": "object",
+      "properties": {
+        "certificateId": { "type": "string" },
+        "recipientName": { "type": "string" },
+        "competitionTitle": { "type": "string" },
+        "category": { "type": "string" },
+        "achievementTitle": { "type": "string" },
+        "rank": { "type": "number" },
+        "score": { "type": "number" },
+        "totalMarks": { "type": "number" },
+        "grade": { "type": "string" },
+        "issueDate": { "type": "string" },
+        "institution": { "type": "string" },
+        "district": { "type": "string" },
+        "state": { "type": "string" },
+        "status": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "trustName": { "type": "string" },
+        "verifiedAt": { "type": "string" }
+      },
+      "required": ["certificateId", "recipientName", "competitionTitle", "status", "isVerified"]
+    },
+    "competitions": {
+      "title": "Talent Search Competitions & Olympiads",
+      "description": "Official educational challenges, book reading contests, and STEM olympiads",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "code": { "type": "string" },
+        "category": { "type": "string" },
+        "status": { "type": "string" },
+        "academicYear": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "examDurationMinutes": { "type": "number" },
+        "totalMarks": { "type": "number" },
+        "passingPercentage": { "type": "number" },
+        "isPublished": { "type": "boolean" }
+      },
+      "required": ["title", "code", "category", "status"]
+    },
+    "competition_registrations": {
+      "title": "Competition Registrations & Hall Tickets",
+      "description": "Student candidate registrations and evaluation scores for talent challenges",
+      "type": "object",
+      "properties": {
+        "registrationNumber": { "type": "string" },
+        "competitionId": { "type": "string" },
+        "participantUid": { "type": "string" },
+        "candidateName": { "type": "string" },
+        "institution": { "type": "string" },
+        "marksObtained": { "type": "number" },
+        "totalMarks": { "type": "number" },
+        "percentage": { "type": "number" },
+        "grade": { "type": "string" },
+        "rank": { "type": "number" },
+        "isResultPublished": { "type": "boolean" },
+        "certificateIssued": { "type": "boolean" },
+        "certificateId": { "type": "string" }
+      },
+      "required": ["registrationNumber", "competitionId", "participantUid", "candidateName"]
+    },
+    "membershipApplications": {
+      "title": "Membership Applications Queue",
+      "description": "Official intake applications submitted by authenticated members seeking trust membership",
+      "type": "object",
+      "properties": {
+        "applicantUid": { "type": "string" },
+        "applicantEmail": { "type": "string" },
+        "fullLegalName": { "type": "string" },
+        "mobileNumber": { "type": "string" },
+        "country": { "type": "string" },
+        "state": { "type": "string" },
+        "district": { "type": "string" },
+        "fullAddress": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "under_review", "approved", "rejected"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "approvedBy": { "type": "string" },
+        "membershipIdAssigned": { "type": "string" },
+        "reviewedByUid": { "type": "string" },
+        "reviewedByEmail": { "type": "string" },
+        "reviewedAt": { "type": "string" },
+        "reviewNotes": { "type": "string" }
+      },
+      "required": ["applicantUid", "applicantEmail", "fullLegalName", "mobileNumber", "country", "status", "createdAt"]
+    },
+    "question_banks": {
+      "title": "Multilingual Question Banks & Book Mastery Repositories",
+      "description": "Question banks organized by subject, category, and prescribed book chapters with multilingual support",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "title": { "type": "string" },
+        "subject": { "type": "string" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "bookMastery": { "type": "object" },
+        "primaryLanguage": { "type": "string" },
+        "supportedLanguages": { "type": "array" },
+        "questionsCount": { "type": "number" },
+        "approvedQuestionsCount": { "type": "number" },
+        "pendingReviewCount": { "type": "number" },
+        "questions": { "type": "array" },
+        "createdByUid": { "type": "string" },
+        "createdByEmail": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["code", "title", "subject", "category", "primaryLanguage", "createdByUid", "createdAt"]
+    },
+    "exam_papers": {
+      "title": "Examination Question Papers & Blueprints",
+      "description": "Multi-section question papers with integrity rules, multilingual settings, and timing constraints",
+      "type": "object",
+      "properties": {
+        "paperCode": { "type": "string" },
+        "paperTitle": { "type": "string" },
+        "competitionId": { "type": "string" },
+        "durationMinutes": { "type": "number" },
+        "totalMarks": { "type": "number" },
+        "passingMarks": { "type": "number" },
+        "supportedLanguages": { "type": "array" },
+        "defaultLanguage": { "type": "string" },
+        "allowLanguageSwitching": { "type": "boolean" },
+        "sections": { "type": "array" },
+        "instructions": { "type": "array" },
+        "integrityConfig": { "type": "object" },
+        "status": { "type": "string", "enum": ["draft", "published", "archived"] },
+        "createdByUid": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["paperCode", "paperTitle", "durationMinutes", "totalMarks", "status", "createdByUid"]
+    },
+    "exam_attempts": {
+      "title": "Candidate Exam Attempts & Integrity Logs",
+      "description": "Secure record of student answers, timestamps, score evaluations, and integrity violation logs",
+      "type": "object",
+      "properties": {
+        "registrationId": { "type": "string" },
+        "participantId": { "type": "string" },
+        "competitionId": { "type": "string" },
+        "competitionTitle": { "type": "string" },
+        "paperId": { "type": "string" },
+        "participantUid": { "type": "string" },
+        "participantName": { "type": "string" },
+        "startedAt": { "type": "string" },
+        "submittedAt": { "type": "string" },
+        "timeSpentSeconds": { "type": "number" },
+        "selectedLanguage": { "type": "string" },
+        "answers": { "type": "object" },
+        "autoScore": { "type": "number" },
+        "manualScore": { "type": "number" },
+        "finalScore": { "type": "number" },
+        "totalMarks": { "type": "number" },
+        "percentage": { "type": "number" },
+        "grade": { "type": "string" },
+        "rank": { "type": "number" },
+        "violationsCount": { "type": "number" },
+        "violations": { "type": "array" },
+        "isDisqualified": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["in_progress", "submitted", "graded", "disqualified"] },
+        "evaluatorRemarks": { "type": "string" },
+        "evaluatedByUid": { "type": "string" },
+        "evaluatedAt": { "type": "string" }
+      },
+      "required": ["registrationId", "participantId", "competitionId", "participantUid", "startedAt", "status"]
+    }
+  },
+  "firestore": {
+    "/organization_config/{configId}": {
+      "schema": "organization_config",
+      "description": "Dynamic organizational branding, configuration, and CMS sliders"
+    },
+    "/users/{userId}": {
+      "schema": "users",
+      "description": "User profiles, roles, contact particulars, and membership status"
+    },
+    "/modules/{moduleId}": {
+      "schema": "modules",
+      "description": "27-chapter module activation matrix"
+    },
+    "/audit_logs/{logId}": {
+      "schema": "audit_logs",
+      "description": "Immutable append-only system audit trails"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "notifications",
+      "description": "Global announcements and broad alerts"
+    },
+    "/user_notifications/{notificationId}": {
+      "schema": "user_notifications",
+      "description": "Targeted private in-app user notifications"
+    },
+    "/admin_broadcasts/{broadcastId}": {
+      "schema": "admin_broadcasts",
+      "description": "Admin broadcast dispatch history"
+    },
+    "/membershipApplications/{applicationId}": {
+      "schema": "membershipApplications",
+      "description": "Digital trust membership applications intake"
+    },
+    "/volunteerApplications/{applicationId}": {
+      "schema": "volunteerApplications",
+      "description": "Volunteer corps recruitment applications intake"
+    },
+    "/donorApplications/{applicationId}": {
+      "schema": "donorApplications",
+      "description": "Patron & donor registration intake"
+    },
+    "/crowdfunding_campaigns/{campaignId}": {
+      "schema": "crowdfunding_campaigns",
+      "description": "Public charitable appeals and crowdfunding drives"
+    },
+    "/campaign_donations/{donationId}": {
+      "schema": "campaign_donations",
+      "description": "Pledged and verified campaign contributions"
+    },
+    "/financial_records/{recordId}": {
+      "schema": "financial_records",
+      "description": "Trust financial income and expense ledger"
+    },
+    "/public_memberships/{memberId}": {
+      "schema": "public_memberships",
+      "description": "Non-sensitive public membership verification data"
+    },
+    "/public_volunteers/{volunteerId}": {
+      "schema": "public_volunteers",
+      "description": "Non-sensitive public volunteer verification data"
+    },
+    "/public_donors/{donorId}": {
+      "schema": "public_donors",
+      "description": "Non-sensitive public donor verification data"
+    },
+    "/public_staff/{staffId}": {
+      "schema": "public_staff",
+      "description": "Non-sensitive public staff verification data"
+    },
+    "/public_certificates/{certId}": {
+      "schema": "public_certificates",
+      "description": "Non-sensitive public certificate verification data"
+    },
+    "/competitions/{competitionId}": {
+      "schema": "competitions",
+      "description": "Talent search and academic competitions"
+    },
+    "/competition_registrations/{registrationId}": {
+      "schema": "competition_registrations",
+      "description": "Participant registrations and hall tickets"
+    },
+    "/question_banks/{bankId}": {
+      "schema": "question_banks",
+      "description": "Multilingual Question Banks and Book Mastery repositories"
+    },
+    "/exam_papers/{paperId}": {
+      "schema": "exam_papers",
+      "description": "Structured examination question papers and sections"
+    },
+    "/exam_attempts/{attemptId}": {
+      "schema": "exam_attempts",
+      "description": "Participant online examination attempts and integrity records"
+    }
+  }
+}

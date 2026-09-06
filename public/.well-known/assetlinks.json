@@ -1,0 +1,16 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "org.fetindia.app",
+      "sha256_cert_fingerprints": [
+        "14:6D:E9:D6:0F:4C:E6:B9:98:8C:7A:41:8C:C9:8F:D6:2B:A4:4E:9F:7C:E6:2F:32:8B:2A:D0:A2:9D:E1:2E:3F",
+        "A1:B2:C3:D4:E5:F6:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23"
+      ]
+    }
+  }
+]

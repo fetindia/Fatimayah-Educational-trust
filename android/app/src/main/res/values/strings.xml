@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">FET India</string>
+    <string name="org_full_name">Fatimyah Educational Trust</string>
+    <string name="tagline">Education • Service • Empowerment</string>
+    <string name="package_name">org.fetindia.app</string>
+    <string name="shortcut_exams">Exams &amp; Tests</string>
+    <string name="shortcut_verify">Verify ID</string>
+    <string name="shortcut_donate">Donate (80G)</string>
+    <string name="shortcut_dashboard">Member Portal</string>
+</resources>

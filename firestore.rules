@@ -1,0 +1,445 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================
+    // Core Global Primitives & Helper Functions
+    // =========================================================
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isSignedIn() {
+      return isAuthenticated();
+    }
+
+    function isUser(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && (
+        (request.auth.token.email != null && (
+          request.auth.token.email == 'fetkofficial@gmail.com' ||
+          request.auth.token.email == 'FETKOFFICIAL@GMAIL.COM'
+        ) && request.auth.token.email_verified == true) ||
+        (exists(/databases/{database}/documents/users/$(request.auth.uid)) && (
+          (get(/databases/{database}/documents/users/$(request.auth.uid)).data.roles != null &&
+           get(/databases/{database}/documents/users/$(request.auth.uid)).data.roles.hasAny(['super_admin'])) ||
+          get(/databases/{database}/documents/users/$(request.auth.uid)).data.primaryRole == 'super_admin' ||
+          get(/databases/{database}/documents/users/$(request.auth.uid)).data.role == 'super_admin' ||
+          get(/databases/{database}/documents/users/$(request.auth.uid)).data.email == 'fetkofficial@gmail.com'
+        ))
+      );
+    }
+
+    function hasAdminRole() {
+      return isAuthenticated() && (
+        isSuperAdmin() ||
+        (exists(/databases/{database}/documents/users/$(request.auth.uid)) && (
+          (get(/databases/{database}/documents/users/$(request.auth.uid)).data.roles != null &&
+           get(/databases/{database}/documents/users/$(request.auth.uid)).data.roles.hasAny([
+             'super_admin', 'administrator', 'core_member', 'volunteer_admin', 'member_admin', 'donor_admin',
+             'crowdfunding_admin', 'examination_admin', 'exam_admin', 'school_admin',
+             'madrasa_admin', 'finance_admin', 'hr_admin', 'content_admin', 'blog_admin',
+             'store_admin', 'travel_admin', 'reports_admin'
+           ])) ||
+          get(/databases/{database}/documents/users/$(request.auth.uid)).data.primaryRole == 'super_admin' ||
+          get(/databases/{database}/documents/users/$(request.auth.uid)).data.primaryRole == 'administrator' ||
+          get(/databases/{database}/documents/users/$(request.auth.uid)).data.role == 'super_admin' ||
+          get(/databases/{database}/documents/users/$(request.auth.uid)).data.role == 'administrator'
+        ))
+      );
+    }
+
+    function canManageRoles() {
+      return isAuthenticated() && (
+        isSuperAdmin() ||
+        (exists(/databases/{database}/documents/users/$(request.auth.uid)) && (
+          (get(/databases/{database}/documents/users/$(request.auth.uid)).data.roles != null &&
+           get(/databases/{database}/documents/users/$(request.auth.uid)).data.roles.hasAny(['super_admin', 'administrator'])) ||
+          (get(/databases/{database}/documents/users/$(request.auth.uid)).data.permissions != null &&
+           get(/databases/{database}/documents/users/$(request.auth.uid)).data.permissions.hasAny(['roles.manage'])) ||
+          get(/databases/{database}/documents/users/$(request.auth.uid)).data.primaryRole == 'super_admin'
+        ))
+      );
+    }
+
+    function canViewUsers() {
+      return isAuthenticated() && (
+        hasAdminRole() ||
+        (exists(/databases/{database}/documents/users/$(request.auth.uid)) && (
+          (get(/databases/{database}/documents/users/$(request.auth.uid)).data.permissions != null &&
+           get(/databases/{database}/documents/users/$(request.auth.uid)).data.permissions.hasAny(['users.view']))
+        ))
+      );
+    }
+
+    // =========================================================
+    // Organization Configuration & Dynamic CMS
+    // =========================================================
+    match /organization_config/{configId} {
+      allow read: if true; // Public site branding, colors, and tagline
+      allow write: if isSuperAdmin();
+    }
+
+    // =========================================================
+    // Public Accreditation & Verification Records (Non-sensitive)
+    // =========================================================
+    match /public_memberships/{memberId} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || hasAdminRole();
+    }
+
+    match /public_donors/{donorId} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || hasAdminRole();
+    }
+
+    match /public_volunteers/{volunteerId} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || hasAdminRole();
+    }
+
+    match /public_staff/{staffId} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || hasAdminRole();
+    }
+
+    match /public_certificates/{certId} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || hasAdminRole();
+    }
+
+    // =========================================================
+    // User Profiles & Identity Collection
+    // =========================================================
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || canViewUsers());
+      allow create: if isAuthenticated() && request.auth.uid == userId && (request.resource.data.uid == userId);
+      allow update: if isAuthenticated() && (
+        // Normal users updating own profile cannot touch roles, permissions, or administrative status
+        (request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'roles', 'primaryRole', 'role', 'accountType', 'permissions', 'customPermissions', 
+          'status', 'accountStatus', 'uid', 'email',
+          'membershipStatus', 'volunteerStatus', 'donorStatus',
+          'membershipId', 'volunteerId', 'donorId',
+          'promotedAt', 'promotedBy', 'promotedByEmail', 'promotionNote'
+        ])) ||
+        // Role managers and Super Admins can update roles/permissions/status
+        canManageRoles()
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    // =========================================================
+    // Module Matrix
+    // =========================================================
+    match /modules/{moduleId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // =========================================================
+    // System Audit Logs (Append-only)
+    // =========================================================
+    match /audit_logs/{logId} {
+      allow read: if hasAdminRole();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Immutable
+    }
+
+    // =========================================================
+    // Sequence Counters
+    // =========================================================
+    match /counters/{counterId} {
+      allow read: if isAuthenticated();
+      allow write: if hasAdminRole() || isSuperAdmin();
+    }
+
+    // =========================================================
+    // Notifications & Broadcasts Subsystem
+    // =========================================================
+    match /notifications/{notificationId} {
+      allow read: if resource.data.targetAudience == 'all' ||
+                     (isAuthenticated() && (hasAdminRole() || (resource.data.targetUserIds != null && resource.data.targetUserIds.hasAny([request.auth.uid]))));
+      allow write: if hasAdminRole();
+    }
+
+    match /user_notifications/{notificationId} {
+      allow read: if isAuthenticated() && (
+        (resource != null && resource.data.userId == request.auth.uid) ||
+        hasAdminRole()
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.userId == request.auth.uid ||
+        hasAdminRole()
+      );
+      allow update: if isAuthenticated() && (
+        (resource.data.userId == request.auth.uid &&
+         request.resource.data.userId == request.auth.uid &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+           'userId', 'userEmail', 'title', 'message', 'createdAt', 'type', 'module', 'createdBy', 'broadcastId', 'targetGroup'
+         ])) ||
+        hasAdminRole()
+      );
+      allow delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isSuperAdmin()
+      );
+    }
+
+    match /admin_broadcasts/{broadcastId} {
+      allow read: if hasAdminRole();
+      allow create: if hasAdminRole();
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // =========================================================
+    // Membership Applications
+    // =========================================================
+    match /membershipApplications/{applicationId} {
+      allow read: if isAuthenticated() && (
+        (resource != null && resource.data.applicantUid == request.auth.uid) ||
+        hasAdminRole()
+      );
+      allow create: if isAuthenticated() &&
+        request.resource.data.applicantUid == request.auth.uid &&
+        (request.resource.data.status == 'pending' || !('status' in request.resource.data));
+      allow update: if isAuthenticated() && (
+        (resource.data.applicantUid == request.auth.uid &&
+         resource.data.status == 'pending' &&
+         request.resource.data.applicantUid == resource.data.applicantUid &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+           'status', 'approvedBy', 'reviewedByUid', 'reviewedByEmail', 'reviewedAt', 'reviewNotes', 'applicantUid'
+         ])) ||
+        hasAdminRole()
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    // =========================================================
+    // Volunteer Applications & Activities
+    // =========================================================
+    match /volunteerApplications/{applicationId} {
+      allow read: if isAuthenticated() && (
+        (resource != null && resource.data.applicantUid == request.auth.uid) ||
+        hasAdminRole()
+      );
+      allow create: if isAuthenticated() &&
+        request.resource.data.applicantUid == request.auth.uid &&
+        (request.resource.data.status == 'pending' || !('status' in request.resource.data));
+      allow update: if isAuthenticated() && (
+        (resource.data.applicantUid == request.auth.uid &&
+         resource.data.status == 'pending' &&
+         request.resource.data.applicantUid == resource.data.applicantUid &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+           'status', 'approvedBy', 'reviewedByUid', 'reviewedByEmail', 'reviewedAt', 'reviewNotes', 'applicantUid'
+         ])) ||
+        hasAdminRole()
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    match /volunteer_categories/{categoryId} {
+      allow read: if true;
+      allow write: if hasAdminRole();
+    }
+
+    match /volunteer_activities/{activityId} {
+      allow read: if isAuthenticated();
+      allow create, delete: if hasAdminRole();
+      allow update: if isAuthenticated() && (
+        hasAdminRole() || 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['enrolledVolunteerIds', 'updatedAt'])
+      );
+    }
+
+    match /volunteer_history/{historyId} {
+      allow read: if isAuthenticated() && (
+        (resource != null && resource.data.volunteerUid == request.auth.uid) ||
+        hasAdminRole()
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.volunteerUid == request.auth.uid ||
+        hasAdminRole()
+      );
+      allow update: if hasAdminRole();
+      allow delete: if isSuperAdmin();
+    }
+
+    // =========================================================
+    // Donor Applications & Community Groups
+    // =========================================================
+    match /donorApplications/{applicationId} {
+      allow read: if isAuthenticated() && (
+        (resource != null && resource.data.applicantUid == request.auth.uid) ||
+        hasAdminRole()
+      );
+      allow create: if isAuthenticated() &&
+        request.resource.data.applicantUid == request.auth.uid &&
+        (request.resource.data.status == 'pending' || !('status' in request.resource.data));
+      allow update: if isAuthenticated() && (
+        (resource.data.applicantUid == request.auth.uid &&
+         resource.data.status == 'pending' &&
+         request.resource.data.applicantUid == resource.data.applicantUid &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+           'status', 'approvedBy', 'reviewedByUid', 'reviewedByEmail', 'reviewedAt', 'reviewNotes', 'applicantUid'
+         ])) ||
+        hasAdminRole()
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    match /community_groups/{groupId} {
+      allow read: if isAuthenticated();
+      allow write: if hasAdminRole();
+    }
+
+    // =========================================================
+    // Crowdfunding Campaigns & Verified Contributions
+    // =========================================================
+    match /crowdfunding_campaigns/{campaignId} {
+      allow read: if true;
+      allow create: if isAuthenticated() &&
+        request.resource.data.creatorUid == request.auth.uid &&
+        (request.resource.data.status in ['pending_review', 'draft']) &&
+        (request.resource.data.raisedAmount == 0 || !('raisedAmount' in request.resource.data)) &&
+        (request.resource.data.verifiedDonationsCount == 0 || !('verifiedDonationsCount' in request.resource.data));
+      allow update: if isAuthenticated() && (
+        (resource.data.creatorUid == request.auth.uid &&
+         (resource.data.status in ['pending_review', 'draft']) &&
+         request.resource.data.creatorUid == resource.data.creatorUid &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+           'status', 'approvedByUid', 'approvedByEmail', 'approvedAt', 
+           'reviewedByUid', 'reviewedByEmail', 'reviewedAt', 'reviewNotes', 
+           'rejectionReason', 'raisedAmount', 'verifiedDonationsCount', 'creatorUid'
+         ])) ||
+        hasAdminRole()
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    match /campaign_donations/{donationId} {
+      allow read: if true;
+      allow create: if (
+        request.resource.data.paymentStatus in ['pending_verification', 'initiated'] ||
+        (hasAdminRole() && request.resource.data.paymentStatus == 'verified')
+      );
+      allow update: if (
+        hasAdminRole() ||
+        (
+          resource.data.paymentStatus in ['initiated', 'pending_verification'] &&
+          request.resource.data.paymentStatus in ['verified', 'failed', 'cancelled'] &&
+          request.resource.data.transactionReference is string
+        )
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    // =========================================================
+    // Financial Records & Ledgers
+    // =========================================================
+    match /financial_records/{recordId} {
+      allow read: if isAuthenticated() && (
+        hasAdminRole() ||
+        (resource != null && (
+          resource.data.donorUid == request.auth.uid ||
+          (request.auth.token.email != null && resource.data.payerPayeeEmail == request.auth.token.email)
+        ))
+      );
+      allow create, update: if isAuthenticated() && hasAdminRole();
+      allow delete: if isSuperAdmin();
+    }
+
+    // =========================================================
+    // Competitions & Examinations Subsystem
+    // =========================================================
+    match /competitions/{competitionId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() && hasAdminRole();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /competition_registrations/{registrationId} {
+      allow read: if (
+        (resource != null && resource.data.isResultPublished == true) ||
+        (isAuthenticated() && (
+          (resource != null && resource.data.participantUid == request.auth.uid) ||
+          hasAdminRole()
+        ))
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.participantUid == request.auth.uid ||
+        hasAdminRole()
+      );
+      allow update: if isAuthenticated() && (
+        (resource.data.participantUid == request.auth.uid &&
+         !resource.data.isResultPublished == true &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+           'marksObtained', 'totalMarks', 'percentage', 'grade', 'rank', 'awardCategory',
+           'isResultPublished', 'evaluatedByUid', 'evaluatedByEmail', 'evaluatedAt',
+           'certificateIssued', 'certificateId', 'participantUid', 'competitionId'
+         ])) ||
+        hasAdminRole()
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    match /question_banks/{bankId} {
+      allow read: if isAuthenticated() && hasAdminRole();
+      allow create, update: if isAuthenticated() && hasAdminRole();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /exam_papers/{paperId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && hasAdminRole();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /exam_attempts/{attemptId} {
+      allow read: if isAuthenticated() && (
+        (resource != null && resource.data.participantUid == request.auth.uid) ||
+        hasAdminRole()
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.participantUid == request.auth.uid ||
+        hasAdminRole()
+      );
+      allow update: if isAuthenticated() && (
+        (resource.data.participantUid == request.auth.uid &&
+         resource.data.status == 'in_progress' &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+           'autoScore', 'manualScore', 'finalScore', 'participantUid', 'competitionId'
+         ])) ||
+        hasAdminRole()
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    match /competition_certificates/{certId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() && hasAdminRole();
+      allow delete: if isSuperAdmin();
+    }
+
+    // Global default catch-all fallback
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

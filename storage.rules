@@ -1,0 +1,70 @@
+rules_version = '2';
+
+// Cloud Storage Security Rules for Fatimyah Educational Trust India (FET India)
+// Dedicated Bucket: fatimyah-educational-trust.firebasestorage.app
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'fetkofficial@gmail.com' ||
+        request.auth.token.email == 'contact@fetindia.org'
+      );
+    }
+
+    function isValidImage() {
+      return request.resource.contentType.matches('image/.*')
+        && request.resource.size <= 15 * 1024 * 1024; // 15MB limit
+    }
+
+    function isValidDocument() {
+      return (
+        request.resource.contentType.matches('image/.*') ||
+        request.resource.contentType == 'application/pdf'
+      ) && request.resource.size <= 25 * 1024 * 1024; // 25MB limit
+    }
+
+    // Public Media Uploads (Campaign covers, gallery photos, news announcements)
+    match /fet_uploads/{folder}/{allPaths=**} {
+      // Anyone can read public media (campaigns, gallery, news, avatars)
+      allow read: if true;
+      
+      // Only authenticated users or admins can upload media
+      allow write: if isSignedIn() && (
+        (folder in ['covers', 'gallery', 'avatars', 'general'] && isValidImage()) ||
+        (folder in ['private_documents', 'id_proofs'] && isValidDocument()) ||
+        isSuperAdmin()
+      );
+    }
+
+    // Member & Student Profile Photos
+    match /profile_photos/{userId}/{allPaths=**} {
+      // Profile avatars are publicly readable on verified credentials & ID badges
+      allow read: if true;
+      
+      // Only the account owner or super admin can upload/update their profile photo
+      allow write: if (isOwner(userId) || isSuperAdmin()) && isValidImage();
+    }
+
+    // Verification Documents, Financial Receipts & Beneficiary Files
+    match /documents/{folder}/{allPaths=**} {
+      // Private documents are restricted to authenticated users & admins
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isValidDocument();
+    }
+
+    // Default deny all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

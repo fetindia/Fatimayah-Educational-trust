@@ -1,0 +1,6 @@
+{
+  "name": "FET India - Fatimyah Educational Trust",
+  "description": "Official digital platform for Fatimyah Educational Trust India (Education • Service • Empowerment) featuring 27-chapter architecture, Razorpay payment gateway with 80G receipts, RBAC, CMS, and community services.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

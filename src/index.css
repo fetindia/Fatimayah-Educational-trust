@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-primary-green: #0D6E42;
+    --color-primary-blue: #0B2545;
+    --color-accent-amber: #D97706;
+  }
+
+  html {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    scroll-behavior: smooth;
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  body {
+    overflow-x: hidden;
+    max-width: 100vw;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* ========================================================================= */
+/* DEDICATED PRINT STYLESHEET FOR OFFICIAL IDENTITY CARDS                    */
+/* ========================================================================= */
+@media print {
+  /* Hide standard web app UI, headers, modals, navbars */
+  body * {
+    visibility: hidden;
+  }
+
+  header, nav, footer, button, .no-print {
+    display: none !important;
+  }
+
+  /* Make print-target visible */
+  #fet-idcard-print-target, 
+  #fet-idcard-print-target * {
+    visibility: visible !important;
+  }
+
+  #fet-idcard-print-target {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 20px;
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-page-layout {
+    max-width: 700px;
+    margin: 0 auto;
+    text-align: center;
+    font-family: 'Plus Jakarta Sans', Arial, sans-serif;
+  }
+
+  .print-header {
+    margin-bottom: 20px;
+    border-bottom: 1.5px solid #0D6E42;
+    padding-bottom: 10px;
+  }
+
+  .print-header h2 {
+    font-size: 18px;
+    font-weight: 900;
+    color: #0D6E42 !important;
+    margin: 0;
+  }
+
+  .print-header p {
+    font-size: 10px;
+    color: #555555;
+    margin: 4px 0 0 0;
+  }
+
+  .print-cards-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin: 20px 0;
+    justify-items: center;
+  }
+
+  .print-card-wrapper {
+    width: 85.6mm;
+    min-height: 54mm;
+    border: 1px dashed #cbd5e1;
+    border-radius: 12px;
+    padding: 4px;
+    background: #ffffff;
+    box-sizing: border-box;
+    page-break-inside: avoid;
+  }
+
+  .print-footer {
+    margin-top: 25px;
+    border-top: 1px dashed #94a3b8;
+    padding-top: 10px;
+    font-size: 9px;
+    color: #64748b;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+}

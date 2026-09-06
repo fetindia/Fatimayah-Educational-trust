@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="shortcut_exams"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_exam"
+        android:shortcutShortLabel="@string/shortcut_exams"
+        android:shortcutLongLabel="@string/shortcut_exams">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="org.fetindia.app"
+            android:targetClass="org.fetindia.app.MainActivity"
+            android:data="https://fetindia.com/#exams" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="shortcut_dashboard"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_user"
+        android:shortcutShortLabel="@string/shortcut_dashboard"
+        android:shortcutLongLabel="@string/shortcut_dashboard">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="org.fetindia.app"
+            android:targetClass="org.fetindia.app.MainActivity"
+            android:data="https://fetindia.com/#dashboard" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="shortcut_verify"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_verify"
+        android:shortcutShortLabel="@string/shortcut_verify"
+        android:shortcutLongLabel="@string/shortcut_verify">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="org.fetindia.app"
+            android:targetClass="org.fetindia.app.MainActivity"
+            android:data="https://fetindia.com/#verify" />
+    </shortcut>
+</shortcuts>

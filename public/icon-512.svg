@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="pwaShieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#0B2545" />
+      <stop offset="100%" stopColor="#040e1b" />
+    </linearGradient>
+    <linearGradient id="pwaEmeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#0D6E42" />
+      <stop offset="100%" stopColor="#063822" />
+    </linearGradient>
+    <linearGradient id="pwaGoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#F59E0B" />
+      <stop offset="100%" stopColor="#D97706" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background Base -->
+  <rect width="512" height="512" rx="100" fill="url(#pwaShieldGrad)" />
+
+  <!-- Outer Decorative Ring -->
+  <circle cx="256" cy="256" r="216" fill="none" stroke="url(#pwaGoldGrad)" stroke-width="8" stroke-dasharray="14 8" opacity="0.6" />
+  
+  <!-- Shield Geometry -->
+  <path 
+    d="M256 64 C350 64 416 94 416 190 C416 330 256 424 256 448 C256 424 96 330 96 190 C96 94 162 64 256 64 Z" 
+    fill="url(#pwaEmeraldGrad)"
+    stroke="url(#pwaGoldGrad)"
+    stroke-width="10"
+  />
+
+  <!-- Sunburst glow behind torch & book -->
+  <circle cx="256" cy="210" r="90" fill="#FEF3C7" opacity="0.15" />
+
+  <!-- Open Book Symbol (Education) -->
+  <g transform="translate(146, 230)">
+    <!-- Left Page -->
+    <path d="M110 30 C70 10 20 18 0 25 L0 105 C20 98 70 90 110 110 Z" fill="#FFFFFF" fill-opacity="0.95" stroke="#0B2545" stroke-width="3" />
+    <!-- Right Page -->
+    <path d="M110 30 C150 10 200 18 220 25 L220 105 C200 98 150 90 110 110 Z" fill="#FFFFFF" fill-opacity="0.95" stroke="#0B2545" stroke-width="3" />
+    <!-- Center Spine -->
+    <line x1="110" y1="30" x2="110" y2="110" stroke="#D97706" stroke-width="4" />
+    <!-- Text Lines on Pages -->
+    <line x1="20" y1="46" x2="90" y2="40" stroke="#0B2545" stroke-width="3" opacity="0.4" />
+    <line x1="20" y1="62" x2="90" y2="56" stroke="#0B2545" stroke-width="3" opacity="0.4" />
+    <line x1="20" y1="78" x2="90" y2="72" stroke="#0B2545" stroke-width="3" opacity="0.4" />
+    <line x1="130" y1="40" x2="200" y2="46" stroke="#0B2545" stroke-width="3" opacity="0.4" />
+    <line x1="130" y1="56" x2="200" y2="62" stroke="#0B2545" stroke-width="3" opacity="0.4" />
+    <line x1="130" y1="72" x2="200" y2="78" stroke="#0B2545" stroke-width="3" opacity="0.4" />
+  </g>
+
+  <!-- Flaming Torch of Knowledge -->
+  <g transform="translate(256, 175)">
+    <!-- Torch Handle -->
+    <path d="M-8 35 L8 35 L5 70 L-5 70 Z" fill="url(#pwaGoldGrad)" stroke="#78350F" stroke-width="2" />
+    <!-- Flame Outer -->
+    <path d="M0 -40 C24 -15 28 15 14 30 C5 40 -5 40 -14 30 C-28 15 -24 -15 0 -40 Z" fill="#F59E0B" />
+    <!-- Flame Inner Core -->
+    <path d="M0 -22 C12 -5 14 12 7 20 C2 26 -2 26 -7 20 C-14 12 -12 -5 0 -22 Z" fill="#FEF3C7" />
+  </g>
+
+  <!-- Stars (Empowerment & Service) -->
+  <polygon points="170,165 174,175 185,176 177,184 179,195 170,189 161,195 163,184 155,176 166,175" fill="#FCD34D" />
+  <polygon points="342,165 346,175 357,176 349,184 351,195 342,189 333,195 335,184 327,176 338,175" fill="#FCD34D" />
+
+  <!-- Ribbon Text Emblem: FET INDIA -->
+  <g transform="translate(256, 400)">
+    <rect x="-110" y="-22" width="220" height="44" rx="22" fill="#0B2545" stroke="#F59E0B" stroke-width="4" />
+    <text x="0" y="8" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-weight="900" font-size="22" fill="#FFFFFF" text-anchor="middle" letter-spacing="3">FET INDIA</text>
+  </g>
+</svg>

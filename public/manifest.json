@@ -1,0 +1,62 @@
+{
+  "name": "FET India | Fatimyah Educational Trust India",
+  "short_name": "FET India",
+  "description": "Official digital platform of Fatimyah Educational Trust India. Education • Service • Empowerment.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#FFFFFF",
+  "theme_color": "#0B2545",
+  "categories": ["education", "social", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Competitions & Exams",
+      "short_name": "Exams",
+      "description": "Access multilingual online examination portal",
+      "url": "/#exams",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Membership Portal",
+      "short_name": "Membership",
+      "description": "Access member dashboard and ID card",
+      "url": "/#portal",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Verify Credentials",
+      "short_name": "Verify",
+      "description": "Scan and verify authentic FET member ID or certificate",
+      "url": "/#verify",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Donate (80G Tax Exemption)",
+      "short_name": "Donate",
+      "description": "Support student scholarships and relief campaigns",
+      "url": "/#donate",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192" }]
+    }
+  ]
+}

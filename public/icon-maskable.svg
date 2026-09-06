@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="pwaMaskableShieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#0B2545" />
+      <stop offset="100%" stopColor="#040e1b" />
+    </linearGradient>
+    <linearGradient id="pwaMaskableEmeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#0D6E42" />
+      <stop offset="100%" stopColor="#063822" />
+    </linearGradient>
+    <linearGradient id="pwaMaskableGoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#F59E0B" />
+      <stop offset="100%" stopColor="#D97706" />
+    </linearGradient>
+  </defs>
+
+  <!-- Solid Full Bleed Background for Maskable Icon Safe Zone -->
+  <rect width="512" height="512" fill="url(#pwaMaskableShieldGrad)" />
+
+  <!-- Shield in safe zone (within 400x400 centered circle) -->
+  <g transform="translate(56, 56) scale(0.78)">
+    <path 
+      d="M256 64 C350 64 416 94 416 190 C416 330 256 424 256 448 C256 424 96 330 96 190 C96 94 162 64 256 64 Z" 
+      fill="url(#pwaMaskableEmeraldGrad)"
+      stroke="url(#pwaMaskableGoldGrad)"
+      stroke-width="12"
+    />
+
+    <circle cx="256" cy="210" r="90" fill="#FEF3C7" opacity="0.2" />
+
+    <!-- Open Book -->
+    <g transform="translate(146, 230)">
+      <path d="M110 30 C70 10 20 18 0 25 L0 105 C20 98 70 90 110 110 Z" fill="#FFFFFF" stroke="#0B2545" stroke-width="4" />
+      <path d="M110 30 C150 10 200 18 220 25 L220 105 C200 98 150 90 110 110 Z" fill="#FFFFFF" stroke="#0B2545" stroke-width="4" />
+      <line x1="110" y1="30" x2="110" y2="110" stroke="#D97706" stroke-width="5" />
+    </g>
+
+    <!-- Torch -->
+    <g transform="translate(256, 175)">
+      <path d="M-8 35 L8 35 L5 70 L-5 70 Z" fill="url(#pwaMaskableGoldGrad)" />
+      <path d="M0 -40 C24 -15 28 15 14 30 C5 40 -5 40 -14 30 C-28 15 -24 -15 0 -40 Z" fill="#F59E0B" />
+      <path d="M0 -22 C12 -5 14 12 7 20 C2 26 -2 26 -7 20 C-14 12 -12 -5 0 -22 Z" fill="#FEF3C7" />
+    </g>
+
+    <g transform="translate(256, 400)">
+      <rect x="-110" y="-22" width="220" height="44" rx="22" fill="#0B2545" stroke="#F59E0B" stroke-width="4" />
+      <text x="0" y="8" font-family="system-ui, sans-serif" font-weight="900" font-size="22" fill="#FFFFFF" text-anchor="middle" letter-spacing="3">FET INDIA</text>
+    </g>
+  </g>
+</svg>
