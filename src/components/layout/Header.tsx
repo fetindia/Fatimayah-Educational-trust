@@ -44,7 +44,9 @@ import {
   Palette,
   LineChart,
   Landmark,
-  UserCog
+  UserCog,
+  Home,
+  Info
 } from 'lucide-react';
 import { FETLogo } from '../common/FETLogo';
 import { usePWAInstall } from '../common/PWAInstallBanner';
@@ -60,8 +62,12 @@ interface HeaderProps {
   onOpenUserDashboard: (tab?: any) => void;
   onOpenAdminConsole: (view?: string) => void;
   onOpenVerification?: (memberId?: string) => void;
+  onOpenLegal?: (tab: 'terms' | 'privacy') => void;
   activeSection: string;
   setActiveSection: (s: string) => void;
+  isMobileMenuOpen?: boolean;
+  onToggleMobileMenu?: () => void;
+  onCloseMobileMenu?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -69,8 +75,12 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenUserDashboard,
   onOpenAdminConsole,
   onOpenVerification,
+  onOpenLegal,
   activeSection,
-  setActiveSection
+  setActiveSection,
+  isMobileMenuOpen,
+  onToggleMobileMenu,
+  onCloseMobileMenu
 }) => {
   const { config } = useConfig();
   const { currentUser, userProfile, hasAdminAccess, isSuperAdmin, signOut } = useAuth();
@@ -78,7 +88,27 @@ export const Header: React.FC<HeaderProps> = ({
   const { getModuleByCode } = useModules();
   const { canInstall, installApp } = usePWAInstall();
 
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [internalMobileMenuOpen, setInternalMobileMenuOpen] = useState(false);
+  const isMenuOpen = isMobileMenuOpen !== undefined ? isMobileMenuOpen : internalMobileMenuOpen;
+
+  const handleToggleMobileMenu = () => {
+    if (onToggleMobileMenu) {
+      onToggleMobileMenu();
+    } else {
+      setInternalMobileMenuOpen(prev => !prev);
+    }
+  };
+
+  const handleCloseMobileMenu = () => {
+    if (onCloseMobileMenu) {
+      onCloseMobileMenu();
+    } else if (onToggleMobileMenu && isMobileMenuOpen) {
+      onToggleMobileMenu();
+    } else {
+      setInternalMobileMenuOpen(false);
+    }
+  };
+
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
@@ -113,7 +143,7 @@ export const Header: React.FC<HeaderProps> = ({
         setUserMenuOpen(false);
         setMoreMenuOpen(false);
         setActiveDropdownId(null);
-        setMobileMenuOpen(false);
+        handleCloseMobileMenu();
       }
     };
 
@@ -127,6 +157,18 @@ export const Header: React.FC<HeaderProps> = ({
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
+
+  // Prevent background scroll when mobile drawer is open
+  useEffect(() => {
+    if (!isMenuOpen) return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isMenuOpen]);
 
   // Check if dynamically surfaced modules are published by Super Admin
   const storeModule = getModuleByCode('m-ecommerce');
@@ -180,7 +222,7 @@ export const Header: React.FC<HeaderProps> = ({
     setActiveDropdownId(null);
     setMoreMenuOpen(false);
     setUserMenuOpen(false);
-    setMobileMenuOpen(false);
+    handleCloseMobileMenu();
 
     if (isExternal && target.startsWith('http')) {
       window.open(target, '_blank', 'noopener,noreferrer');
@@ -188,6 +230,30 @@ export const Header: React.FC<HeaderProps> = ({
     }
 
     const cleanTarget = target.replace(/^#/, '');
+
+    if (cleanTarget === 'home') {
+      setActiveSection('home');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (cleanTarget === 'privacy' || cleanTarget === 'privacy-policy') {
+      if (onOpenLegal) {
+        onOpenLegal('privacy');
+      } else {
+        setActiveSection('mission_cta');
+      }
+      return;
+    }
+
+    if (cleanTarget === 'terms' || cleanTarget === 'terms-of-trust' || cleanTarget === 'terms-and-conditions') {
+      if (onOpenLegal) {
+        onOpenLegal('terms');
+      } else {
+        setActiveSection('mission_cta');
+      }
+      return;
+    }
 
     if (cleanTarget === 'membership' || cleanTarget === 'volunteer_membership' || cleanTarget === 'volunteer') {
       setActiveSection('volunteer_membership');
@@ -216,9 +282,27 @@ export const Header: React.FC<HeaderProps> = ({
       return;
     }
 
-    if (cleanTarget === 'about' || cleanTarget === 'about_trust' || cleanTarget === 'history' || cleanTarget === 'mission_cta' || cleanTarget === 'mission' || cleanTarget === 'contact') {
+    if (cleanTarget === 'about' || cleanTarget === 'about_trust' || cleanTarget === 'history' || cleanTarget === 'mission_cta' || cleanTarget === 'mission' || cleanTarget === 'governance') {
       setActiveSection('mission_cta');
-      const element = document.getElementById('mission_cta') || document.getElementById('contact') || document.getElementById('about');
+      const element = document.getElementById('mission_cta') || document.getElementById('about') || document.getElementById('governance');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
+
+    if (cleanTarget === 'contact') {
+      setActiveSection('mission_cta');
+      const element = document.getElementById('contact') || document.getElementById('mission_cta');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
+
+    if (cleanTarget === 'events' || cleanTarget === 'events_blog' || cleanTarget === 'blog') {
+      setActiveSection('events_blog');
+      const element = document.getElementById('events_blog') || document.getElementById('events');
       if (element) {
         element.scrollIntoView({ behavior: 'smooth' });
       }
@@ -237,6 +321,15 @@ export const Header: React.FC<HeaderProps> = ({
     if (cleanTarget === 'education' || cleanTarget === 'exams' || cleanTarget === 'talent') {
       setActiveSection('education');
       const element = document.getElementById('education') || document.getElementById('exams');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
+
+    if (cleanTarget === 'store' || cleanTarget === 'travel' || cleanTarget === 'future_services') {
+      setActiveSection('future_services');
+      const element = document.getElementById('future_services') || document.getElementById('store');
       if (element) {
         element.scrollIntoView({ behavior: 'smooth' });
       }
@@ -714,7 +807,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Quick Donate CTA with 80G Gold Highlight */}
           <button
             onClick={() => handleNavClick('donate')}
-            className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-400 transition-all shadow-xs border border-amber-400 hover:shadow-md active:scale-95 cursor-pointer"
+            className="hidden lg:inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-400 transition-all shadow-xs border border-amber-400 hover:shadow-md active:scale-95 cursor-pointer"
             id="header-quick-donate-btn"
             title="Donate to FET India with 50% 80G Tax Exemption"
           >
@@ -726,7 +819,7 @@ export const Header: React.FC<HeaderProps> = ({
           {currentUser && (
             <button
               onClick={() => onOpenUserDashboard('notifications')}
-              className="relative p-1.5 sm:p-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 hover:text-slate-900 transition-colors cursor-pointer"
+              className="hidden lg:flex relative p-1.5 sm:p-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 hover:text-slate-900 transition-colors cursor-pointer"
               id="header-notifications-bell-btn"
               title="Open Notification Center"
               aria-label={`Notifications (${unreadCount} unread)`}
@@ -742,7 +835,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Authenticated User: Direct Dashboard Button & Account Menu */}
           {currentUser ? (
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="hidden lg:flex items-center gap-1.5 sm:gap-2">
               {/* Direct Dashboard Button (Role-Aware) */}
               {isSuperAdmin ? (
                 <button
@@ -1106,7 +1199,7 @@ export const Header: React.FC<HeaderProps> = ({
             /* Unauthenticated State: Sign In Button */
             <button
               onClick={onOpenAuth}
-              className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold text-white shadow-xs transition-all hover:brightness-110 active:scale-95 cursor-pointer shrink-0"
+              className="hidden lg:inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold text-white shadow-xs transition-all hover:brightness-110 active:scale-95 cursor-pointer shrink-0"
               style={{ backgroundColor: primaryGreen }}
               id="header-signin-btn"
               title="Sign in to FET India Portal"
@@ -1116,20 +1209,20 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {/* Mobile Menu Toggle Button (< 1024px) - Highly Visible & Accessible */}
+          {/* Mobile Menu Toggle Button (< 1024px) - Clean, Uncluttered, min 44x44px touch target */}
           <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className={`lg:hidden flex items-center justify-center gap-1.5 px-3 py-2 min-h-[40px] rounded-xl transition-all cursor-pointer shrink-0 font-extrabold text-xs shadow-xs border ${
-              mobileMenuOpen 
+            onClick={handleToggleMobileMenu}
+            className={`lg:hidden flex items-center justify-center gap-1.5 px-3 py-2 min-h-[44px] min-w-[44px] rounded-xl transition-all cursor-pointer shrink-0 font-extrabold text-xs shadow-xs border ${
+              isMenuOpen 
                 ? 'bg-slate-900 text-white border-slate-800 ring-2 ring-slate-900/20' 
                 : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-950 border-emerald-300 hover:border-emerald-400 active:scale-95'
             }`}
             id="header-mobile-menu-toggle"
-            aria-label={mobileMenuOpen ? 'Close Navigation Menu' : 'Open Navigation Menu'}
-            aria-expanded={mobileMenuOpen}
+            aria-label={isMenuOpen ? 'Close Navigation Menu' : 'Open Navigation Menu'}
+            aria-expanded={isMenuOpen}
             title="Main Menu"
           >
-            {mobileMenuOpen ? (
+            {isMenuOpen ? (
               <>
                 <X className="w-4 h-4 text-amber-400 shrink-0" />
                 <span>Close</span>
@@ -1145,12 +1238,68 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Mobile Drawer with Accordion Sub-menus and Account Controls */}
-      {mobileMenuOpen && (
-        <div 
-          className="lg:hidden bg-white border-t border-slate-200 px-4 pt-3 pb-6 space-y-4 shadow-xl max-h-[85vh] overflow-y-auto" 
-          id="header-mobile-drawer"
-        >
+      {/* Synchronized Full Mobile Navigation Drawer (Overlay & Slide Panel) */}
+      {isMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex flex-col" id="header-mobile-drawer-overlay">
+          {/* Dark Backdrop Overlay */}
+          <div 
+            className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs transition-opacity"
+            onClick={handleCloseMobileMenu}
+            aria-hidden="true"
+          />
+
+          {/* Drawer Panel: Slide-in with Native Safe Area Support */}
+          <div 
+            className="relative z-10 w-full max-w-md ml-auto bg-white h-full flex flex-col shadow-2xl border-l border-slate-200 overflow-hidden"
+            id="header-mobile-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="FET India Mobile Website Menu"
+          >
+            {/* Drawer Top Bar with Brand & Close Button */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50/90 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <FETLogo size="sm" variant="emblem" />
+                <div>
+                  <h2 className="text-xs font-black tracking-tight text-slate-900 uppercase">
+                    FET India
+                  </h2>
+                  <p className="text-[10px] font-bold text-emerald-700">Public Navigation</p>
+                </div>
+              </div>
+
+              {/* Close Button (Touch Friendly 44x44px) */}
+              <button
+                onClick={handleCloseMobileMenu}
+                className="flex items-center justify-center w-11 h-11 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 hover:text-slate-900 transition-colors cursor-pointer"
+                id="header-mobile-drawer-close-btn"
+                aria-label="Close Mobile Navigation"
+                title="Close Menu"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Drawer Body */}
+            <div className="flex-1 overflow-y-auto overscroll-contain px-4 pt-3 pb-6 space-y-4">
+              {/* Quick 80G Tax-Exempt Donation Card */}
+              <button
+                onClick={() => handleNavClick('donate')}
+                className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 text-slate-950 font-extrabold shadow-sm hover:shadow-md transition-all active:scale-[0.98] border border-amber-400 cursor-pointer"
+                id="mobile-drawer-donate-btn"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-slate-950/10 flex items-center justify-center shrink-0">
+                    <HeartHandshake className="w-5 h-5 text-emerald-950" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-black tracking-tight leading-tight">Support FET India</p>
+                    <p className="text-[10px] font-bold text-emerald-950/80">50% 80G Tax Exemption Benefit</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-emerald-950 shrink-0" />
+              </button>
+
           {/* User Profile Card (if Authenticated) */}
           {currentUser ? (
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
@@ -1178,7 +1327,7 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <button
                   onClick={() => {
-                    setMobileMenuOpen(false);
+                    handleCloseMobileMenu();
                     onOpenUserDashboard('profile');
                   }}
                   className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 shadow-2xs cursor-pointer"
@@ -1189,7 +1338,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                 <button
                   onClick={() => {
-                    setMobileMenuOpen(false);
+                    handleCloseMobileMenu();
                     onOpenUserDashboard('dashboard');
                   }}
                   className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold text-white shadow-2xs cursor-pointer"
@@ -1203,7 +1352,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <>
                     <button
                       onClick={() => {
-                        setMobileMenuOpen(false);
+                        handleCloseMobileMenu();
                         onOpenAdminConsole('super_admin');
                       }}
                       className="col-span-2 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-black bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-xs cursor-pointer border border-amber-500/50"
@@ -1229,7 +1378,7 @@ export const Header: React.FC<HeaderProps> = ({
                       <div className="col-span-2 grid grid-cols-2 gap-1.5 p-2 bg-slate-900 rounded-xl border border-slate-800 text-[11px]">
                         <button
                           onClick={() => {
-                            setMobileMenuOpen(false);
+                            handleCloseMobileMenu();
                             onOpenAdminConsole('cms');
                           }}
                           className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-left font-bold cursor-pointer"
@@ -1240,7 +1389,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                         <button
                           onClick={() => {
-                            setMobileMenuOpen(false);
+                            handleCloseMobileMenu();
                             onOpenAdminConsole('crowdfunding');
                           }}
                           className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-left font-bold cursor-pointer"
@@ -1251,7 +1400,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                         <button
                           onClick={() => {
-                            setMobileMenuOpen(false);
+                            handleCloseMobileMenu();
                             onOpenAdminConsole('donors');
                           }}
                           className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-left font-bold cursor-pointer"
@@ -1262,7 +1411,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                         <button
                           onClick={() => {
-                            setMobileMenuOpen(false);
+                            handleCloseMobileMenu();
                             onOpenAdminConsole('finance');
                           }}
                           className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-left font-bold cursor-pointer"
@@ -1273,7 +1422,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                         <button
                           onClick={() => {
-                            setMobileMenuOpen(false);
+                            handleCloseMobileMenu();
                             onOpenAdminConsole('hrms');
                           }}
                           className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-left font-bold cursor-pointer"
@@ -1284,7 +1433,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                         <button
                           onClick={() => {
-                            setMobileMenuOpen(false);
+                            handleCloseMobileMenu();
                             onOpenAdminConsole('volunteers');
                           }}
                           className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-left font-bold cursor-pointer"
@@ -1295,7 +1444,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                         <button
                           onClick={() => {
-                            setMobileMenuOpen(false);
+                            handleCloseMobileMenu();
                             onOpenAdminConsole('exams');
                           }}
                           className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-left font-bold cursor-pointer"
@@ -1306,7 +1455,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                         <button
                           onClick={() => {
-                            setMobileMenuOpen(false);
+                            handleCloseMobileMenu();
                             onOpenAdminConsole('reports');
                           }}
                           className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-left font-bold cursor-pointer"
@@ -1317,7 +1466,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                         <button
                           onClick={() => {
-                            setMobileMenuOpen(false);
+                            handleCloseMobileMenu();
                             onOpenAdminConsole('roles');
                           }}
                           className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-left font-bold cursor-pointer"
@@ -1328,7 +1477,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                         <button
                           onClick={() => {
-                            setMobileMenuOpen(false);
+                            handleCloseMobileMenu();
                             onOpenAdminConsole('modules');
                           }}
                           className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-left font-bold cursor-pointer"
@@ -1339,7 +1488,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                         <button
                           onClick={() => {
-                            setMobileMenuOpen(false);
+                            handleCloseMobileMenu();
                             onOpenAdminConsole('audit');
                           }}
                           className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-left font-bold cursor-pointer"
@@ -1350,7 +1499,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                         <button
                           onClick={() => {
-                            setMobileMenuOpen(false);
+                            handleCloseMobileMenu();
                             onOpenAdminConsole('dashboard');
                           }}
                           className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-left font-bold cursor-pointer"
@@ -1366,7 +1515,7 @@ export const Header: React.FC<HeaderProps> = ({
                 {hasAdminAccess && !isSuperAdmin && (
                   <button
                     onClick={() => {
-                      setMobileMenuOpen(false);
+                      handleCloseMobileMenu();
                       onOpenAdminConsole('dashboard');
                     }}
                     className="col-span-2 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold text-white shadow-2xs cursor-pointer"
@@ -1381,7 +1530,7 @@ export const Header: React.FC<HeaderProps> = ({
           ) : (
             <button
               onClick={() => {
-                setMobileMenuOpen(false);
+                handleCloseMobileMenu();
                 onOpenAuth();
               }}
               className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-xs font-bold text-white shadow-sm cursor-pointer"
@@ -1392,119 +1541,250 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {/* Navigation Links with Sub-menu Accordions */}
+          {/* Categorized Public Navigation Sections */}
+          {/* Section 1: Main */}
           <div className="space-y-1">
-            <p className="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              Navigation Menu
+            <p className="px-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+              Main
             </p>
-            {navMenuItems.map((item) => {
-              const hasSub = item.subItems && item.subItems.length > 0;
-              const isExpanded = mobileExpandedMenuId === item.id;
-
-              return (
-                <div key={item.id} className="border-b border-slate-100 last:border-0 pb-1">
-                  <div className="flex items-center justify-between">
-                    <button
-                      onClick={() => {
-                        if (hasSub) {
-                          setMobileExpandedMenuId(isExpanded ? null : item.id);
-                        } else {
-                          handleNavClick(item.target, item.isExternal);
-                        }
-                      }}
-                      className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between cursor-pointer ${
-                        activeSection === item.target.replace(/^#/, '')
-                          ? 'text-emerald-900 bg-emerald-50 border border-emerald-200'
-                          : 'text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{item.label}</span>
-                        {item.badge && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-amber-100 text-amber-900">
-                            {item.badge}
-                          </span>
-                        )}
-                      </div>
-                      {hasSub && (
-                        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                      )}
-                    </button>
-                  </div>
-
-                  {hasSub && isExpanded && (
-                    <div className="pl-4 pr-2 py-1 space-y-1 bg-slate-50 rounded-xl my-1 border border-slate-200/60">
-                      {item.subItems?.filter(s => s.isEnabled).map((sub) => (
-                        <button
-                          key={sub.id}
-                          onClick={() => handleNavClick(sub.target, sub.isExternal)}
-                          className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-slate-600 hover:text-emerald-800 hover:bg-white flex items-center justify-between cursor-pointer transition-colors"
-                        >
-                          <span className="flex items-center gap-2">
-                            <ChevronRight className="w-3 h-3 text-emerald-600" />
-                            <span>{sub.label}</span>
-                          </span>
-                          {sub.isExternal && <ExternalLink className="w-3 h-3 text-slate-400" />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+            <div className="bg-slate-50/80 rounded-2xl border border-slate-200/80 p-1 divide-y divide-slate-100">
+              <button
+                onClick={() => handleNavClick('home')}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer min-h-[44px] ${
+                  activeSection === 'home' || activeSection === ''
+                    ? 'bg-emerald-100/70 text-emerald-950'
+                    : 'text-slate-800 hover:bg-white'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Home className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>Home</span>
                 </div>
-              );
-            })}
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
+              <button
+                onClick={() => handleNavClick('about')}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold text-slate-800 hover:bg-white transition-colors cursor-pointer min-h-[44px]"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Info className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>About Trust</span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
+              <button
+                onClick={() => handleNavClick('programs')}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer min-h-[44px] ${
+                  activeSection === 'programs'
+                    ? 'bg-emerald-100/70 text-emerald-950'
+                    : 'text-slate-800 hover:bg-white'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <BookOpen className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>Programs & Initiatives</span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
+              <button
+                onClick={() => handleNavClick('events')}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer min-h-[44px] ${
+                  activeSection === 'events_blog' || activeSection === 'events'
+                    ? 'bg-emerald-100/70 text-emerald-950'
+                    : 'text-slate-800 hover:bg-white'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Calendar className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>Events & News</span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+            </div>
           </div>
 
-          {/* Quick Action Buttons in Drawer */}
-          <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
-            <button
-              onClick={() => handleNavClick('donate')}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-extrabold bg-gradient-to-r from-amber-400 to-amber-300 text-slate-950 shadow-xs cursor-pointer"
-            >
-              <HeartHandshake className="w-4 h-4 text-emerald-950" />
-              <span>Donate with 80G Tax Deduction (50%)</span>
-            </button>
-
-            {onOpenVerification && (
+          {/* Section 2: Community & Education */}
+          <div className="space-y-1">
+            <p className="px-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+              Community & Education
+            </p>
+            <div className="bg-slate-50/80 rounded-2xl border border-slate-200/80 p-1 divide-y divide-slate-100">
               <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onOpenVerification();
-                }}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 cursor-pointer"
+                onClick={() => handleNavClick('membership')}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold text-slate-800 hover:bg-white transition-colors cursor-pointer min-h-[44px]"
               >
-                <CreditCard className="w-4 h-4 text-emerald-700" />
-                <span>Verify Official Member Accreditation</span>
-              </button>
-            )}
-
-            {currentUser && (
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onOpenUserDashboard('notifications');
-                }}
-                className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-bold text-slate-800 bg-amber-50 border border-amber-200/80 shadow-xs cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Bell className="w-4 h-4 text-amber-700" />
-                  <span>Notification Center</span>
+                <div className="flex items-center gap-2.5">
+                  <Users className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>Membership Registration</span>
                 </div>
-                {unreadCount > 0 && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white">
-                    {unreadCount} UNREAD
-                  </span>
-                )}
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
               </button>
-            )}
 
+              <button
+                onClick={() => handleNavClick('volunteer')}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold text-slate-800 hover:bg-white transition-colors cursor-pointer min-h-[44px]"
+              >
+                <div className="flex items-center gap-2.5">
+                  <HeartHandshake className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>Volunteer Corps</span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
+              <button
+                onClick={() => handleNavClick('education')}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer min-h-[44px] ${
+                  activeSection === 'education' || activeSection === 'exams'
+                    ? 'bg-emerald-100/70 text-emerald-950'
+                    : 'text-slate-800 hover:bg-white'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Award className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>Competitions & Examinations</span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+            </div>
+          </div>
+
+          {/* Section 3: Impact & Stewardship */}
+          <div className="space-y-1">
+            <p className="px-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+              Impact & Stewardship
+            </p>
+            <div className="bg-slate-50/80 rounded-2xl border border-slate-200/80 p-1 divide-y divide-slate-100">
+              <button
+                onClick={() => handleNavClick('crowdfunding')}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer min-h-[44px] ${
+                  activeSection === 'crowdfunding'
+                    ? 'bg-emerald-100/70 text-emerald-950'
+                    : 'text-slate-800 hover:bg-white'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <HeartHandshake className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>Crowdfunding & Relief Appeals</span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
+              <button
+                onClick={() => handleNavClick('donate')}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold text-slate-800 hover:bg-white transition-colors cursor-pointer min-h-[44px]"
+              >
+                <div className="flex items-center gap-2.5">
+                  <BadgeDollarSign className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>Donations & 80G Receipts</span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
+              <button
+                onClick={() => handleNavClick('governance')}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold text-slate-800 hover:bg-white transition-colors cursor-pointer min-h-[44px]"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Landmark className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>Governance & Trustees</span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
+              <button
+                onClick={() => handleNavClick('statistics')}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold text-slate-800 hover:bg-white transition-colors cursor-pointer min-h-[44px]"
+              >
+                <div className="flex items-center gap-2.5">
+                  <LineChart className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>Reports & Transparency</span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+            </div>
+          </div>
+
+          {/* Section 4: Explore & Services */}
+          <div className="space-y-1">
+            <p className="px-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+              Explore & Services
+            </p>
+            <div className="bg-slate-50/80 rounded-2xl border border-slate-200/80 p-1 divide-y divide-slate-100">
+              <button
+                onClick={() => handleNavClick('store')}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold text-slate-800 hover:bg-white transition-colors cursor-pointer min-h-[44px]"
+              >
+                <div className="flex items-center gap-2.5">
+                  <ShoppingBag className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>Publications & Store</span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
+              <button
+                onClick={() => handleNavClick('contact')}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold text-slate-800 hover:bg-white transition-colors cursor-pointer min-h-[44px]"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Phone className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>Contact Secretariat</span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
+              {onOpenVerification && (
+                <button
+                  onClick={() => {
+                    handleCloseMobileMenu();
+                    onOpenVerification();
+                  }}
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold text-slate-800 hover:bg-white transition-colors cursor-pointer min-h-[44px]"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <CreditCard className="w-4 h-4 text-emerald-700 shrink-0" />
+                    <span>Verify Member Credential (QR)</span>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                </button>
+              )}
+
+              <button
+                onClick={() => handleNavClick('privacy')}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold text-slate-800 hover:bg-white transition-colors cursor-pointer min-h-[44px]"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Shield className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>Privacy Policy</span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
+              <button
+                onClick={() => handleNavClick('terms')}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold text-slate-800 hover:bg-white transition-colors cursor-pointer min-h-[44px]"
+              >
+                <div className="flex items-center gap-2.5">
+                  <FileText className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>Terms of Trust</span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Action Buttons & Additional Mobile Controls */}
+          <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
             {/* PWA Install Button */}
             {canInstall && (
               <button
                 onClick={() => {
-                  setMobileMenuOpen(false);
+                  handleCloseMobileMenu();
                   installApp();
                 }}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-xs border border-slate-700 cursor-pointer transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-xs border border-slate-700 cursor-pointer transition-colors min-h-[44px]"
                 id="header-mobile-install-pwa-btn"
               >
                 <Smartphone className="w-4 h-4 text-emerald-400" />
@@ -1512,22 +1792,33 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Mobile Sign Out */}
+            {/* Mobile Sign Out (if logged in) */}
             {currentUser && (
               <button
                 onClick={() => {
-                  setMobileMenuOpen(false);
+                  handleCloseMobileMenu();
                   signOut();
                 }}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200/60 rounded-xl cursor-pointer transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200/60 rounded-xl cursor-pointer transition-colors min-h-[44px]"
               >
                 <LogOut className="w-4 h-4" />
                 <span>Sign Out</span>
               </button>
             )}
           </div>
+
+          {/* Drawer Compliance & Registration Footer */}
+          <div className="pt-2 pb-6 text-center text-[10px] text-slate-400 space-y-1">
+            <p className="font-semibold text-slate-500">
+              {config.legalName || 'Fatimyah Educational Trust India'}
+            </p>
+            <p>Reg. No: 153/2014 • 80G & 12A Certified • NITI Aayog</p>
+            <p className="text-emerald-700 font-bold">Helpline: +91 97793 42786</p>
+          </div>
         </div>
-      )}
+      </div>
+    </div>
+  )}
     </header>
   );
 };

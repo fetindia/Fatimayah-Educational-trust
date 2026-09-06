@@ -8,12 +8,11 @@
 import React from 'react';
 import { 
   Home, 
-  GraduationCap, 
+  BookOpen, 
   HeartHandshake, 
-  CreditCard, 
-  User, 
+  Calendar, 
   Menu,
-  ShieldCheck
+  X
 } from 'lucide-react';
 import { triggerHapticFeedback } from '../../lib/appBridge';
 import { useAuth } from '../../contexts/AuthContext';
@@ -25,30 +24,28 @@ interface MobileBottomNavProps {
   setActiveSection: (section: string) => void;
   onOpenAuth: () => void;
   onOpenUserDashboard: (tab?: any) => void;
-  onOpenMoreMenu: () => void;
+  onOpenMoreMenu?: () => void;
+  isMobileMenuOpen?: boolean;
+  onToggleMobileMenu: () => void;
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   activeSection,
   setActiveSection,
-  onOpenAuth,
-  onOpenUserDashboard,
-  onOpenMoreMenu
+  isMobileMenuOpen = false,
+  onToggleMobileMenu
 }) => {
-  const { currentUser, userProfile } = useAuth();
   const { unreadCount } = useNotifications();
   const { config } = useConfig();
 
   const primaryGreen = config.primaryGreen || '#0D6E42';
 
-  const handleNavClick = (section: string, action?: () => void) => {
+  const handleShortcutClick = (section: string) => {
     triggerHapticFeedback('light');
-    if (action) {
-      action();
-    } else {
-      setActiveSection(section);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (isMobileMenuOpen) {
+      onToggleMobileMenu();
     }
+    setActiveSection(section);
   };
 
   const navItems = [
@@ -56,42 +53,39 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       id: 'home',
       label: 'Home',
       icon: Home,
-      isActive: activeSection === 'home' || activeSection === '',
-      onClick: () => handleNavClick('home')
+      isActive: !isMobileMenuOpen && (activeSection === 'home' || activeSection === ''),
+      onClick: () => handleShortcutClick('home')
     },
     {
-      id: 'exams',
-      label: 'Exams',
-      icon: GraduationCap,
-      isActive: activeSection === 'exams' || activeSection === 'competitions',
-      onClick: () => handleNavClick('exams')
-    },
-    {
-      id: 'crowdfunding',
-      label: 'Relief',
-      icon: HeartHandshake,
-      isActive: activeSection === 'crowdfunding' || activeSection === 'campaigns',
-      onClick: () => handleNavClick('crowdfunding')
+      id: 'programs',
+      label: 'Programs',
+      icon: BookOpen,
+      isActive: !isMobileMenuOpen && activeSection === 'programs',
+      onClick: () => handleShortcutClick('programs')
     },
     {
       id: 'donate',
       label: 'Donate',
-      icon: CreditCard,
-      isActive: activeSection === 'donate',
-      onClick: () => handleNavClick('donate')
+      icon: HeartHandshake,
+      isActive: !isMobileMenuOpen && (activeSection === 'donate' || activeSection === 'crowdfunding'),
+      onClick: () => handleShortcutClick('donate')
     },
     {
-      id: 'profile',
-      label: currentUser ? 'Portal' : 'Sign In',
-      icon: User,
+      id: 'events',
+      label: 'Events',
+      icon: Calendar,
+      isActive: !isMobileMenuOpen && (activeSection === 'events_blog' || activeSection === 'events'),
+      onClick: () => handleShortcutClick('events_blog')
+    },
+    {
+      id: 'menu',
+      label: 'Menu',
+      icon: isMobileMenuOpen ? X : Menu,
       badge: unreadCount > 0 ? unreadCount : undefined,
-      isActive: activeSection === 'portal' || activeSection === 'dashboard' || activeSection === 'profile',
+      isActive: isMobileMenuOpen,
       onClick: () => {
-        if (currentUser) {
-          handleNavClick('dashboard', () => onOpenUserDashboard());
-        } else {
-          handleNavClick('auth', () => onOpenAuth());
-        }
+        triggerHapticFeedback('medium');
+        onToggleMobileMenu();
       }
     }
   ];
@@ -99,40 +93,45 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   return (
     <nav 
       aria-label="Mobile Bottom Navigation"
-      className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-slate-900/95 backdrop-blur-md border-t border-slate-800/80 px-2 py-1.5 shadow-2xl safe-area-bottom"
+      className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-slate-950/95 backdrop-blur-md border-t border-slate-800/90 px-1 py-1 shadow-2xl safe-area-bottom"
     >
-      <div className="flex items-center justify-around max-w-lg mx-auto">
+      <div className="flex items-center justify-around max-w-md mx-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = item.isActive;
+          const isMenuBtn = item.id === 'menu';
 
           return (
             <button
               key={item.id}
               id={`mobile-nav-btn-${item.id}`}
               onClick={item.onClick}
-              className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all duration-200 min-w-[56px] ${
+              aria-label={isMenuBtn ? (isMobileMenuOpen ? 'Close Navigation Menu' : 'Open Full Navigation Menu') : item.label}
+              aria-expanded={isMenuBtn ? isMobileMenuOpen : undefined}
+              className={`relative flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all duration-150 min-w-[54px] min-h-[44px] cursor-pointer active:scale-95 ${
                 isActive 
-                  ? 'text-emerald-400 font-semibold scale-105' 
-                  : 'text-slate-400 hover:text-slate-200 font-medium'
+                  ? 'text-amber-400 font-extrabold' 
+                  : 'text-slate-300 hover:text-white font-medium'
               }`}
             >
               <div className="relative">
-                <Icon className={`w-5 h-5 transition-transform ${isActive ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+                <Icon className={`w-5 h-5 transition-transform ${isActive ? 'scale-110 stroke-[2.5px]' : 'stroke-2'}`} />
                 {item.badge !== undefined && item.badge > 0 && (
-                  <span className="absolute -top-1.5 -right-2 bg-amber-500 text-slate-950 text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center border-2 border-slate-900">
+                  <span className="absolute -top-1.5 -right-2 bg-rose-500 text-white text-[9px] font-black rounded-full w-4 h-4 flex items-center justify-center border-2 border-slate-950 shadow-xs animate-pulse">
                     {item.badge > 9 ? '9+' : item.badge}
                   </span>
                 )}
               </div>
-              <span className="text-[11px] mt-1 tracking-tight leading-none whitespace-nowrap">
+              <span className={`text-[11px] mt-0.5 tracking-tight leading-none whitespace-nowrap ${
+                isActive ? 'text-amber-300 font-bold' : 'text-slate-300'
+              }`}>
                 {item.label}
               </span>
 
               {isActive && (
                 <span 
-                  className="absolute bottom-0 w-6 h-0.5 rounded-full bg-emerald-400"
-                  style={{ backgroundColor: primaryGreen }}
+                  className="absolute bottom-0 w-6 h-0.5 rounded-full bg-amber-400"
+                  style={{ backgroundColor: isMenuBtn ? '#F59E0B' : primaryGreen }}
                 />
               )}
             </button>

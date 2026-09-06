@@ -52,6 +52,19 @@ const FETIndiaPlatform: React.FC = () => {
   const [verificationMemberId, setVerificationMemberId] = useState<string>('');
   const [isLegalModalOpen, setIsLegalModalOpen] = useState<boolean>(false);
   const [legalModalTab, setLegalModalTab] = useState<'terms' | 'privacy'>('terms');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+
+  // Lock body scroll when mobile menu is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMobileMenuOpen]);
 
   // Sync route from URL / hash on mount & popstate
   useEffect(() => {
@@ -154,12 +167,17 @@ const FETIndiaPlatform: React.FC = () => {
   };
 
   const handleScrollToSection = (sectionId: string) => {
+    setIsMobileMenuOpen(false);
     setActiveSection(sectionId);
     if (currentExperience !== 'public') {
       setCurrentExperience('public');
       window.history.pushState(null, '', '/');
     }
     setTimeout(() => {
+      if (sectionId === 'home') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
       const element = document.getElementById(sectionId);
       if (element) {
         element.scrollIntoView({ behavior: 'smooth' });
@@ -201,11 +219,30 @@ const FETIndiaPlatform: React.FC = () => {
           {/* Public Header */}
           <Header
             activeSection={activeSection}
-            setActiveSection={setActiveSection}
-            onOpenAuth={() => setIsAuthModalOpen(true)}
-            onOpenUserDashboard={handleOpenUserDashboard}
-            onOpenAdminConsole={handleOpenAdmin}
-            onOpenVerification={handleOpenVerification}
+            setActiveSection={handleScrollToSection}
+            onOpenAuth={() => {
+              setIsMobileMenuOpen(false);
+              setIsAuthModalOpen(true);
+            }}
+            onOpenUserDashboard={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenUserDashboard(tab);
+            }}
+            onOpenAdminConsole={(view) => {
+              setIsMobileMenuOpen(false);
+              handleOpenAdmin(view);
+            }}
+            onOpenVerification={(memberId) => {
+              setIsMobileMenuOpen(false);
+              handleOpenVerification(memberId);
+            }}
+            onOpenLegal={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenLegal(tab);
+            }}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+            onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
           />
 
           {/* Main Public Website Body */}
@@ -325,9 +362,17 @@ const FETIndiaPlatform: React.FC = () => {
           <MobileBottomNav
             activeSection={activeSection}
             setActiveSection={handleScrollToSection}
-            onOpenAuth={() => setIsAuthModalOpen(true)}
-            onOpenUserDashboard={handleOpenUserDashboard}
-            onOpenMoreMenu={() => handleScrollToSection('footer')}
+            onOpenAuth={() => {
+              setIsMobileMenuOpen(false);
+              setIsAuthModalOpen(true);
+            }}
+            onOpenUserDashboard={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenUserDashboard(tab);
+            }}
+            onOpenMoreMenu={() => setIsMobileMenuOpen(true)}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
           />
         </div>
       )}

@@ -45,7 +45,7 @@ export const FETLogo: React.FC<FETLogoProps> = ({
       width={dimensions.emblem}
       height={dimensions.emblem}
       onError={() => setImgError(true)}
-      className="shrink-0 object-contain rounded-xl shadow-xs transition-transform duration-300 hover:scale-105"
+      className="shrink-0 object-contain rounded-xl shadow-xs transition-transform duration-300 hover:scale-105 fet-logo-subtle-motion"
       referrerPolicy="no-referrer"
       id="fet-official-custom-logo-img"
     />
@@ -56,7 +56,7 @@ export const FETLogo: React.FC<FETLogoProps> = ({
       viewBox="0 0 120 120"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className="shrink-0 transition-transform duration-300 hover:scale-105 filter drop-shadow-xs"
+      className="shrink-0 transition-transform duration-300 hover:scale-105 filter drop-shadow-xs fet-logo-subtle-motion"
       id="fet-official-emblem"
     >
       <defs>

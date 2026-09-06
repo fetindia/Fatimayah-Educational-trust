@@ -113,3 +113,30 @@
     margin: 10mm;
   }
 }
+
+/* ========================================================================= */
+/* FET INDIA OFFICIAL LOGO SUBTLE IDENTITY MOTION                           */
+/* ========================================================================= */
+@keyframes fetLogoBreathing {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 1px 2px rgba(13, 110, 66, 0.18));
+  }
+  50% {
+    transform: scale(1.025);
+    filter: drop-shadow(0 2px 7px rgba(217, 119, 6, 0.28));
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fet-logo-subtle-motion {
+    animation: fetLogoBreathing 5.5s ease-in-out infinite;
+    will-change: transform, filter;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fet-logo-subtle-motion {
+    animation: none !important;
+  }
+}
