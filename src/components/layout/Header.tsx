@@ -63,6 +63,11 @@ interface HeaderProps {
   onOpenAdminConsole: (view?: string) => void;
   onOpenVerification?: (memberId?: string) => void;
   onOpenLegal?: (tab: 'terms' | 'privacy') => void;
+  onOpenAbout?: (tab?: 'overview' | 'governance' | 'transparency' | 'history') => void;
+  onOpenExamination?: () => void;
+  onOpenApplyExam?: () => void;
+  onOpenChairmanMessage?: () => void;
+  onOpenNewsBlogs?: () => void;
   activeSection: string;
   setActiveSection: (s: string) => void;
   isMobileMenuOpen?: boolean;
@@ -76,6 +81,11 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAdminConsole,
   onOpenVerification,
   onOpenLegal,
+  onOpenAbout,
+  onOpenExamination,
+  onOpenApplyExam,
+  onOpenChairmanMessage,
+  onOpenNewsBlogs,
   activeSection,
   setActiveSection,
   isMobileMenuOpen,
@@ -184,6 +194,56 @@ export const Header: React.FC<HeaderProps> = ({
 
   const navMenuItems: NavigationMenuItem[] = [...rawNavMenu].sort((a, b) => (a.order || 0) - (b.order || 0));
 
+  // Ensure Examination is always available in navigation if not already present
+  if (!navMenuItems.some(m => m.target === 'examinations' || m.id === 'nav-examination')) {
+    navMenuItems.splice(2, 0, {
+      id: 'nav-examination',
+      label: 'Examination',
+      target: 'examinations',
+      isEnabled: true,
+      order: 3,
+      badge: 'Open',
+      subItems: [
+        { id: 'sub-exam-portal', label: 'Examination', target: 'examinations', isEnabled: true },
+        { id: 'sub-exam-apply', label: 'Apply for Examination', target: 'exam_apply', isEnabled: true },
+        { id: 'sub-exam-book', label: 'Book Mastery', target: 'exam_book_mastery', isEnabled: true }
+      ]
+    });
+  }
+
+  // Ensure About Trust includes Chairman's Message if not present
+  const aboutMenu = navMenuItems.find(m => m.id === 'nav-about' || m.target === 'about');
+  if (aboutMenu && aboutMenu.subItems && !aboutMenu.subItems.some(s => s.target === 'chairman_message')) {
+    aboutMenu.subItems.splice(2, 0, {
+      id: 'sub-about-chairman',
+      label: "Chairman's Message",
+      target: 'chairman_message',
+      isEnabled: true
+    });
+  }
+
+  // Ensure Appeals includes Featured Cases if not present
+  const appealsMenu = navMenuItems.find(m => m.id === 'nav-crowdfunding' || m.target === 'crowdfunding');
+  if (appealsMenu && appealsMenu.subItems && !appealsMenu.subItems.some(s => s.target === 'featured_cases')) {
+    appealsMenu.subItems.push({
+      id: 'sub-crowd-featured',
+      label: 'Featured Cases',
+      target: 'featured_cases',
+      isEnabled: true
+    });
+  }
+
+  // Ensure Events & News includes News & Blogs if not present
+  const eventsMenu = navMenuItems.find(m => m.id === 'nav-events' || m.target === 'events_blog');
+  if (eventsMenu && eventsMenu.subItems && !eventsMenu.subItems.some(s => s.target === 'news_blogs')) {
+    eventsMenu.subItems.push({
+      id: 'sub-events-news',
+      label: 'News & Blogs',
+      target: 'news_blogs',
+      isEnabled: true
+    });
+  }
+
   // Dynamically insert published Store or Travel if not already in menu
   if (isStorePublished && !navMenuItems.some(m => m.target === 'store' || m.id === 'nav-store')) {
     navMenuItems.push({
@@ -282,9 +342,70 @@ export const Header: React.FC<HeaderProps> = ({
       return;
     }
 
-    if (cleanTarget === 'about' || cleanTarget === 'about_trust' || cleanTarget === 'history' || cleanTarget === 'mission_cta' || cleanTarget === 'mission' || cleanTarget === 'governance') {
+    if (cleanTarget === 'about' || cleanTarget === 'about_trust') {
+      if (onOpenAbout) {
+        onOpenAbout('overview');
+        return;
+      }
       setActiveSection('mission_cta');
-      const element = document.getElementById('mission_cta') || document.getElementById('about') || document.getElementById('governance');
+      const element = document.getElementById('mission_cta') || document.getElementById('about');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
+
+    if (cleanTarget === 'governance') {
+      if (onOpenAbout) {
+        onOpenAbout('governance');
+        return;
+      }
+      setActiveSection('mission_cta');
+      const element = document.getElementById('mission_cta') || document.getElementById('governance');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
+
+    if (cleanTarget === 'history') {
+      if (onOpenAbout) {
+        onOpenAbout('history');
+        return;
+      }
+      setActiveSection('mission_cta');
+      const element = document.getElementById('mission_cta') || document.getElementById('history');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
+
+    if (cleanTarget === 'transparency') {
+      if (onOpenAbout) {
+        onOpenAbout('transparency');
+        return;
+      }
+      setActiveSection('statistics');
+      const element = document.getElementById('statistics');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
+
+    if (cleanTarget === 'education_support' || cleanTarget === 'support_education') {
+      setActiveSection('education_support');
+      const element = document.getElementById('education-support') || document.getElementById('education');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
+
+    if (cleanTarget === 'mission_cta' || cleanTarget === 'mission') {
+      setActiveSection('mission_cta');
+      const element = document.getElementById('mission_cta') || document.getElementById('contact');
       if (element) {
         element.scrollIntoView({ behavior: 'smooth' });
       }
@@ -294,6 +415,73 @@ export const Header: React.FC<HeaderProps> = ({
     if (cleanTarget === 'contact') {
       setActiveSection('mission_cta');
       const element = document.getElementById('contact') || document.getElementById('mission_cta');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
+
+    if (cleanTarget === 'examinations' || cleanTarget === 'examination') {
+      setActiveSection('examinations');
+      const element = document.getElementById('examinations');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+      if (onOpenExamination) {
+        onOpenExamination();
+      }
+      return;
+    }
+
+    if (cleanTarget === 'exam_apply' || cleanTarget === 'apply_examination') {
+      setActiveSection('examinations');
+      const element = document.getElementById('examinations');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+      if (onOpenApplyExam) {
+        onOpenApplyExam();
+      }
+      return;
+    }
+
+    if (cleanTarget === 'exam_book_mastery' || cleanTarget === 'book_mastery') {
+      setActiveSection('examinations');
+      const element = document.getElementById('examinations');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
+
+    if (cleanTarget === 'featured_cases' || cleanTarget === 'cases') {
+      setActiveSection('featured_cases');
+      const element = document.getElementById('featured_cases');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
+
+    if (cleanTarget === 'news_blogs' || cleanTarget === 'news' || cleanTarget === 'blogs') {
+      setActiveSection('news_blogs');
+      const element = document.getElementById('news_blogs');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+      if (onOpenNewsBlogs) {
+        onOpenNewsBlogs();
+      }
+      return;
+    }
+
+    if (cleanTarget === 'chairman_message' || cleanTarget === 'chairman') {
+      if (onOpenChairmanMessage) {
+        onOpenChairmanMessage();
+        return;
+      }
+      setActiveSection('chairmans_message');
+      const element = document.getElementById('chairmans_message');
       if (element) {
         element.scrollIntoView({ behavior: 'smooth' });
       }

@@ -19,17 +19,20 @@ import {
 } from 'lucide-react';
 import { FETLogo } from '../common/FETLogo';
 import { useConfig } from '../../contexts/ConfigContext';
+import { Scale } from 'lucide-react';
 
 interface MissionCtaSectionProps {
   onOpenDonate: () => void;
   onOpenVolunteer: () => void;
   onOpenContact: () => void;
+  onOpenAbout?: () => void;
 }
 
 export const MissionCtaSection: React.FC<MissionCtaSectionProps> = ({
   onOpenDonate,
   onOpenVolunteer,
-  onOpenContact
+  onOpenContact,
+  onOpenAbout
 }) => {
   const { config } = useConfig();
 
@@ -125,6 +128,17 @@ export const MissionCtaSection: React.FC<MissionCtaSectionProps> = ({
                   <UserPlus className="w-4 h-4 text-emerald-400" />
                   <span>Join as Volunteer / Member</span>
                 </button>
+
+                {onOpenAbout && (
+                  <button
+                    onClick={onOpenAbout}
+                    className="px-4 py-3.5 rounded-2xl text-xs sm:text-sm font-bold text-amber-300 hover:text-white bg-slate-900/80 hover:bg-slate-800 border border-amber-400/40 transition-all flex items-center gap-2 cursor-pointer"
+                    id="cta-learn-governance-btn"
+                  >
+                    <Scale className="w-4 h-4 text-amber-400" />
+                    <span>Learn About Our Governance</span>
+                  </button>
+                )}
               </div>
             </div>
 

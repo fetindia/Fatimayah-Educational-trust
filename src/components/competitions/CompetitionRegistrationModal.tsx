@@ -22,19 +22,23 @@ import {
 } from 'lucide-react';
 import { Competition, CompetitionRegistration } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-import { db } from '../../lib/firebase';
+import { db, cleanFirestoreData } from '../../lib/firebase';
 import { doc, setDoc, updateDoc, increment, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 interface CompetitionRegistrationModalProps {
   competition: Competition;
   onClose: () => void;
-  onSuccess: (registrationId: string) => void;
+  onSuccess?: (registrationId: string) => void;
+  isOpen?: boolean;
+  onOpenAuth?: () => void;
 }
 
 export const CompetitionRegistrationModal: React.FC<CompetitionRegistrationModalProps> = ({
   competition,
   onClose,
-  onSuccess
+  onSuccess,
+  isOpen = true,
+  onOpenAuth
 }) => {
   const { currentUser, userProfile } = useAuth();
   const profileAny = userProfile as any;
@@ -133,7 +137,7 @@ export const CompetitionRegistrationModal: React.FC<CompetitionRegistrationModal
       };
 
       // Write to Firestore
-      await setDoc(doc(db, 'competition_registrations', registrationDocId), newRegistration);
+      await setDoc(doc(db, 'competition_registrations', registrationDocId), cleanFirestoreData(newRegistration));
 
       // Increment registered count in competition document
       if (competition.id) {
@@ -147,25 +151,25 @@ export const CompetitionRegistrationModal: React.FC<CompetitionRegistrationModal
       }
 
       // Record in In-App Notifications for Candidate
-      await addDoc(collection(db, 'user_notifications'), {
+      await addDoc(collection(db, 'user_notifications'), cleanFirestoreData({
         userId: currentUser.uid,
-        userEmail: currentUser.email,
+        userEmail: currentUser.email || '',
         title: `Registration Confirmed: ${competition.title}`,
         message: `You have successfully enrolled in ${competition.title}. Your assigned Participant Roll ID is ${participantId}.`,
         type: 'competition_registration',
         module: 'exams',
         read: false,
         createdAt: new Date().toISOString()
-      }).catch(() => {});
+      })).catch(() => {});
 
       // Record in Audit Log
-      await addDoc(collection(db, 'audit_logs'), {
+      await addDoc(collection(db, 'audit_logs'), cleanFirestoreData({
         action: 'COMPETITION_REGISTRATION_CREATED',
         userId: currentUser.uid,
-        userEmail: currentUser.email,
+        userEmail: currentUser.email || '',
         details: `Registered candidate ${formData.participantName} for ${competition.title} with Participant ID ${participantId}`,
         timestamp: new Date().toISOString()
-      }).catch(() => {});
+      })).catch(() => {});
 
       onSuccess(registrationDocId);
     } catch (err: any) {
@@ -175,6 +179,8 @@ export const CompetitionRegistrationModal: React.FC<CompetitionRegistrationModal
       setIsSubmitting(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto" id="fet-competition-reg-modal">
@@ -198,6 +204,22 @@ export const CompetitionRegistrationModal: React.FC<CompetitionRegistrationModal
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Public Visitor Notice */}
+        {!currentUser && (
+          <div className="p-3.5 bg-amber-50 border-b border-amber-200 text-xs text-amber-900 flex flex-col sm:flex-row items-center justify-between gap-2 px-6">
+            <span>You are viewing this as a guest. Please sign in or register to submit your application.</span>
+            {onOpenAuth && (
+              <button
+                type="button"
+                onClick={onOpenAuth}
+                className="px-3 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[11px] shrink-0 cursor-pointer shadow-xs"
+              >
+                Sign In / Register
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Competition Context Banner */}
         <div className="p-4 bg-emerald-50/70 border-b border-emerald-100 flex items-start justify-between gap-3">

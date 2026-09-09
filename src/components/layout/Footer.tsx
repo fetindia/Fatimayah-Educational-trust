@@ -31,13 +31,15 @@ interface FooterProps {
   onOpenAdmin: (view?: string) => void;
   onOpenVerification?: (memberId?: string) => void;
   onOpenLegal?: (tab: 'terms' | 'privacy') => void;
+  onOpenAbout?: (tab?: 'overview' | 'governance' | 'transparency' | 'history') => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({ 
   onOpenSection, 
   onOpenAdmin, 
   onOpenVerification,
-  onOpenLegal 
+  onOpenLegal,
+  onOpenAbout
 }) => {
   const { config } = useConfig();
   const { seriesStats } = useModules();
@@ -219,10 +221,10 @@ export const Footer: React.FC<FooterProps> = ({
                 </li>
                 <li>
                   <button 
-                    onClick={() => onOpenSection('mission_cta')}
+                    onClick={() => onOpenAbout ? onOpenAbout('governance') : onOpenSection('mission_cta')}
                     className="hover:text-amber-300 transition-colors text-left flex items-center gap-1 cursor-pointer"
                   >
-                    <ArrowUpRight className="w-3 h-3 text-slate-500" /> Public Accountability Charter
+                    <ArrowUpRight className="w-3 h-3 text-slate-500" /> Public Accountability Charter & Governance
                   </button>
                 </li>
               </ul>
@@ -296,6 +298,13 @@ export const Footer: React.FC<FooterProps> = ({
                 <span>Verify Certificate & Credential (QR)</span>
               </button>
             )}
+            <span>•</span>
+            <button 
+              onClick={() => onOpenAbout ? onOpenAbout('overview') : onOpenSection('mission_cta')} 
+              className="hover:text-slate-300 cursor-pointer font-bold text-slate-400"
+            >
+              About FET India
+            </button>
             <span>•</span>
             <button 
               onClick={() => onOpenLegal ? onOpenLegal('privacy') : onOpenSection('mission_cta')} 

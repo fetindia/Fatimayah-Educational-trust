@@ -105,14 +105,15 @@ export const AdminCMSView: React.FC = () => {
 
   const defaultSections = [
     { id: 'hero', name: 'Hero Visual Slider & Trust Seal', desc: 'Main headline, dynamic media slides, and primary CTAs' },
-    { id: 'statistics', name: 'Impact Statistics Counter', desc: 'Students funded, institutions, volunteers, and statutory census' },
-    { id: 'programs', name: 'Flagship Programs & Scholarships', desc: 'Featured educational initiatives & grants' },
-    { id: 'education', name: 'Education & Talent Examination', desc: 'FET Talent Search, Madrasa modernization' },
+    { id: 'crowdfunding', name: 'Featured Crowdfunding Appeals', desc: 'Verified and board-approved public appeals immediately below hero' },
+    { id: 'education_support', name: 'Support Education & Deserving Scholars', desc: 'Educational assistance mission for vulnerable and promising students' },
+    { id: 'programs', name: 'Key Initiatives & Programs', desc: 'Higher education scholarships, STEM labs, and welfare missions' },
+    { id: 'events_blog', name: 'Upcoming Events & Educational Programs', desc: 'Convocations, talent tests, institutional updates, and announcements' },
+    { id: 'statistics', name: 'Impact Statistics & Census', desc: 'Students funded, volunteers, institutions, and statutory impact' },
+    { id: 'mission_cta', name: 'Final Call to Action & Secretariat', desc: 'Support, volunteer, membership, and central contact info' },
     { id: 'volunteer_membership', name: 'Volunteer & Membership CTA', desc: 'Dual pathway for grassroots participation and membership' },
-    { id: 'crowdfunding', name: 'Crowdfunding & 80G Tax Exemption', desc: 'Curated public appeals and tax-exempt contributions' },
-    { id: 'events_blog', name: 'Convocations, Events & Articles', desc: 'Institutional updates, news, and convocation schedules' },
-    { id: 'future_services', name: 'Special Services (Store & Travel)', desc: 'E-Commerce store and Haj/Ziyarat travel modules' },
-    { id: 'mission_cta', name: 'Mission & Governance Creed', desc: 'Final public commitment, leadership, and contact' }
+    { id: 'education', name: 'Education & Talent Examination', desc: 'FET Talent Search, Madrasa modernization' },
+    { id: 'future_services', name: 'Special Services (Store & Travel)', desc: 'E-Commerce store and Haj/Ziyarat travel modules' }
   ];
 
   const cleanSectionOrder = (raw?: string[]) => {

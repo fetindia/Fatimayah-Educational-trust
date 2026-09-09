@@ -21,13 +21,27 @@ export const DEFAULT_NAV_MENU: NavigationMenuItem[] = [
   {
     id: 'nav-about',
     label: 'About Trust',
-    target: 'mission_cta',
+    target: 'about',
     isEnabled: true,
     order: 2,
     subItems: [
-      { id: 'sub-about-trust', label: 'Trust History & Vision', target: 'mission_cta', isEnabled: true },
-      { id: 'sub-about-gov', label: 'Leadership & Governance', target: 'mission_cta', isEnabled: true },
-      { id: 'sub-about-stats', label: 'Impact & Transparency', target: 'statistics', isEnabled: true }
+      { id: 'sub-about-trust', label: 'Trust History & Vision', target: 'history', isEnabled: true },
+      { id: 'sub-about-gov', label: 'Leadership & Governance', target: 'governance', isEnabled: true },
+      { id: 'sub-about-chairman', label: "Chairman's Message", target: 'chairman_message', isEnabled: true },
+      { id: 'sub-about-stats', label: 'Statutory Transparency', target: 'transparency', isEnabled: true }
+    ]
+  },
+  {
+    id: 'nav-examination',
+    label: 'Examination',
+    target: 'examinations',
+    isEnabled: true,
+    order: 3,
+    badge: 'Open',
+    subItems: [
+      { id: 'sub-exam-portal', label: 'Examination', target: 'examinations', isEnabled: true },
+      { id: 'sub-exam-apply', label: 'Apply for Examination', target: 'exam_apply', isEnabled: true },
+      { id: 'sub-exam-book', label: 'Book Mastery', target: 'exam_book_mastery', isEnabled: true }
     ]
   },
   {
@@ -35,10 +49,11 @@ export const DEFAULT_NAV_MENU: NavigationMenuItem[] = [
     label: 'Programs & Welfare',
     target: 'programs',
     isEnabled: true,
-    order: 3,
+    order: 4,
     subItems: [
+      { id: 'sub-prog-support', label: 'Support Education & Scholars', target: 'education_support', isEnabled: true },
       { id: 'sub-prog-flagship', label: 'Flagship Educational Initiatives', target: 'programs', isEnabled: true },
-      { id: 'sub-prog-exam', label: 'Talent Search & Exam System', target: 'education', isEnabled: true },
+      { id: 'sub-prog-exam', label: 'Talent Search & Exam System', target: 'examinations', isEnabled: true },
       { id: 'sub-prog-scholarships', label: 'Higher Education Grants', target: 'programs', isEnabled: true }
     ]
   },
@@ -47,15 +62,19 @@ export const DEFAULT_NAV_MENU: NavigationMenuItem[] = [
     label: 'Appeals (80G)',
     target: 'crowdfunding',
     isEnabled: true,
-    order: 4,
-    badge: 'Tax Free'
+    order: 5,
+    badge: 'Tax Free',
+    subItems: [
+      { id: 'sub-crowd-urgent', label: 'Urgent Appeals (80G)', target: 'crowdfunding', isEnabled: true },
+      { id: 'sub-crowd-featured', label: 'Featured Cases', target: 'featured_cases', isEnabled: true }
+    ]
   },
   {
     id: 'nav-membership',
     label: 'Membership',
     target: 'volunteer_membership',
     isEnabled: true,
-    order: 5,
+    order: 6,
     subItems: [
       { id: 'sub-mem-apply', label: 'Apply for Membership', target: 'volunteer_membership', isEnabled: true },
       { id: 'sub-mem-core', label: 'Core Member Accreditation', target: 'volunteer_membership', isEnabled: true }
@@ -66,21 +85,25 @@ export const DEFAULT_NAV_MENU: NavigationMenuItem[] = [
     label: 'Volunteer',
     target: 'volunteer_membership',
     isEnabled: true,
-    order: 6
+    order: 7
   },
   {
     id: 'nav-events',
     label: 'Events & News',
     target: 'events_blog',
     isEnabled: true,
-    order: 7
+    order: 8,
+    subItems: [
+      { id: 'sub-events-all', label: 'Upcoming Trust Events', target: 'events_blog', isEnabled: true },
+      { id: 'sub-events-news', label: 'News & Blogs', target: 'news_blogs', isEnabled: true }
+    ]
   },
   {
     id: 'nav-contact',
     label: 'Contact',
     target: 'mission_cta',
     isEnabled: true,
-    order: 8
+    order: 9
   }
 ];
 
@@ -112,24 +135,31 @@ export const DEFAULT_ORG_CONFIG: OrgConfig = {
   homepageSectionsOrdering: [
     'hero',
     'crowdfunding',
+    'education_support',
     'programs',
-    'education',
-    'statistics',
-    'volunteer_membership',
+    'featured_cases',
     'events_blog',
-    'future_services',
+    'examinations',
+    'news_blogs',
+    'chairmans_message',
+    'statistics',
     'mission_cta'
   ],
   homepageSectionsVisibility: {
     hero: true,
     crowdfunding: true,
+    education_support: true,
     programs: true,
-    education: true,
-    statistics: true,
-    volunteer_membership: true,
+    featured_cases: true,
     events_blog: true,
-    future_services: true,
-    mission_cta: true
+    examinations: true,
+    news_blogs: true,
+    chairmans_message: true,
+    statistics: true,
+    mission_cta: true,
+    education: false,
+    volunteer_membership: false,
+    future_services: false
   },
 
   headerSettings: {

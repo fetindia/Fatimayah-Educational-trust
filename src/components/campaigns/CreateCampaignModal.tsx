@@ -384,10 +384,6 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
           showError('Please enter a comprehensive narrative describing the case (minimum 20 characters).');
           return false;
         }
-        if (!coverImageUrl) {
-          showError('Please upload a Cover Photo for the appeal.');
-          return false;
-        }
         return true;
 
       case 2:
@@ -413,10 +409,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
         return true;
 
       case 4:
-        if (supportingDocuments.length === 0) {
-          showError('Please upload at least one private verification document (fee structure, hospital estimate, income proof, etc.).');
-          return false;
-        }
+        // Verification documents are optional during initial creation, though recommended for expedited Board approval
         return true;
 
       case 5:
@@ -512,13 +505,13 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
           creatorFullName: creatorFullName.trim(),
           creatorParentage: creatorParentage.trim(),
           creatorContactPhone: creatorContactPhone.trim(),
-          creatorAlternatePhone: creatorAlternatePhone.trim() || undefined,
+          creatorAlternatePhone: creatorAlternatePhone.trim() || '',
           creatorEmailAddress: creatorEmailAddress.trim(),
           creatorResidentialLocation: creatorResidentialLocation.trim(),
           creatorState,
           creatorDistrict,
-          creatorCityTownVillage: creatorCityTownVillage.trim() || undefined,
-          creatorMemberId: creatorMemberId.trim() || undefined,
+          creatorCityTownVillage: creatorCityTownVillage.trim() || '',
+          creatorMemberId: creatorMemberId.trim() || '',
           relationshipToBeneficiary,
           declarationAccepted: truthDeclaration && trustDisbursalDeclaration,
           termsAccepted,
@@ -598,13 +591,13 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
           creatorFullName: creatorFullName.trim(),
           creatorParentage: creatorParentage.trim(),
           creatorContactPhone: creatorContactPhone.trim(),
-          creatorAlternatePhone: creatorAlternatePhone.trim() || undefined,
+          creatorAlternatePhone: creatorAlternatePhone.trim() || '',
           creatorEmailAddress: creatorEmailAddress.trim(),
           creatorResidentialLocation: creatorResidentialLocation.trim(),
           creatorState,
           creatorDistrict,
-          creatorCityTownVillage: creatorCityTownVillage.trim() || undefined,
-          creatorMemberId: creatorMemberId.trim() || undefined,
+          creatorCityTownVillage: creatorCityTownVillage.trim() || '',
+          creatorMemberId: creatorMemberId.trim() || '',
           relationshipToBeneficiary,
 
           declarationAccepted: true,
@@ -828,7 +821,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
               {/* Upload Cover Photo */}
               <div className="space-y-2 pt-2 border-t border-slate-200">
                 <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center justify-between">
-                  <span>Upload Cover Photo <span className="text-rose-600">*</span></span>
+                  <span>Upload Cover Photo <span className="text-slate-400 font-normal text-[11px]">(Optional)</span></span>
                   <span className="text-[10px] font-normal text-slate-400">JPG, JPEG, PNG or WebP (Max 10MB)</span>
                 </label>
 
@@ -1470,13 +1463,18 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
               {/* Summary Card 1: Appeal & Cover */}
               <div className="rounded-3xl border border-slate-200 overflow-hidden bg-slate-50">
                 <div className="relative h-44 sm:h-52 bg-slate-900">
-                  {coverImageUrl && (
+                  {coverImageUrl ? (
                     <img 
                       src={coverImageUrl} 
                       alt="Cover" 
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"
                     />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-800/80">
+                      <HeartHandshake className="w-10 h-10 text-slate-500 mb-1.5" />
+                      <span className="text-xs font-bold text-slate-400">Institutional Appeal Banner (No Photo Attached)</span>
+                    </div>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-black/30" />
                   <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-white">

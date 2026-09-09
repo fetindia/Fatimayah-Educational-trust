@@ -229,8 +229,8 @@ export const AdminCompetitionsExamsView: React.FC = () => {
       // Log to Audit Trail
       await addDoc(collection(db, 'audit_logs'), {
         action: 'COMPETITION_RESULTS_PUBLISHED',
-        userId: currentUser?.uid,
-        userEmail: currentUser?.email,
+        userId: currentUser?.uid || 'admin',
+        userEmail: currentUser?.email || 'admin@fetindia.com',
         details: `Published results for competition ${comp.title} (${comp.code}) with ${compRegs.length} candidate scorecards.`,
         timestamp: new Date().toISOString()
       });
@@ -319,8 +319,8 @@ export const AdminCompetitionsExamsView: React.FC = () => {
       // Log to Audit Trail
       await addDoc(collection(db, 'audit_logs'), {
         action: 'COMPETITION_CERTIFICATES_BATCH_ISSUED',
-        userId: currentUser?.uid,
-        userEmail: currentUser?.email,
+        userId: currentUser?.uid || 'admin',
+        userEmail: currentUser?.email || 'admin@fetindia.com',
         details: `Batch generated and issued ${count} digital verified certificates for ${comp.title}`,
         timestamp: new Date().toISOString()
       });
@@ -1618,8 +1618,8 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ onClose
       // Audit Log
       await addDoc(collection(db, 'audit_logs'), {
         action: 'COMPETITION_CREATED',
-        userId: currentUser?.uid,
-        userEmail: currentUser?.email,
+        userId: currentUser?.uid || 'admin',
+        userEmail: currentUser?.email || 'admin@fetindia.com',
         details: `Created new competition: ${newComp.title} (${newComp.code})`,
         timestamp: new Date().toISOString()
       });
@@ -1860,8 +1860,8 @@ const GradeCandidateModal: React.FC<GradeCandidateModalProps> = ({ registration,
       // Audit Log
       await addDoc(collection(db, 'audit_logs'), {
         action: 'CANDIDATE_SCORED',
-        userId: currentUser?.uid,
-        userEmail: currentUser?.email,
+        userId: currentUser?.uid || 'admin',
+        userEmail: currentUser?.email || 'admin@fetindia.com',
         details: `Scored candidate ${registration.participantName} (${registration.participantId}) in ${registration.competitionTitle}: ${marks}/${totalMarks} (${calculatedGrade}, Rank #${rank})`,
         timestamp: new Date().toISOString()
       });

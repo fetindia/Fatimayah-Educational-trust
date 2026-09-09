@@ -118,8 +118,14 @@ export const auth = getAuth(app);
 
 // Initialize Cloud Firestore with specified database ID and auto-detect long polling for reliable container proxy connectivity
 export const db = firebaseConfigData.firestoreDatabaseId
-  ? initializeFirestore(app, { experimentalAutoDetectLongPolling: true }, firebaseConfigData.firestoreDatabaseId)
-  : initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+  ? initializeFirestore(app, {
+      experimentalAutoDetectLongPolling: true,
+      ignoreUndefinedProperties: true
+    }, firebaseConfigData.firestoreDatabaseId)
+  : initializeFirestore(app, {
+      experimentalAutoDetectLongPolling: true,
+      ignoreUndefinedProperties: true
+    });
 
 // Initialize Cloud Storage with the designated Firebase Storage bucket
 export const storage = getStorage(app, firebaseConfigData.storageBucket || 'fatimyah-educational-trust.firebasestorage.app');
@@ -185,12 +191,97 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 }
 
 // -------------------------------------------------------------
+// FIRESTORE PAYLOAD SANITIZER (Deep undefined & non-serializable purifier)
+// -------------------------------------------------------------
+/**
+ * Recursively purifies any payload destined for Firestore:
+ * - Strips any key whose value is `undefined`
+ * - Converts or omits raw browser File, Blob, Event, React Elements, or DOM objects
+ * - Preserves Firebase Timestamp instances, FieldValues (e.g. serverTimestamp), Dates, strings, numbers, booleans
+ * - Deeply cleans nested objects and arrays
+ */
+export function cleanFirestoreData<T = any>(input: T): T {
+  if (input === undefined) {
+    return undefined as any;
+  }
+  if (input === null || typeof input !== 'object') {
+    return input;
+  }
+
+  // Preserve Date instances
+  if (input instanceof Date) {
+    return input;
+  }
+
+  // Preserve Firestore FieldValue and Timestamp instances
+  if (
+    typeof (input as any).toDate === 'function' ||
+    typeof (input as any).isEqual === 'function' ||
+    typeof (input as any).toMillis === 'function' ||
+    Boolean((input as any)._methodName)
+  ) {
+    return input;
+  }
+
+  // Sanitize browser File / Blob if accidentally passed directly
+  if (typeof File !== 'undefined' && input instanceof File) {
+    return {
+      fileName: input.name,
+      sizeBytes: input.size,
+      mimeType: input.type
+    } as any;
+  }
+  if (typeof Blob !== 'undefined' && input instanceof Blob) {
+    return {
+      sizeBytes: input.size,
+      mimeType: input.type
+    } as any;
+  }
+
+  // Reject DOM Nodes, Elements, or Events
+  if (typeof Event !== 'undefined' && input instanceof Event) {
+    return undefined as any;
+  }
+  if (typeof Element !== 'undefined' && input instanceof Element) {
+    return undefined as any;
+  }
+  // Reject React Elements ($$typeof)
+  if ((input as any).$$typeof) {
+    return undefined as any;
+  }
+
+  // Arrays: clean each element, discard undefined items
+  if (Array.isArray(input)) {
+    return input
+      .map(item => cleanFirestoreData(item))
+      .filter(item => item !== undefined) as any;
+  }
+
+  // Plain objects: clean each key, strip undefined keys
+  const cleaned: Record<string, any> = {};
+  for (const [key, val] of Object.entries(input)) {
+    if (val === undefined) {
+      continue;
+    }
+    if (typeof val === 'function') {
+      continue;
+    }
+    const cleanedVal = cleanFirestoreData(val);
+    if (cleanedVal !== undefined) {
+      cleaned[key] = cleanedVal;
+    }
+  }
+
+  return cleaned as T;
+}
+
+// -------------------------------------------------------------
 // AUDIT LOG HELPER (Immutable Append-only)
 // -------------------------------------------------------------
 export async function logAuditEvent(params: {
   actorUid: string;
-  actorEmail: string;
-  actorRole: UserRole;
+  actorEmail?: string;
+  actorRole?: UserRole | string;
   action: string;
   targetEntity: string;
   targetId?: string;
@@ -198,12 +289,19 @@ export async function logAuditEvent(params: {
 }): Promise<void> {
   try {
     const auditRef = collection(db, 'audit_logs');
-    await addDoc(auditRef, {
-      ...params,
+    const cleanedPayload = cleanFirestoreData({
+      actorUid: params.actorUid || 'system',
+      actorEmail: params.actorEmail || '',
+      actorRole: params.actorRole || 'visitor',
+      action: params.action,
+      targetEntity: params.targetEntity,
+      targetId: params.targetId || '',
+      details: params.details || {},
       timestamp: new Date().toISOString(),
       serverTimestamp: serverTimestamp(),
       platform: 'FET India Web Platform v1.0.0'
     });
+    await addDoc(auditRef, cleanedPayload);
   } catch (error) {
     console.warn('Audit logging non-blocking fallback:', error);
   }
@@ -944,17 +1042,18 @@ export async function createUserNotification(
     read: false,
     readAt: null,
     isArchived: false,
-    archivedAt: undefined,
-    idempotencyKey: notification.idempotencyKey || undefined,
+    archivedAt: notification.archivedAt || null,
+    idempotencyKey: notification.idempotencyKey || null,
     publishAt: notification.publishAt || now,
-    expiresAt: notification.expiresAt || undefined,
+    expiresAt: notification.expiresAt || null,
     createdAt: now,
     emailTriggered: notification.emailTriggered ?? false,
     emailDeliveryStatus: notification.emailDeliveryStatus || 'not_configured',
     emailDeliveryNote: notification.emailDeliveryNote || 'In-app notification delivered.'
   };
 
-  const docRef = await addDoc(userNotifRef, payload);
+  const cleanedPayload = cleanFirestoreData(payload);
+  const docRef = await addDoc(userNotifRef, cleanedPayload);
   return docRef.id;
 }
 
@@ -1287,7 +1386,7 @@ export async function dispatchAdminBroadcast(
       broadcastId,
       createdBy: adminUser.email,
       publishAt: publishTime,
-      expiresAt: params.expiresAt || undefined,
+      expiresAt: params.expiresAt || null,
       read: false,
       readAt: null,
       isArchived: false,
@@ -1297,7 +1396,7 @@ export async function dispatchAdminBroadcast(
       emailDeliveryNote: emailNote
     };
 
-    return addDoc(userNotifCol, notifPayload);
+    return addDoc(userNotifCol, cleanFirestoreData(notifPayload));
   });
 
   await Promise.all(notificationPromises);
@@ -1309,7 +1408,7 @@ export async function dispatchAdminBroadcast(
       ? 'announcement' 
       : (params.severity === 'critical' ? 'critical' : params.severity === 'warning' ? 'warning' : params.severity === 'success' ? 'success' : 'info');
 
-    await addDoc(notifRef, {
+    await addDoc(notifRef, cleanFirestoreData({
       title: params.title,
       message: params.message,
       type: globalType,
@@ -1319,7 +1418,7 @@ export async function dispatchAdminBroadcast(
       createdAt: now,
       createdBy: adminUser.email,
       readBy: []
-    });
+    }));
   } catch (syncErr) {
     console.warn('Global notification ticker sync non-blocking note:', syncErr);
   }
@@ -1501,14 +1600,14 @@ export async function submitVolunteerApplication(
   const now = new Date().toISOString();
 
   // Create document in volunteerApplications collection linked to applicantUid
-  const docRef = await addDoc(volunteerCol, {
+  const docRef = await addDoc(volunteerCol, cleanFirestoreData({
     ...applicationData,
     applicantUid: user.uid,
     applicantEmail: user.email,
     status: 'pending',
     createdAt: now,
     updatedAt: now
-  });
+  }));
 
   // Update user profile volunteerStatus to 'pending'
   try {
@@ -1844,11 +1943,11 @@ export async function createVolunteerCategory(
 ): Promise<string> {
   const col = collection(db, 'volunteer_categories');
   const now = new Date().toISOString();
-  const docRef = await addDoc(col, {
+  const docRef = await addDoc(col, cleanFirestoreData({
     ...categoryData,
     createdAt: now,
     updatedAt: now
-  });
+  }));
 
   await logAuditEvent({
     actorUid: adminUser.uid,
@@ -1928,7 +2027,7 @@ export async function createVolunteerActivity(
     updatedAt: now
   };
 
-  const docRef = await addDoc(col, payload);
+  const docRef = await addDoc(col, cleanFirestoreData(payload));
 
   // Notify assigned volunteers if any
   if (activityData.assignedVolunteerIds && activityData.assignedVolunteerIds.length > 0) {
@@ -2075,7 +2174,7 @@ export async function logVolunteerHours(
     updatedAt: now
   };
 
-  const docRef = await addDoc(col, payload);
+  const docRef = await addDoc(col, cleanFirestoreData(payload));
 
   await logAuditEvent({
     actorUid: volunteerUser.uid,
@@ -2245,7 +2344,7 @@ export async function createCommunityGroup(
     updatedAt: now
   };
 
-  const docRef = await addDoc(col, payload);
+  const docRef = await addDoc(col, cleanFirestoreData(payload));
 
   await logAuditEvent({
     actorUid: adminUser.uid,
@@ -2379,14 +2478,14 @@ export async function submitMembershipApplication(
   const now = new Date().toISOString();
 
   // Create document in membershipApplications collection linked to applicantUid
-  const docRef = await addDoc(memberCol, {
+  const docRef = await addDoc(memberCol, cleanFirestoreData({
     ...applicationData,
     applicantUid: user.uid,
     applicantEmail: user.email,
     status: 'pending',
     createdAt: now,
     updatedAt: now
-  });
+  }));
 
   // Update user's membershipStatus to 'pending'
   try {
@@ -2638,14 +2737,14 @@ export async function submitDonorApplication(
   const now = new Date().toISOString();
 
   // Create document in donorApplications collection linked to applicantUid
-  const docRef = await addDoc(donorCol, {
+  const docRef = await addDoc(donorCol, cleanFirestoreData({
     ...applicationData,
     applicantUid: user.uid,
     applicantEmail: user.email,
     status: 'pending',
     createdAt: now,
     updatedAt: now
-  });
+  }));
 
   // Sync user profile donorStatus to 'pending' without touching other statuses
   try {
@@ -3700,27 +3799,83 @@ export async function createCampaign(
   const now = new Date().toISOString();
   const target = Number(campaignData.targetAmount) || 0;
 
-  const newCampaign: Omit<CrowdfundingCampaign, 'id'> = {
-    ...campaignData,
+  // Build clean, well-defined Firestore-safe payload with normalized primitives
+  const rawCampaign: Record<string, any> = {
+    campaignId: campaignNumber,
     campaignNumber,
+    title: String(campaignData.title || '').trim(),
+    category: campaignData.category || 'education',
+    categoryLabel: campaignData.categoryLabel || CAMPAIGN_CATEGORY_CONFIG[campaignData.category || 'education']?.label || 'Charitable Appeal',
+    description: String(campaignData.description || '').trim(),
+    beneficiaryName: String(campaignData.beneficiaryName || '').trim(),
+    beneficiaryDescription: String(campaignData.beneficiaryDescription || '').trim(),
+    targetInstitution: String(campaignData.targetInstitution || '').trim(),
+    beneficiaryLocation: String(campaignData.beneficiaryLocation || '').trim(),
     targetAmount: target,
     requiredAmount: target,
     raisedAmount: 0,
     remainingAmount: target,
     progressPercentage: 0,
     verifiedDonationsCount: 0,
+    location: String(campaignData.location || '').trim(),
+    state: String(campaignData.state || 'Telangana').trim(),
+    district: String(campaignData.district || 'Hyderabad').trim(),
+    city: String(campaignData.city || '').trim(),
+    startDate: campaignData.startDate || now.split('T')[0],
+    endDate: campaignData.endDate || now.split('T')[0],
+    fundUtilizationNotes: String(campaignData.fundUtilizationNotes || '').trim(),
+    coverImageUrl: String(campaignData.coverImageUrl || '').trim(),
+    supportingImages: Array.isArray(campaignData.supportingImages) 
+      ? campaignData.supportingImages.map((img: any) => ({
+          id: String(img.id || `img_${Date.now()}`),
+          url: String(img.url || ''),
+          caption: String(img.caption || '').trim(),
+          fileName: String(img.fileName || ''),
+          uploadedAt: String(img.uploadedAt || now)
+        }))
+      : [],
+    supportingDocuments: Array.isArray(campaignData.supportingDocuments)
+      ? campaignData.supportingDocuments.map((doc: any) => ({
+          id: String(doc.id || `doc_${Date.now()}`),
+          name: String(doc.name || 'Verification Document'),
+          type: String(doc.type || 'Other'),
+          url: String(doc.url || ''),
+          uploadedAt: String(doc.uploadedAt || now),
+          sizeBytes: Number(doc.sizeBytes) || 0,
+          fileName: String(doc.fileName || ''),
+          mimeType: String(doc.mimeType || 'application/octet-stream'),
+          isPrivate: Boolean(doc.isPrivate !== false)
+        }))
+      : [],
+    contactPersonName: String(campaignData.contactPersonName || creatorProfile.displayName || '').trim(),
+    contactPhone: String(campaignData.contactPhone || '').trim(),
+    contactEmail: String(campaignData.contactEmail || creatorProfile.email || '').trim(),
+    creatorFullName: String(campaignData.creatorFullName || creatorProfile.displayName || '').trim(),
+    creatorParentage: String(campaignData.creatorParentage || '').trim(),
+    creatorContactPhone: String(campaignData.creatorContactPhone || '').trim(),
+    creatorAlternatePhone: String(campaignData.creatorAlternatePhone || '').trim(),
+    creatorEmailAddress: String(campaignData.creatorEmailAddress || creatorProfile.email || '').trim(),
+    creatorResidentialLocation: String(campaignData.creatorResidentialLocation || '').trim(),
+    creatorState: String(campaignData.creatorState || 'Telangana').trim(),
+    creatorDistrict: String(campaignData.creatorDistrict || 'Hyderabad').trim(),
+    creatorCityTownVillage: String(campaignData.creatorCityTownVillage || '').trim(),
+    creatorMemberId: String(campaignData.creatorMemberId || '').trim(),
+    relationshipToBeneficiary: String(campaignData.relationshipToBeneficiary || 'Self'),
+    declarationAccepted: Boolean(campaignData.declarationAccepted),
+    termsAccepted: Boolean(campaignData.termsAccepted),
     status: 'pending_review',
     isVerifiedByFET: false,
     creatorUid: creatorProfile.uid,
-    creatorEmail: creatorProfile.email,
+    creatorEmail: creatorProfile.email || 'trust@fetindia.org',
     creatorName: creatorProfile.displayName || 'Authorized Member',
     createdAt: now,
     updatedAt: now,
     submittedAt: now
   };
 
+  const cleanedCampaign = cleanFirestoreData(rawCampaign);
   const campaignsRef = collection(db, 'crowdfunding_campaigns');
-  const docRef = await addDoc(campaignsRef, newCampaign);
+  const docRef = await addDoc(campaignsRef, cleanedCampaign);
 
   // 1. Immutable Audit Log
   await logAuditEvent({
@@ -3783,13 +3938,13 @@ export async function saveCampaignDraft(
       throw new Error('Permission denied: You can only edit your own campaigns');
     }
 
-    const updatePayload: Partial<CrowdfundingCampaign> = {
+    const updatePayload: Partial<CrowdfundingCampaign> = cleanFirestoreData({
       ...campaignData,
       targetAmount: target,
       requiredAmount: target,
       status: 'draft',
       updatedAt: now
-    };
+    });
     // Ensure audit fields and funds are not tampered
     delete (updatePayload as any).raisedAmount;
     delete (updatePayload as any).verifiedDonationsCount;
@@ -3802,44 +3957,64 @@ export async function saveCampaignDraft(
     const newDraft: Omit<CrowdfundingCampaign, 'id'> = {
       campaignId: campaignNumber,
       campaignNumber,
-      title: campaignData.title || 'Untitled Appeal Draft',
+      title: String(campaignData.title || 'Untitled Appeal Draft').trim(),
       category: campaignData.category || 'education',
       categoryLabel: campaignData.categoryLabel || CAMPAIGN_CATEGORY_CONFIG[campaignData.category || 'education']?.label || 'Charitable Appeal',
-      description: campaignData.description || '',
-      beneficiaryName: campaignData.beneficiaryName || '',
-      beneficiaryDescription: campaignData.beneficiaryDescription || '',
-      targetInstitution: campaignData.targetInstitution || '',
-      beneficiaryLocation: campaignData.beneficiaryLocation || '',
+      description: String(campaignData.description || '').trim(),
+      beneficiaryName: String(campaignData.beneficiaryName || '').trim(),
+      beneficiaryDescription: String(campaignData.beneficiaryDescription || '').trim(),
+      targetInstitution: String(campaignData.targetInstitution || '').trim(),
+      beneficiaryLocation: String(campaignData.beneficiaryLocation || '').trim(),
       targetAmount: target,
       requiredAmount: target,
       raisedAmount: 0,
       remainingAmount: target,
       progressPercentage: 0,
       verifiedDonationsCount: 0,
-      location: campaignData.location || '',
-      state: campaignData.state || 'Telangana',
-      district: campaignData.district || 'Hyderabad',
-      city: campaignData.city || '',
-      startDate: campaignData.startDate || new Date().toISOString().split('T')[0],
+      location: String(campaignData.location || '').trim(),
+      state: String(campaignData.state || 'Telangana').trim(),
+      district: String(campaignData.district || 'Hyderabad').trim(),
+      city: String(campaignData.city || '').trim(),
+      startDate: campaignData.startDate || now.split('T')[0],
       endDate: campaignData.endDate || new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      fundUtilizationNotes: campaignData.fundUtilizationNotes || '',
-      coverImageUrl: campaignData.coverImageUrl || '',
-      supportingImages: campaignData.supportingImages || [],
-      supportingDocuments: campaignData.supportingDocuments || [],
-      contactPersonName: campaignData.contactPersonName || creatorProfile.displayName,
-      contactPhone: campaignData.contactPhone || '',
-      contactEmail: campaignData.contactEmail || creatorProfile.email,
-      creatorFullName: campaignData.creatorFullName || creatorProfile.displayName,
-      creatorParentage: campaignData.creatorParentage || '',
-      creatorContactPhone: campaignData.creatorContactPhone || '',
-      creatorAlternatePhone: campaignData.creatorAlternatePhone || '',
-      creatorEmailAddress: campaignData.creatorEmailAddress || creatorProfile.email,
-      creatorResidentialLocation: campaignData.creatorResidentialLocation || '',
-      creatorState: campaignData.creatorState || 'Telangana',
-      creatorDistrict: campaignData.creatorDistrict || 'Hyderabad',
-      creatorCityTownVillage: campaignData.creatorCityTownVillage || '',
-      creatorMemberId: campaignData.creatorMemberId || '',
-      relationshipToBeneficiary: campaignData.relationshipToBeneficiary || 'Self',
+      fundUtilizationNotes: String(campaignData.fundUtilizationNotes || '').trim(),
+      coverImageUrl: String(campaignData.coverImageUrl || '').trim(),
+      supportingImages: Array.isArray(campaignData.supportingImages)
+        ? campaignData.supportingImages.map((img: any) => ({
+            id: String(img.id || `img_${Date.now()}`),
+            url: String(img.url || ''),
+            caption: String(img.caption || '').trim(),
+            fileName: String(img.fileName || ''),
+            uploadedAt: String(img.uploadedAt || now)
+          }))
+        : [],
+      supportingDocuments: Array.isArray(campaignData.supportingDocuments)
+        ? campaignData.supportingDocuments.map((doc: any) => ({
+            id: String(doc.id || `doc_${Date.now()}`),
+            name: String(doc.name || 'Verification Document'),
+            type: String(doc.type || 'Other'),
+            url: String(doc.url || ''),
+            uploadedAt: String(doc.uploadedAt || now),
+            sizeBytes: Number(doc.sizeBytes) || 0,
+            fileName: String(doc.fileName || ''),
+            mimeType: String(doc.mimeType || 'application/octet-stream'),
+            isPrivate: Boolean(doc.isPrivate !== false)
+          }))
+        : [],
+      contactPersonName: String(campaignData.contactPersonName || creatorProfile.displayName || '').trim(),
+      contactPhone: String(campaignData.contactPhone || '').trim(),
+      contactEmail: String(campaignData.contactEmail || creatorProfile.email || '').trim(),
+      creatorFullName: String(campaignData.creatorFullName || creatorProfile.displayName || '').trim(),
+      creatorParentage: String(campaignData.creatorParentage || '').trim(),
+      creatorContactPhone: String(campaignData.creatorContactPhone || '').trim(),
+      creatorAlternatePhone: String(campaignData.creatorAlternatePhone || '').trim(),
+      creatorEmailAddress: String(campaignData.creatorEmailAddress || creatorProfile.email || '').trim(),
+      creatorResidentialLocation: String(campaignData.creatorResidentialLocation || '').trim(),
+      creatorState: String(campaignData.creatorState || 'Telangana').trim(),
+      creatorDistrict: String(campaignData.creatorDistrict || 'Hyderabad').trim(),
+      creatorCityTownVillage: String(campaignData.creatorCityTownVillage || '').trim(),
+      creatorMemberId: String(campaignData.creatorMemberId || '').trim(),
+      relationshipToBeneficiary: String(campaignData.relationshipToBeneficiary || 'Self'),
       declarationAccepted: Boolean(campaignData.declarationAccepted),
       termsAccepted: Boolean(campaignData.termsAccepted),
       status: 'draft',
@@ -3851,8 +4026,9 @@ export async function saveCampaignDraft(
       updatedAt: now
     };
 
+    const cleanedDraft = cleanFirestoreData(newDraft);
     const campaignsRef = collection(db, 'crowdfunding_campaigns');
-    const docRef = await addDoc(campaignsRef, newDraft);
+    const docRef = await addDoc(campaignsRef, cleanedDraft);
     return docRef.id;
   }
 }
@@ -3879,7 +4055,7 @@ export async function submitCampaignAppeal(
       throw new Error('Permission denied: You can only resubmit your own campaigns');
     }
 
-    const updatePayload: Partial<CrowdfundingCampaign> = {
+    const updatePayload: Partial<CrowdfundingCampaign> = cleanFirestoreData({
       ...campaignData,
       targetAmount: target,
       requiredAmount: target,
@@ -3888,7 +4064,9 @@ export async function submitCampaignAppeal(
       isVerifiedByFET: false,
       submittedAt: now,
       updatedAt: now
-    };
+    });
+    delete (updatePayload as any).raisedAmount;
+    delete (updatePayload as any).verifiedDonationsCount;
 
     await updateDoc(docRef, updatePayload);
 
@@ -4234,15 +4412,16 @@ export async function adminReviewCampaign(
     reviewerUid: options.adminUid,
     reviewerEmail: options.adminEmail,
     timestamp: now,
-    internalNotes: internalNotes || undefined,
-    applicantFeedback: feedback || undefined
+    internalNotes: internalNotes || '',
+    applicantFeedback: feedback || ''
   };
 
   const existingHistory = campaign.reviewHistory || [];
   updatePayload.reviewHistory = [historyEntry, ...existingHistory];
 
-  // Update Firestore Document
-  await updateDoc(docRef, updatePayload);
+  // Update Firestore Document with cleaned payload
+  const cleanedPayload = cleanFirestoreData(updatePayload);
+  await updateDoc(docRef, cleanedPayload);
 
   // Record Immutable Audit Log
   await logAuditEvent({
@@ -4315,25 +4494,26 @@ export async function recordCampaignDonation(donationData: {
     donationId,
     campaignId: donationData.campaignId,
     campaignTitle: donationData.campaignTitle,
-    donorUid: donationData.donorUid,
+    donorUid: donationData.donorUid || null,
     donorName: donationData.donorName || 'Well-Wisher',
     donorEmail: donationData.donorEmail || '',
-    donorPhone: donationData.donorPhone,
-    donorPan: donationData.donorPan,
+    donorPhone: donationData.donorPhone || null,
+    donorPan: donationData.donorPan || null,
     amount: cleanAmount,
     createdAt: now,
     paymentStatus: isVerified ? 'verified' : 'pending_verification',
     transactionReference: donationData.transactionReference || 'REF-OFFLINE',
     paymentMethod: donationData.paymentMethod || 'Direct Bank Transfer / UPI',
     isAnonymous: Boolean(donationData.isAnonymous),
-    message: donationData.message,
-    verifiedAt: isVerified ? now : undefined,
-    verifiedByUid: isVerified ? donationData.adminUid : undefined,
-    verifiedByEmail: isVerified ? donationData.adminEmail : undefined
+    message: donationData.message || '',
+    verifiedAt: isVerified ? now : null,
+    verifiedByUid: isVerified ? (donationData.adminUid || null) : null,
+    verifiedByEmail: isVerified ? (donationData.adminEmail || null) : null
   };
 
   const donationsRef = collection(db, 'campaign_donations');
-  const docRef = await addDoc(donationsRef, newDonation);
+  const cleanedDonation = cleanFirestoreData(newDonation);
+  const docRef = await addDoc(donationsRef, cleanedDonation);
 
   // If verified, atomically update the Campaign's raisedAmount and verifiedDonationsCount
   if (isVerified) {
@@ -4649,7 +4829,7 @@ export async function createFinancialRecord(
     financialYear: recordData.financialYear || '2026-27'
   };
 
-  const docRef = await addDoc(recordsRef, docData);
+  const docRef = await addDoc(recordsRef, cleanFirestoreData(docData));
 
   // Record Audit Trail
   await logAuditEvent({

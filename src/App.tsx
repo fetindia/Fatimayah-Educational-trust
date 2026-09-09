@@ -27,14 +27,31 @@ import { PublicInitiatives } from './components/home/PublicInitiatives';
 import { EducationExamSection } from './components/home/EducationExamSection';
 import { VolunteerMembershipSection } from './components/home/VolunteerMembershipSection';
 import { CrowdfundingDonationSection } from './components/home/CrowdfundingDonationSection';
+import { FeaturedCrowdfundingSection } from './components/home/FeaturedCrowdfundingSection';
+import { EducationSupportSection } from './components/home/EducationSupportSection';
+import { PublicDonationSection } from './components/home/PublicDonationSection';
 import { EventsBlogSection } from './components/home/EventsBlogSection';
 import { FutureServicesSection } from './components/home/FutureServicesSection';
 import { MissionCtaSection } from './components/home/MissionCtaSection';
+import { FeaturedCasesSection } from './components/home/FeaturedCasesSection';
+import { FETIndiaExaminationsSection } from './components/home/FETIndiaExaminationsSection';
+import { LatestNewsBlogSection } from './components/home/LatestNewsBlogSection';
+import { ChairmanMessageSection } from './components/home/ChairmanMessageSection';
+import { ChairmanMessageModal } from './components/home/ChairmanMessageModal';
+import { NewsBlogReaderModal, NewsArticle } from './components/home/NewsBlogReaderModal';
+import { ExaminationInfoModal } from './components/competitions/ExaminationInfoModal';
+import { CompetitionRegistrationModal } from './components/competitions/CompetitionRegistrationModal';
+import { CampaignDetailsModal } from './components/campaigns/CampaignDetailsModal';
+import { SupportCampaignModal } from './components/campaigns/SupportCampaignModal';
+import { Competition, CrowdfundingCampaign } from './types';
+import { INITIAL_COMPETITIONS } from './data/initialCompetitions';
 import { AdminConsole } from './components/admin/AdminConsole';
 import { UserDashboard, MemberDashboardTab } from './components/dashboard/UserDashboard';
 import { AuthModal } from './components/auth/AuthModal';
 import { MembershipVerificationModal } from './components/membership/MembershipVerificationModal';
 import { LegalDocumentModal } from './components/legal/LegalDocumentModal';
+import { AboutTrustModal, AboutTab } from './components/common/AboutTrustModal';
+import { DonationModal } from './components/common/DonationModal';
 import { MobileBottomNav } from './components/layout/MobileBottomNav';
 import { OfflineNotice } from './components/common/OfflineNotice';
 import { PWAInstallBanner } from './components/common/PWAInstallBanner';
@@ -52,7 +69,26 @@ const FETIndiaPlatform: React.FC = () => {
   const [verificationMemberId, setVerificationMemberId] = useState<string>('');
   const [isLegalModalOpen, setIsLegalModalOpen] = useState<boolean>(false);
   const [legalModalTab, setLegalModalTab] = useState<'terms' | 'privacy'>('terms');
+  const [isAboutModalOpen, setIsAboutModalOpen] = useState<boolean>(false);
+  const [aboutModalTab, setAboutModalTab] = useState<AboutTab>('overview');
+  const [isDonationModalOpen, setIsDonationModalOpen] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+
+  // Modals for new homepage additions
+  const [selectedCaseForDetails, setSelectedCaseForDetails] = useState<CrowdfundingCampaign | null>(null);
+  const [isCaseDetailsOpen, setIsCaseDetailsOpen] = useState<boolean>(false);
+  const [selectedCaseForSupport, setSelectedCaseForSupport] = useState<CrowdfundingCampaign | null>(null);
+  const [isCaseSupportOpen, setIsCaseSupportOpen] = useState<boolean>(false);
+
+  const [selectedExamForApply, setSelectedExamForApply] = useState<Competition | null>(null);
+  const [isExamApplyOpen, setIsExamApplyOpen] = useState<boolean>(false);
+  const [selectedExamForInfo, setSelectedExamForInfo] = useState<Competition | null>(null);
+  const [isExamInfoOpen, setIsExamInfoOpen] = useState<boolean>(false);
+  const [examInfoTab, setExamInfoTab] = useState<'instructions' | 'book_mastery' | 'eligibility'>('instructions');
+
+  const [isChairmanModalOpen, setIsChairmanModalOpen] = useState<boolean>(false);
+  const [selectedArticleForReader, setSelectedArticleForReader] = useState<NewsArticle | null>(null);
+  const [isNewsReaderOpen, setIsNewsReaderOpen] = useState<boolean>(false);
 
   // Lock body scroll when mobile menu is open
   useEffect(() => {
@@ -117,6 +153,51 @@ const FETIndiaPlatform: React.FC = () => {
         setLegalModalTab('terms');
         setIsLegalModalOpen(true);
         setCurrentExperience('public');
+      } else if (hash === '#about' || hash === '#about_trust' || hash === '#about-trust' || path.startsWith('/about')) {
+        setAboutModalTab('overview');
+        setIsAboutModalOpen(true);
+        setCurrentExperience('public');
+      } else if (hash === '#governance' || path.startsWith('/governance')) {
+        setAboutModalTab('governance');
+        setIsAboutModalOpen(true);
+        setCurrentExperience('public');
+      } else if (hash === '#history' || path.startsWith('/history')) {
+        setAboutModalTab('history');
+        setIsAboutModalOpen(true);
+        setCurrentExperience('public');
+      } else if (hash === '#transparency' || path.startsWith('/transparency')) {
+        setAboutModalTab('transparency');
+        setIsAboutModalOpen(true);
+        setCurrentExperience('public');
+      } else if (hash === '#chairman' || hash === '#chairman_message' || hash === '#chairmans_message') {
+        setIsChairmanModalOpen(true);
+        setCurrentExperience('public');
+      } else if (hash === '#examinations' || hash === '#examination' || path.startsWith('/examinations')) {
+        setActiveSection('examinations');
+        setCurrentExperience('public');
+        setTimeout(() => {
+          document.getElementById('examinations')?.scrollIntoView({ behavior: 'smooth' });
+        }, 80);
+      } else if (hash === '#apply_exam' || hash === '#exam_apply') {
+        const exam = INITIAL_COMPETITIONS[0] || null;
+        setSelectedExamForApply(exam);
+        setIsExamApplyOpen(true);
+        setCurrentExperience('public');
+      } else if (hash === '#featured_cases' || hash === '#cases') {
+        setActiveSection('featured_cases');
+        setCurrentExperience('public');
+        setTimeout(() => {
+          document.getElementById('featured_cases')?.scrollIntoView({ behavior: 'smooth' });
+        }, 80);
+      } else if (hash === '#news_blogs' || hash === '#news' || hash === '#blogs') {
+        setActiveSection('news_blogs');
+        setCurrentExperience('public');
+        setTimeout(() => {
+          document.getElementById('news_blogs')?.scrollIntoView({ behavior: 'smooth' });
+        }, 80);
+      } else if (hash === '#donate' || path.startsWith('/donate')) {
+        setIsDonationModalOpen(true);
+        setCurrentExperience('public');
       } else {
         setCurrentExperience('public');
       }
@@ -134,6 +215,47 @@ const FETIndiaPlatform: React.FC = () => {
   const handleOpenLegal = (tab: 'terms' | 'privacy' = 'terms') => {
     setLegalModalTab(tab);
     setIsLegalModalOpen(true);
+  };
+
+  const handleOpenAbout = (tab: AboutTab = 'overview') => {
+    setAboutModalTab(tab);
+    setIsAboutModalOpen(true);
+  };
+
+  const handleOpenDonate = () => {
+    setIsDonationModalOpen(true);
+  };
+
+  const handleViewCase = (campaign: CrowdfundingCampaign) => {
+    setSelectedCaseForDetails(campaign);
+    setIsCaseDetailsOpen(true);
+  };
+
+  const handleSupportCase = (campaign: CrowdfundingCampaign) => {
+    setSelectedCaseForSupport(campaign);
+    setIsCaseSupportOpen(true);
+  };
+
+  const handleApplyExam = (competition: Competition) => {
+    setSelectedExamForApply(competition);
+    setIsExamApplyOpen(true);
+  };
+
+  const handleOpenApplyExamDirect = () => {
+    const exam = INITIAL_COMPETITIONS[0] || null;
+    setSelectedExamForApply(exam);
+    setIsExamApplyOpen(true);
+  };
+
+  const handleViewExamInfo = (competition: Competition, tab: 'instructions' | 'book_mastery' | 'eligibility' = 'instructions') => {
+    setSelectedExamForInfo(competition);
+    setExamInfoTab(tab);
+    setIsExamInfoOpen(true);
+  };
+
+  const handleReadArticle = (article: NewsArticle) => {
+    setSelectedArticleForReader(article);
+    setIsNewsReaderOpen(true);
   };
 
   const handleOpenVerification = (memberId?: string) => {
@@ -168,6 +290,29 @@ const FETIndiaPlatform: React.FC = () => {
 
   const handleScrollToSection = (sectionId: string) => {
     setIsMobileMenuOpen(false);
+    
+    // Intercept separate destinations for About & Governance as per prompt
+    if (sectionId === 'about' || sectionId === 'about_trust') {
+      handleOpenAbout('overview');
+      return;
+    }
+    if (sectionId === 'governance') {
+      handleOpenAbout('governance');
+      return;
+    }
+    if (sectionId === 'history') {
+      handleOpenAbout('history');
+      return;
+    }
+    if (sectionId === 'transparency') {
+      handleOpenAbout('transparency');
+      return;
+    }
+    if (sectionId === 'donate') {
+      handleOpenDonate();
+      return;
+    }
+
     setActiveSection(sectionId);
     if (currentExperience !== 'public') {
       setCurrentExperience('public');
@@ -178,7 +323,8 @@ const FETIndiaPlatform: React.FC = () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
-      const element = document.getElementById(sectionId);
+      const element = document.getElementById(sectionId) || 
+        (sectionId === 'education_support' ? document.getElementById('education-support') : null);
       if (element) {
         element.scrollIntoView({ behavior: 'smooth' });
       }
@@ -240,6 +386,11 @@ const FETIndiaPlatform: React.FC = () => {
               setIsMobileMenuOpen(false);
               handleOpenLegal(tab);
             }}
+            onOpenAbout={handleOpenAbout}
+            onOpenExamination={() => handleScrollToSection('examinations')}
+            onOpenApplyExam={handleOpenApplyExamDirect}
+            onOpenChairmanMessage={() => setIsChairmanModalOpen(true)}
+            onOpenNewsBlogs={() => handleScrollToSection('news_blogs')}
             isMobileMenuOpen={isMobileMenuOpen}
             onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
             onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
@@ -250,25 +401,35 @@ const FETIndiaPlatform: React.FC = () => {
             {(() => {
               const defaultOrder = [
                 'hero',
-                'statistics',
-                'programs',
-                'education',
-                'volunteer_membership',
                 'crowdfunding',
+                'featured_cases',
+                'education_support',
+                'programs',
+                'examinations',
                 'events_blog',
-                'future_services',
+                'news_blogs',
+                'chairmans_message',
+                'statistics',
                 'mission_cta'
               ];
               
-              // Normalize and deduplicate section keys if legacy keys (like store/travel/governance) exist
-              const rawOrder = config.homepageSectionsOrdering && config.homepageSectionsOrdering.length > 0
+              // Normalize and deduplicate section keys if legacy keys exist
+              const baseOrder = (config.homepageSectionsOrdering && config.homepageSectionsOrdering.length > 0)
                 ? config.homepageSectionsOrdering
                 : defaultOrder;
+
+              // Ensure all newly added sections are safely included if not already present
+              const fullOrder = [...baseOrder];
+              defaultOrder.forEach((key) => {
+                if (!fullOrder.includes(key)) {
+                  fullOrder.push(key);
+                }
+              });
 
               const normalizedOrder: string[] = [];
               const seen = new Set<string>();
 
-              rawOrder.forEach((item) => {
+              fullOrder.forEach((item) => {
                 let canonical = item;
                 if (item === 'store' || item === 'travel') {
                   canonical = 'future_services';
@@ -297,12 +458,35 @@ const FETIndiaPlatform: React.FC = () => {
                           <HeroSlider
                             key={itemKey}
                             onExplorePrograms={() => handleScrollToSection('programs')}
-                            onOpenDonate={() => handleScrollToSection('donate')}
+                            onOpenDonate={handleOpenDonate}
                             onOpenAuth={() => setIsAuthModalOpen(true)}
                           />
                         );
-                      case 'statistics':
-                        return <ImpactStatisticsSection key={itemKey} />;
+                      case 'crowdfunding':
+                        return (
+                          <FeaturedCrowdfundingSection 
+                            key={itemKey} 
+                            onOpenDonate={handleOpenDonate}
+                            onOpenLegal={handleOpenLegal} 
+                          />
+                        );
+                      case 'featured_cases':
+                        return (
+                          <FeaturedCasesSection
+                            key={itemKey}
+                            onViewCase={handleViewCase}
+                            onSupportCase={handleSupportCase}
+                            onViewAllCases={() => handleScrollToSection('crowdfunding')}
+                          />
+                        );
+                      case 'education_support':
+                        return (
+                          <EducationSupportSection 
+                            key={itemKey} 
+                            onOpenDonate={handleOpenDonate}
+                            onExplorePrograms={() => handleScrollToSection('programs')}
+                          />
+                        );
                       case 'programs':
                         return (
                           <PublicInitiatives
@@ -311,6 +495,35 @@ const FETIndiaPlatform: React.FC = () => {
                             onSelectInitiative={handleScrollToSection}
                           />
                         );
+                      case 'examinations':
+                        return (
+                          <FETIndiaExaminationsSection
+                            key={itemKey}
+                            onApplyExam={handleApplyExam}
+                            onViewExamInfo={handleViewExamInfo}
+                            onViewAllExams={() => handleScrollToSection('examinations')}
+                          />
+                        );
+                      case 'events_blog':
+                        return <EventsBlogSection key={itemKey} />;
+                      case 'news_blogs':
+                        return (
+                          <LatestNewsBlogSection
+                            key={itemKey}
+                            onReadArticle={handleReadArticle}
+                            onViewAllNewsBlogs={() => handleScrollToSection('events_blog')}
+                          />
+                        );
+                      case 'chairmans_message':
+                        return (
+                          <ChairmanMessageSection
+                            key={itemKey}
+                            onReadMoreChairman={() => setIsChairmanModalOpen(true)}
+                            onOpenGovernance={() => handleOpenAbout('governance')}
+                          />
+                        );
+                      case 'statistics':
+                        return <ImpactStatisticsSection key={itemKey} />;
                       case 'education':
                         return (
                           <EducationExamSection
@@ -326,19 +539,23 @@ const FETIndiaPlatform: React.FC = () => {
                             onOpenUserDashboard={handleOpenUserDashboard}
                           />
                         );
-                      case 'crowdfunding':
-                        return <CrowdfundingDonationSection key={itemKey} onOpenLegal={handleOpenLegal} />;
-                      case 'events_blog':
-                        return <EventsBlogSection key={itemKey} />;
                       case 'future_services':
                         return <FutureServicesSection key={itemKey} />;
+                      case 'donate':
+                        return (
+                          <PublicDonationSection 
+                            key={itemKey} 
+                            onOpenLegal={handleOpenLegal} 
+                          />
+                        );
                       case 'mission_cta':
                         return (
                           <MissionCtaSection
                             key={itemKey}
-                            onOpenDonate={() => handleScrollToSection('donate')}
+                            onOpenDonate={handleOpenDonate}
                             onOpenVolunteer={() => handleScrollToSection('volunteer')}
                             onOpenContact={() => handleScrollToSection('contact')}
+                            onOpenAbout={() => handleOpenAbout('governance')}
                           />
                         );
                       default:
@@ -356,6 +573,7 @@ const FETIndiaPlatform: React.FC = () => {
             onOpenAdmin={handleOpenAdmin}
             onOpenVerification={handleOpenVerification}
             onOpenLegal={handleOpenLegal}
+            onOpenAbout={handleOpenAbout}
           />
 
           {/* Native Mobile Bottom Navigation Bar */}
@@ -407,6 +625,115 @@ const FETIndiaPlatform: React.FC = () => {
           }
         }}
         initialTab={legalModalTab}
+      />
+
+      {/* Dedicated About Us, Governance & Institutional Transparency Modal */}
+      <AboutTrustModal
+        isOpen={isAboutModalOpen}
+        onClose={() => {
+          setIsAboutModalOpen(false);
+          if (
+            window.location.hash.startsWith('#about') || 
+            window.location.hash.startsWith('#governance') || 
+            window.location.hash.startsWith('#history') || 
+            window.location.hash.startsWith('#transparency')
+          ) {
+            window.history.pushState(null, '', window.location.pathname);
+          }
+        }}
+        initialTab={aboutModalTab}
+        onOpenDonate={handleOpenDonate}
+        onOpenVolunteer={() => {
+          setIsAboutModalOpen(false);
+          handleScrollToSection('volunteer');
+        }}
+      />
+
+      {/* Central 80G Tax-Exempt Contribution Modal */}
+      <DonationModal
+        isOpen={isDonationModalOpen}
+        onClose={() => {
+          setIsDonationModalOpen(false);
+          if (window.location.hash.startsWith('#donate')) {
+            window.history.pushState(null, '', window.location.pathname);
+          }
+        }}
+        onOpenLegal={handleOpenLegal}
+      />
+
+      {/* Public Examination Application Modal */}
+      {selectedExamForApply && (
+        <CompetitionRegistrationModal
+          competition={selectedExamForApply}
+          isOpen={isExamApplyOpen}
+          onClose={() => {
+            setIsExamApplyOpen(false);
+            setSelectedExamForApply(null);
+          }}
+          onOpenAuth={() => {
+            setIsExamApplyOpen(false);
+            setIsAuthModalOpen(true);
+          }}
+        />
+      )}
+
+      {/* Public Examination Information & Book Mastery Modal */}
+      <ExaminationInfoModal
+        competition={selectedExamForInfo}
+        isOpen={isExamInfoOpen}
+        onClose={() => {
+          setIsExamInfoOpen(false);
+          setSelectedExamForInfo(null);
+        }}
+        onApply={(comp) => {
+          setIsExamInfoOpen(false);
+          handleApplyExam(comp);
+        }}
+        initialTab={examInfoTab}
+      />
+
+      {/* Featured Case Details Modal */}
+      <CampaignDetailsModal
+        campaign={selectedCaseForDetails}
+        isOpen={isCaseDetailsOpen}
+        onClose={() => {
+          setIsCaseDetailsOpen(false);
+          setSelectedCaseForDetails(null);
+        }}
+        onOpenSupport={(c) => {
+          setIsCaseDetailsOpen(false);
+          handleSupportCase(c);
+        }}
+      />
+
+      {/* Featured Case Support & Contribution Modal */}
+      <SupportCampaignModal
+        campaign={selectedCaseForSupport}
+        isOpen={isCaseSupportOpen}
+        onClose={() => {
+          setIsCaseSupportOpen(false);
+          setSelectedCaseForSupport(null);
+        }}
+      />
+
+      {/* Chairman's Message Dedicated Address Modal */}
+      <ChairmanMessageModal
+        isOpen={isChairmanModalOpen}
+        onClose={() => setIsChairmanModalOpen(false)}
+        onOpenGovernance={() => {
+          setIsChairmanModalOpen(false);
+          handleOpenAbout('governance');
+        }}
+      />
+
+      {/* News & Blog Circular Reader Modal */}
+      <NewsBlogReaderModal
+        article={selectedArticleForReader}
+        isOpen={isNewsReaderOpen}
+        onClose={() => {
+          setIsNewsReaderOpen(false);
+          setSelectedArticleForReader(null);
+        }}
       />
     </>
   );
