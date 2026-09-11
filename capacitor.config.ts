@@ -19,7 +19,10 @@ const config: LocalCapacitorConfig = {
       'fetindia.com',
       '*.fetindia.com',
       '*.firebaseio.com',
-      '*.googleapis.com'
+      '*.googleapis.com',
+      'api.razorpay.com',
+      '*.razorpay.com',
+      'checkout.razorpay.com'
     ]
   },
   android: {

@@ -59,11 +59,23 @@ declare global {
 }
 
 /**
+ * Get backend API base URL. Defaults to empty string (same-origin/relative),
+ * or uses VITE_API_BASE_URL if configured for a dedicated production Cloud Run instance.
+ */
+export function getApiBaseUrl(): string {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (envUrl && typeof envUrl === 'string') {
+    return envUrl.trim().replace(/\/+$/, '');
+  }
+  return '';
+}
+
+/**
  * Fetch client-safe Razorpay configuration from backend
  */
 export async function fetchRazorpayConfig(): Promise<RazorpayPublicConfig> {
   try {
-    const res = await fetch('/api/razorpay/config');
+    const res = await fetch(`${getApiBaseUrl()}/api/razorpay/config`);
     if (!res.ok) {
       throw new Error(`Failed to load Razorpay configuration (${res.status})`);
     }
@@ -118,7 +130,7 @@ export function loadRazorpaySDK(): Promise<boolean> {
  * Securely create a Razorpay Order on the backend
  */
 export async function createRazorpayOrder(params: CreateOrderParams): Promise<CreateOrderResult> {
-  const response = await fetch('/api/razorpay/create-order', {
+  const response = await fetch(`${getApiBaseUrl()}/api/razorpay/create-order`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params)
@@ -142,7 +154,7 @@ export async function verifyRazorpayPayment(payload: {
   internalReference: string;
   campaignId: string;
 }): Promise<PaymentVerificationResult> {
-  const response = await fetch('/api/razorpay/verify-payment', {
+  const response = await fetch(`${getApiBaseUrl()}/api/razorpay/verify-payment`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -218,6 +230,16 @@ export async function initiateRazorpayContribution(options: {
       modal: {
         confirm_close: true,
         ondismiss: () => {
+          // Record cancellation non-blockingly
+          fetch(`${getApiBaseUrl()}/api/razorpay/record-failure`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              internalReference: order.internalReference,
+              razorpayOrderId: order.orderId,
+              errorDescription: 'Payment modal dismissed by contributor before authorization'
+            })
+          }).catch(() => {});
           if (onDismiss) {
             onDismiss();
           }
@@ -284,6 +306,16 @@ export async function initiateRazorpayContribution(options: {
       const rzpInstance = new window.Razorpay(checkoutOptions);
       rzpInstance.on('payment.failed', (resp: any) => {
         const errorDesc = resp.error?.description || resp.error?.reason || 'Transaction could not be completed at gateway.';
+        // Report failure to backend non-blockingly
+        fetch(`${getApiBaseUrl()}/api/razorpay/record-failure`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            internalReference: order.internalReference,
+            razorpayOrderId: order.orderId,
+            errorDescription: errorDesc
+          })
+        }).catch(() => {});
         onError(`Payment failed: ${errorDesc} (Code: ${resp.error?.code || 'UNKNOWN'})`);
       });
       rzpInstance.open();

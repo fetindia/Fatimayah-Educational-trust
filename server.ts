@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
+import http from 'http';
 import path from 'path';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
@@ -23,7 +24,25 @@ import firebaseConfigData from './firebase-applet-config.json';
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+
+// Enable CORS for frontend clients (including fetindia.com, www.fetindia.com, and preview runtimes)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
 
 // Initialize Firebase server connection
 const firebaseApp = initializeApp(firebaseConfigData);
@@ -36,6 +55,17 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ extended: true }));
+
+// Helper: Clean object of undefined values for Firestore
+function cleanObject<T extends Record<string, any>>(obj: T): T {
+  const result: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
 
 // Helper: Get Razorpay Client or null
 function getRazorpayClient(): Razorpay | null {
@@ -77,8 +107,8 @@ app.get('/api/razorpay/config', (_req: Request, res: Response) => {
   const isLive = keyId.startsWith('rzp_live');
 
   res.json({
-    // Return keyId if configured, or a fallback test identifier
-    keyId: keyId || 'rzp_test_FET_INDIA_TESTMODE',
+    // Return keyId if configured, or a fallback test identifier for preview
+    keyId: keyId || (isLive ? '' : 'rzp_test_FET_INDIA_TESTMODE'),
     isConfigured,
     mode: isLive ? 'live' : 'test',
     currency: 'INR',
@@ -136,13 +166,22 @@ app.post('/api/razorpay/create-order', async (req: Request, res: Response) => {
     const internalReference = `FET-DON-${currentYear}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 
     const rzp = getRazorpayClient();
+    const rawKeyId = process.env.RAZORPAY_KEY_ID || '';
+    const isLive = rawKeyId.startsWith('rzp_live');
     let orderId: string;
-    let mode: 'test' | 'live' = 'test';
-    const keyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_FET_INDIA_TESTMODE';
+    let mode: 'test' | 'live' = isLive ? 'live' : 'test';
+    const keyId = rawKeyId || 'rzp_test_FET_INDIA_TESTMODE';
+
+    if (isLive && (!rzp || !process.env.RAZORPAY_KEY_SECRET)) {
+      res.status(500).json({
+        error: 'Razorpay Live key ID is set, but server Secret is missing or client failed to initialize. Please configure RAZORPAY_KEY_SECRET in server environment.'
+      });
+      return;
+    }
 
     if (rzp && process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
       // Official Razorpay API order creation
-      mode = process.env.RAZORPAY_KEY_ID.startsWith('rzp_live') ? 'live' : 'test';
+      mode = isLive ? 'live' : 'test';
       const orderOptions = {
         amount: amountInPaise,
         currency: 'INR',
@@ -160,14 +199,14 @@ app.post('/api/razorpay/create-order', async (req: Request, res: Response) => {
       const razorpayOrder = await rzp.orders.create(orderOptions);
       orderId = razorpayOrder.id;
     } else {
-      // Test simulation mode (allows full development and automated testing before keys injected)
+      // Test simulation mode (allows full development and preview before keys injected)
       orderId = `order_test_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
       mode = 'test';
     }
 
     // Save pending contribution record in Firestore
     const now = new Date().toISOString();
-    const donationData = {
+    const donationData = cleanObject({
       donationId: internalReference,
       campaignId,
       campaignTitle,
@@ -185,14 +224,14 @@ app.post('/api/razorpay/create-order', async (req: Request, res: Response) => {
       gatewayMode: mode,
       isAnonymous: Boolean(isAnonymous),
       message: message ? String(message).trim() : ''
-    };
+    });
 
     const donationsCollection = collection(db, 'campaign_donations');
     const docRef = await addDoc(donationsCollection, donationData);
 
     // Audit log
     try {
-      await addDoc(collection(db, 'audit_logs'), {
+      await addDoc(collection(db, 'audit_logs'), cleanObject({
         actorUid: donorUid || 'donor_public',
         actorEmail: donorEmail,
         actorRole: 'user',
@@ -207,7 +246,7 @@ app.post('/api/razorpay/create-order', async (req: Request, res: Response) => {
           amount: cleanAmount,
           mode
         }
-      });
+      }));
     } catch (auditErr) {
       console.warn('Non-blocking audit log warning:', auditErr);
     }
@@ -253,7 +292,8 @@ app.post('/api/razorpay/verify-payment', async (req: Request, res: Response) => 
     }
 
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
-    const isLive = process.env.RAZORPAY_KEY_ID?.startsWith('rzp_live');
+    const rawKeyId = process.env.RAZORPAY_KEY_ID || '';
+    const isLive = rawKeyId.startsWith('rzp_live');
 
     let isSignatureValid = false;
 
@@ -272,16 +312,18 @@ app.post('/api/razorpay/verify-payment', async (req: Request, res: Response) => 
       } catch {
         isSignatureValid = false;
       }
-    } else if (!keySecret && !isLive) {
+    } else if (!isLive && !keySecret) {
       // In development/test mode before secret is injected:
-      // Allow verification if valid mock test payment ID structure is supplied
+      // Allow simulation only when live keys are NOT active
       isSignatureValid = razorpay_payment_id.startsWith('pay_');
     }
 
-    // Locate the matching donation record in Firestore
+    // Locate the matching donation record in Firestore by internalReference or orderId
     const donationsCollection = collection(db, 'campaign_donations');
-    const q = query(donationsCollection, where('transactionReference', '==', internalReference));
-    const snap = await getDocs(q);
+    let snap = await getDocs(query(donationsCollection, where('transactionReference', '==', internalReference)));
+    if (snap.empty && razorpay_order_id) {
+      snap = await getDocs(query(donationsCollection, where('razorpayOrderId', '==', razorpay_order_id)));
+    }
 
     if (snap.empty) {
       res.status(404).json({
@@ -295,26 +337,45 @@ app.post('/api/razorpay/verify-payment', async (req: Request, res: Response) => 
     const donationData = donationDoc.data();
     const now = new Date().toISOString();
 
-    // Prevent duplicate processing if already verified
+    // Idempotency: Prevent duplicate processing if already verified
     if (donationData.paymentStatus === 'verified') {
       res.json({
         success: true,
         message: 'Payment was already verified.',
         receiptNumber: donationData.receiptNumber,
         internalReference: donationData.transactionReference,
-        paymentId: donationData.razorpayPaymentId
+        paymentId: donationData.razorpayPaymentId,
+        amount: donationData.amount
       });
       return;
     }
 
+    // Check if this payment ID was already used on another contribution (replay attack prevention)
+    if (razorpay_payment_id && !razorpay_payment_id.startsWith('pay_test_sim_')) {
+      const existingPaymentSnap = await getDocs(query(
+        donationsCollection,
+        where('razorpayPaymentId', '==', razorpay_payment_id),
+        where('paymentStatus', '==', 'verified')
+      ));
+      if (!existingPaymentSnap.empty && existingPaymentSnap.docs[0].id !== donationDoc.id) {
+        res.status(409).json({
+          success: false,
+          error: 'This Razorpay payment ID has already been credited to a verified contribution record.',
+          receiptNumber: existingPaymentSnap.docs[0].data().receiptNumber
+        });
+        return;
+      }
+    }
+
     if (!isSignatureValid) {
       // Mark as failed in database
-      await updateDoc(doc(db, 'campaign_donations', donationDoc.id), {
+      await updateDoc(doc(db, 'campaign_donations', donationDoc.id), cleanObject({
         paymentStatus: 'failed',
         razorpayOrderId: razorpay_order_id,
         razorpayPaymentId: razorpay_payment_id,
-        paymentError: 'Cryptographic signature mismatch'
-      });
+        paymentError: 'Cryptographic signature mismatch',
+        failedAt: now
+      }));
 
       res.status(400).json({
         success: false,
@@ -328,7 +389,7 @@ app.post('/api/razorpay/verify-payment', async (req: Request, res: Response) => 
     const receiptNumber = `REC/80G/2026/${suffix}`;
     const financialYear = '2026-27';
 
-    await updateDoc(doc(db, 'campaign_donations', donationDoc.id), {
+    await updateDoc(doc(db, 'campaign_donations', donationDoc.id), cleanObject({
       paymentStatus: 'verified',
       razorpayOrderId: razorpay_order_id,
       razorpayPaymentId: razorpay_payment_id,
@@ -337,7 +398,7 @@ app.post('/api/razorpay/verify-payment', async (req: Request, res: Response) => 
       receiptNumber,
       financialYear,
       paymentMethod: 'Razorpay Payment Gateway (Verified)'
-    });
+    }));
 
     // Recalculate campaign progress if campaignId is supplied and not general
     const effectiveCampaignId = campaignId || donationData.campaignId;
@@ -359,11 +420,11 @@ app.post('/api/razorpay/verify-payment', async (req: Request, res: Response) => 
         const campaignRef = doc(db, 'crowdfunding_campaigns', effectiveCampaignId);
         const campaignDocSnap = await getDoc(campaignRef);
         if (campaignDocSnap.exists()) {
-          await updateDoc(campaignRef, {
+          await updateDoc(campaignRef, cleanObject({
             raisedAmount: totalRaised,
             verifiedDonationsCount: count,
             updatedAt: now
-          });
+          }));
         }
       } catch (campErr) {
         console.warn('Campaign progress recalculation warning:', campErr);
@@ -372,7 +433,7 @@ app.post('/api/razorpay/verify-payment', async (req: Request, res: Response) => 
 
     // Audit log
     try {
-      await addDoc(collection(db, 'audit_logs'), {
+      await addDoc(collection(db, 'audit_logs'), cleanObject({
         actorUid: donationData.donorUid || 'donor_public',
         actorEmail: donationData.donorEmail || 'donor@fetindia.com',
         actorRole: 'user',
@@ -388,7 +449,7 @@ app.post('/api/razorpay/verify-payment', async (req: Request, res: Response) => 
           amount: donationData.amount,
           financialYear
         }
-      });
+      }));
     } catch (auditErr) {
       console.warn('Non-blocking audit log warning:', auditErr);
     }
@@ -407,6 +468,43 @@ app.post('/api/razorpay/verify-payment', async (req: Request, res: Response) => 
       success: false,
       error: error.message || 'Payment verification encountered an internal error.'
     });
+  }
+});
+
+// -------------------------------------------------------------
+// 4b. RECORD CLIENT PAYMENT FAILURE / DISMISSAL
+// -------------------------------------------------------------
+app.post('/api/razorpay/record-failure', async (req: Request, res: Response) => {
+  try {
+    const { internalReference, razorpayOrderId, errorDescription } = req.body;
+    if (!internalReference && !razorpayOrderId) {
+      res.status(400).json({ error: 'Reference or order ID required.' });
+      return;
+    }
+
+    const donationsCollection = collection(db, 'campaign_donations');
+    let snap;
+    if (internalReference) {
+      snap = await getDocs(query(donationsCollection, where('transactionReference', '==', internalReference)));
+    } else {
+      snap = await getDocs(query(donationsCollection, where('razorpayOrderId', '==', razorpayOrderId)));
+    }
+
+    if (!snap.empty) {
+      const dDoc = snap.docs[0];
+      const dData = dDoc.data();
+      // Only mark failed if still pending
+      if (dData.paymentStatus === 'pending_verification') {
+        await updateDoc(doc(db, 'campaign_donations', dDoc.id), cleanObject({
+          paymentStatus: 'failed',
+          paymentError: String(errorDescription || 'Payment interrupted or cancelled by user').substring(0, 250),
+          failedAt: new Date().toISOString()
+        }));
+      }
+    }
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -460,13 +558,13 @@ app.post('/api/razorpay/webhook', async (req: Request, res: Response) => {
           if (prev.paymentStatus !== 'verified') {
             const now = new Date().toISOString();
             const suffix = prev.transactionReference?.split('-').pop() || crypto.randomBytes(3).toString('hex').toUpperCase();
-            await updateDoc(doc(db, 'campaign_donations', donationDoc.id), {
+            await updateDoc(doc(db, 'campaign_donations', donationDoc.id), cleanObject({
               paymentStatus: 'verified',
               razorpayPaymentId: paymentId || prev.razorpayPaymentId || 'WEBHOOK_CAPTURED',
               verifiedAt: now,
               receiptNumber: prev.receiptNumber || `REC/80G/2026/${suffix}`,
               financialYear: '2026-27'
-            });
+            }));
           }
         }
       }
@@ -477,10 +575,10 @@ app.post('/api/razorpay/webhook', async (req: Request, res: Response) => {
         const snap = await getDocs(query(collection(db, 'campaign_donations'), where('transactionReference', '==', internalReference)));
         if (!snap.empty) {
           const donationDoc = snap.docs[0];
-          await updateDoc(doc(db, 'campaign_donations', donationDoc.id), {
+          await updateDoc(doc(db, 'campaign_donations', donationDoc.id), cleanObject({
             paymentStatus: 'failed',
             paymentError: paymentEntity?.error_description || 'Payment failed at gateway'
-          });
+          }));
         }
       }
     }
@@ -496,10 +594,17 @@ app.post('/api/razorpay/webhook', async (req: Request, res: Response) => {
 // 6. VITE MIDDLEWARE (Dev) & STATIC SERVING (Prod)
 // -------------------------------------------------------------
 async function initServer() {
+  const httpServer = http.createServer(app);
+
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: {
+          server: httpServer
+        }
+      },
       appType: 'spa'
     });
     app.use(vite.middlewares);
@@ -511,7 +616,7 @@ async function initServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`FET India Full-Stack Server running on http://0.0.0.0:${PORT}`);
   });
 }
