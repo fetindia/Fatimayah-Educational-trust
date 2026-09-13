@@ -58,25 +58,15 @@ declare global {
   }
 }
 
-// Dedicated production Cloud Run backend endpoint for FET India API & Razorpay Gateway
-const PRODUCTION_CLOUD_RUN_API_URL = 'https://fatimayah-educational-trust-git-991424927510.asia-south1.run.app';
-
 /**
  * Get backend API base URL.
- * 1. Checks VITE_API_BASE_URL environment variable first.
- * 2. In production builds, routes directly to the dedicated Cloud Run backend URL.
- * 3. In local development (import.meta.env.DEV), falls back to empty string for same-origin dev server.
+ * Uses the configured production API base URL: import.meta.env.VITE_API_BASE_URL.
+ * If empty or in local development, defaults to empty string for same-origin dev server proxy.
  */
 export function getApiBaseUrl(): string {
   const envUrl = import.meta.env.VITE_API_BASE_URL;
   if (envUrl && typeof envUrl === 'string' && envUrl.trim() !== '') {
     return envUrl.trim().replace(/\/+$/, '');
-  }
-
-  // In production builds (e.g. deployed to Firebase Hosting / fetindia.com),
-  // directly communicate with the Cloud Run API instance
-  if (import.meta.env.PROD) {
-    return PRODUCTION_CLOUD_RUN_API_URL;
   }
 
   return '';
