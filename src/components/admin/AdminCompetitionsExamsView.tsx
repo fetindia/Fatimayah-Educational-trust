@@ -37,7 +37,8 @@ import {
   Check,
   ExternalLink,
   Lock,
-  AlertTriangle
+  AlertTriangle,
+  Trophy
 } from 'lucide-react';
 import { 
   Competition, 
@@ -46,7 +47,8 @@ import {
   CompetitionCategory,
   ParticipantAward,
   CompetitionCertificateRecord,
-  ExamQuestion
+  ExamQuestion,
+  CompetitionPrizeTier
 } from '../../types';
 import { INITIAL_COMPETITIONS } from '../../data/initialCompetitions';
 import { useAuth } from '../../contexts/AuthContext';
@@ -656,6 +658,17 @@ export const AdminCompetitionsExamsView: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-1">
+                      {isSuperAdmin && (
+                        <button
+                          onClick={() => setEditingComp(comp)}
+                          className="px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 hover:bg-amber-100 text-amber-900 font-bold text-xs cursor-pointer flex items-center gap-1"
+                          title="Edit Examination & Prizes Structure"
+                        >
+                          <Edit3 className="w-3.5 h-3.5 text-amber-700" />
+                          <span>Edit & Prizes</span>
+                        </button>
+                      )}
+
                       {comp.status === 'under_evaluation' || comp.status === 'result_pending' ? (
                         <button
                           onClick={() => handlePublishCompetitionResults(comp)}
@@ -1436,7 +1449,7 @@ export const AdminCompetitionsExamsView: React.FC = () => {
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* MODAL 1: CREATE / SCHEDULE COMPETITION */}
+      {/* MODAL 1: CREATE / SCHEDULE / EDIT COMPETITION */}
       {/* ------------------------------------------------------------- */}
       {showCreateModal && (
         <CreateCompetitionModal
@@ -1444,6 +1457,17 @@ export const AdminCompetitionsExamsView: React.FC = () => {
           onSuccess={(comp) => {
             setShowCreateModal(false);
             notify(`Competition "${comp.title}" created successfully!`);
+          }}
+        />
+      )}
+
+      {editingComp && (
+        <CreateCompetitionModal
+          initialCompetition={editingComp}
+          onClose={() => setEditingComp(null)}
+          onSuccess={(comp) => {
+            setEditingComp(null);
+            notify(`Competition "${comp.title}" and prize rewards updated successfully!`);
           }}
         />
       )}
@@ -1508,45 +1532,110 @@ export const AdminCompetitionsExamsView: React.FC = () => {
 };
 
 // -------------------------------------------------------------
-// SUB-MODAL: CREATE NEW COMPETITION
+// SUB-MODAL: CREATE / EDIT COMPETITION & PRIZES
 // -------------------------------------------------------------
 interface CreateCompetitionModalProps {
+  initialCompetition?: Competition | null;
   onClose: () => void;
   onSuccess: (comp: Competition) => void;
 }
 
-const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ onClose, onSuccess }) => {
+const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initialCompetition, onClose, onSuccess }) => {
   const { currentUser } = useAuth();
+  const isEditing = Boolean(initialCompetition);
 
   const [formData, setFormData] = useState({
-    code: `FET-CMP-2026-00${Math.floor(10 + Math.random() * 90)}`,
-    title: '',
-    category: 'book_reading' as CompetitionCategory,
-    categoryLabel: 'Book Reading Competition',
-    description: '',
-    eligibilityAgeMin: 12,
-    eligibilityAgeMax: 22,
-    eligibleClasses: 'Class 8th, Class 9th, Class 10th, Class 11th, Class 12th',
-    registrationStartDate: new Date().toISOString().split('T')[0],
-    registrationEndDate: '2026-10-15',
-    competitionDate: '2026-10-30',
-    resultPublicationDate: '2026-11-15',
-    maxParticipants: 2000,
-    maxMarks: 100,
-    passingMarks: 40,
+    code: initialCompetition?.code || `FET-CMP-2026-00${Math.floor(10 + Math.random() * 90)}`,
+    title: initialCompetition?.title || '',
+    category: (initialCompetition?.category || 'book_reading') as CompetitionCategory,
+    categoryLabel: initialCompetition?.categoryLabel || 'Book Reading Competition',
+    description: initialCompetition?.description || '',
+    eligibilityAgeMin: initialCompetition?.eligibilityAgeMin ?? 12,
+    eligibilityAgeMax: initialCompetition?.eligibilityAgeMax ?? 22,
+    eligibleClasses: initialCompetition?.eligibleClasses?.join(', ') || 'Class 8th, Class 9th, Class 10th, Class 11th, Class 12th',
+    registrationStartDate: initialCompetition?.registrationStartDate || new Date().toISOString().split('T')[0],
+    registrationEndDate: initialCompetition?.registrationEndDate || '2026-10-15',
+    competitionDate: initialCompetition?.competitionDate || '2026-10-30',
+    resultPublicationDate: initialCompetition?.resultPublicationDate || '2026-11-15',
+    maxParticipants: initialCompetition?.maxParticipants ?? 2000,
+    maxMarks: initialCompetition?.maxMarks ?? 100,
+    passingMarks: initialCompetition?.passingMarks ?? 40,
     // Book details
-    isBookReading: true,
-    bookTitle: 'Wings of Fire: An Autobiography',
-    author: 'Dr. A.P.J. Abdul Kalam',
-    requiredChapters: 'Chapters 1 to 6',
+    isBookReading: initialCompetition ? Boolean(initialCompetition.bookDetails) : true,
+    bookTitle: initialCompetition?.bookDetails?.bookTitle || 'Wings of Fire: An Autobiography',
+    author: initialCompetition?.bookDetails?.author || 'Dr. A.P.J. Abdul Kalam',
+    requiredChapters: initialCompetition?.bookDetails?.requiredChapters || 'Chapters 1 to 6',
     // Exam details
-    isOnlineExam: true,
-    durationMinutes: 45,
-    coverImageUrl: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=800&q=80',
-    status: 'registration_open' as CompetitionStatus
+    isOnlineExam: initialCompetition?.examDetails?.isOnlineExam ?? true,
+    durationMinutes: initialCompetition?.examDetails?.durationMinutes ?? 45,
+    coverImageUrl: initialCompetition?.coverImageUrl || 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=800&q=80',
+    status: (initialCompetition?.status || 'registration_open') as CompetitionStatus,
+    prizesSummary: initialCompetition?.prizesSummary?.join(', ') || '1st Prize: ₹25,000 Gold Medal & Trophy, 2nd Prize: ₹15,000 Silver Medal, 3rd Prize: ₹10,000 Bronze Medal, Top 10 Distinction Certificates'
   });
 
+  const [prizeTiers, setPrizeTiers] = useState<CompetitionPrizeTier[]>(
+    initialCompetition?.prizeRewards && initialCompetition.prizeRewards.length > 0
+      ? initialCompetition.prizeRewards
+      : [
+          {
+            id: 'pz-1',
+            rankPosition: 1,
+            title: '1st Prize - Gold Distinction',
+            rewardAmount: 25000,
+            rewardDescription: 'Gold Medal, Certificate of Excellence & ₹25,000 Educational Grant',
+            winnerCount: 1,
+            status: 'active'
+          },
+          {
+            id: 'pz-2',
+            rankPosition: 2,
+            title: '2nd Prize - Silver Distinction',
+            rewardAmount: 15000,
+            rewardDescription: 'Silver Medal, Certificate of Excellence & ₹15,000 Educational Grant',
+            winnerCount: 1,
+            status: 'active'
+          },
+          {
+            id: 'pz-3',
+            rankPosition: 3,
+            title: '3rd Prize - Bronze Distinction',
+            rewardAmount: 10000,
+            rewardDescription: 'Bronze Medal, Certificate of Excellence & ₹10,000 Educational Grant',
+            winnerCount: 1,
+            status: 'active'
+          }
+        ]
+  );
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleUpdatePrize = (index: number, field: keyof CompetitionPrizeTier, val: any) => {
+    setPrizeTiers(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: val };
+      return updated;
+    });
+  };
+
+  const handleAddPrizeTier = () => {
+    const nextRank = prizeTiers.length + 1;
+    setPrizeTiers(prev => [
+      ...prev,
+      {
+        id: `pz-${Date.now()}-${nextRank}`,
+        rankPosition: nextRank,
+        title: `${nextRank}th Place - Consolation Award`,
+        rewardAmount: 2000,
+        rewardDescription: 'Merit Trophy & Educational Kit',
+        winnerCount: 1,
+        status: 'active'
+      }
+    ]);
+  };
+
+  const handleRemovePrizeTier = (index: number) => {
+    setPrizeTiers(prev => prev.filter((_, idx) => idx !== index));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1554,8 +1643,11 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ onClose
 
     setIsSubmitting(true);
     try {
-      const compId = `cmp-${Date.now()}`;
-      const newComp: Competition = {
+      const compId = initialCompetition?.id || `cmp-${Date.now()}`;
+      const prizesList = formData.prizesSummary.split(',').map(s => s.trim()).filter(Boolean);
+
+      const compData: Competition = {
+        ...(initialCompetition || {}),
         id: compId,
         code: formData.code,
         title: formData.title.trim(),
@@ -1565,17 +1657,19 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ onClose
         eligibilityAgeMin: Number(formData.eligibilityAgeMin),
         eligibilityAgeMax: Number(formData.eligibilityAgeMax),
         eligibleClasses: formData.eligibleClasses.split(',').map((s) => s.trim()).filter(Boolean),
-        eligibleStates: ['All India'],
-        eligibleDistricts: ['All Districts'],
+        eligibleStates: initialCompetition?.eligibleStates || ['All India'],
+        eligibleDistricts: initialCompetition?.eligibleDistricts || ['All Districts'],
         registrationStartDate: formData.registrationStartDate,
         registrationEndDate: formData.registrationEndDate,
         competitionDate: formData.competitionDate,
         resultPublicationDate: formData.resultPublicationDate,
         maxParticipants: Number(formData.maxParticipants),
-        registeredCount: 0,
+        registeredCount: initialCompetition?.registeredCount || 0,
         maxMarks: Number(formData.maxMarks),
         passingMarks: Number(formData.passingMarks),
-        rules: [
+        prizesSummary: prizesList,
+        prizeRewards: prizeTiers,
+        rules: initialCompetition?.rules || [
           'Candidate must bring official admit pass or login at the scheduled exam time.',
           'All answers must be the original, independent work of the candidate.'
         ],
@@ -1585,7 +1679,7 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ onClose
           author: formData.author,
           requiredChapters: formData.requiredChapters
         } : undefined,
-        examDetails: {
+        examDetails: initialCompetition?.examDetails || {
           isOnlineExam: formData.isOnlineExam,
           durationMinutes: Number(formData.durationMinutes),
           questions: [
@@ -1607,26 +1701,26 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ onClose
         },
         status: formData.status,
         isPublished: true,
-        createdByUid: currentUser?.uid || 'admin',
-        createdByEmail: currentUser?.email || 'admin@fetindia.com',
-        createdAt: new Date().toISOString(),
+        createdByUid: initialCompetition?.createdByUid || currentUser?.uid || 'admin',
+        createdByEmail: initialCompetition?.createdByEmail || currentUser?.email || 'admin@fetindia.com',
+        createdAt: initialCompetition?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
-      await setDoc(doc(db, 'competitions', compId), newComp);
+      await setDoc(doc(db, 'competitions', compId), compData, { merge: true });
 
       // Audit Log
       await addDoc(collection(db, 'audit_logs'), {
-        action: 'COMPETITION_CREATED',
+        action: isEditing ? 'COMPETITION_UPDATED' : 'COMPETITION_CREATED',
         userId: currentUser?.uid || 'admin',
         userEmail: currentUser?.email || 'admin@fetindia.com',
-        details: `Created new competition: ${newComp.title} (${newComp.code})`,
+        details: `${isEditing ? 'Updated' : 'Created'} competition: ${compData.title} (${compData.code})`,
         timestamp: new Date().toISOString()
       });
 
-      onSuccess(newComp);
+      onSuccess(compData);
     } catch (err: any) {
-      console.error('Error creating competition:', err);
+      console.error('Error saving competition:', err);
     } finally {
       setIsSubmitting(false);
     }
@@ -1639,7 +1733,9 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ onClose
         <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Award className="w-5 h-5 text-amber-400" />
-            <h3 className="text-base font-bold text-white">Create New Competition / Examination</h3>
+            <h3 className="text-base font-bold text-white">
+              {isEditing ? 'Edit Competition & Prize Structure' : 'Create New Competition / Examination'}
+            </h3>
           </div>
           <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-white cursor-pointer">
             ✕
@@ -1722,6 +1818,76 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ onClose
               </>
             )}
 
+            {/* Prizes & Awards Configuration */}
+            <div className="sm:col-span-2 p-3 bg-indigo-50/70 rounded-2xl border border-indigo-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="font-bold text-indigo-950 flex items-center gap-1.5">
+                  <Trophy className="w-4 h-4 text-amber-500" />
+                  <span>Prizes & Recognition Tiers</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddPrizeTier}
+                  className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>Add Rank Prize</span>
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {prizeTiers.map((tier, idx) => (
+                  <div key={tier.id || idx} className="p-2.5 rounded-xl bg-white border border-indigo-100 flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-amber-100 text-amber-900 font-black text-xs flex items-center justify-center shrink-0">
+                      #{tier.rankPosition}
+                    </span>
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2 w-full">
+                      <input
+                        type="text"
+                        placeholder="Prize Title"
+                        value={tier.title}
+                        onChange={(e) => handleUpdatePrize(idx, 'title', e.target.value)}
+                        className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold"
+                      />
+                      <input
+                        type="number"
+                        placeholder="Cash Reward (₹)"
+                        value={tier.rewardAmount || ''}
+                        onChange={(e) => handleUpdatePrize(idx, 'rewardAmount', Number(e.target.value))}
+                        className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-mono font-semibold"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Description (Medal, Trophy, etc.)"
+                        value={tier.rewardDescription}
+                        onChange={(e) => handleUpdatePrize(idx, 'rewardDescription', e.target.value)}
+                        className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemovePrizeTier(idx)}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer shrink-0"
+                      title="Remove Tier"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Prizes Summary (Comma separated for portal badges)</label>
+                <input
+                  type="text"
+                  value={formData.prizesSummary}
+                  onChange={(e) => setFormData({ ...formData, prizesSummary: e.target.value })}
+                  placeholder="1st Prize: ₹25,000 Gold Medal, 2nd Prize: ₹15,000 Silver Medal, ..."
+                  className="w-full px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs"
+                />
+              </div>
+            </div>
+
             <div>
               <label className="block font-bold text-slate-700 mb-1">Eligible Classes (comma separated)</label>
               <input
@@ -1800,7 +1966,7 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ onClose
               disabled={isSubmitting}
               className="px-5 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl font-bold cursor-pointer"
             >
-              {isSubmitting ? 'Saving Program...' : 'Create Competition'}
+              {isSubmitting ? 'Saving Program...' : isEditing ? 'Save Changes & Prizes' : 'Create Competition'}
             </button>
           </div>
 

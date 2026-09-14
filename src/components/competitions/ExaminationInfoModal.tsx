@@ -18,7 +18,9 @@ import {
   ShieldCheck, 
   ArrowRight,
   Download,
-  AlertCircle
+  AlertCircle,
+  Trophy,
+  Gift
 } from 'lucide-react';
 import { Competition } from '../../types';
 
@@ -27,7 +29,7 @@ interface ExaminationInfoModalProps {
   isOpen: boolean;
   onClose: () => void;
   onApply: (comp: Competition) => void;
-  initialTab?: 'instructions' | 'book_mastery' | 'eligibility';
+  initialTab?: 'instructions' | 'book_mastery' | 'eligibility' | 'prizes';
 }
 
 export const ExaminationInfoModal: React.FC<ExaminationInfoModalProps> = ({
@@ -37,7 +39,7 @@ export const ExaminationInfoModal: React.FC<ExaminationInfoModalProps> = ({
   onApply,
   initialTab = 'instructions'
 }) => {
-  const [activeTab, setActiveTab] = useState<'instructions' | 'book_mastery' | 'eligibility'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'instructions' | 'book_mastery' | 'eligibility' | 'prizes'>(initialTab);
 
   if (!isOpen || !competition) return null;
 
@@ -115,6 +117,18 @@ export const ExaminationInfoModal: React.FC<ExaminationInfoModalProps> = ({
           >
             <CheckCircle2 className="w-4 h-4" />
             <span>Eligibility & Dates</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('prizes')}
+            className={`px-4 py-2.5 border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
+              activeTab === 'prizes'
+                ? 'border-amber-600 text-amber-900'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Trophy className="w-4 h-4 text-amber-500" />
+            <span>Prizes & Rewards</span>
           </button>
         </div>
 
@@ -240,6 +254,71 @@ export const ExaminationInfoModal: React.FC<ExaminationInfoModalProps> = ({
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* TAB 4: PRIZES & REWARDS */}
+          {activeTab === 'prizes' && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-300 text-xs text-amber-950 flex items-start gap-3">
+                <Trophy className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-extrabold text-sm text-amber-950 mb-0.5">Recognition & National Scholarships</h4>
+                  <p className="text-amber-800/90 leading-relaxed">
+                    All participants who qualify will receive an authenticated, cryptographically signed FET India Digital Certificate. Top-ranking candidates qualify for awards and scholarship grants.
+                  </p>
+                </div>
+              </div>
+
+              {competition.prizeRewards && competition.prizeRewards.length > 0 ? (
+                <div className="space-y-3">
+                  {competition.prizeRewards.map((prize, idx) => (
+                    <div 
+                      key={prize.id || idx}
+                      className="p-4 rounded-2xl border bg-white border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 ${
+                          prize.rankPosition === 1 ? 'bg-amber-100 text-amber-900 border border-amber-300' :
+                          prize.rankPosition === 2 ? 'bg-slate-100 text-slate-800 border border-slate-300' :
+                          prize.rankPosition === 3 ? 'bg-amber-900/10 text-amber-900 border border-amber-900/20' :
+                          'bg-indigo-50 text-indigo-800 border border-indigo-200'
+                        }`}>
+                          #{prize.rankPosition}
+                        </div>
+                        <div>
+                          <h5 className="font-bold text-slate-900 text-sm">{prize.title}</h5>
+                          <p className="text-xs text-slate-600">{prize.rewardDescription}</p>
+                          {prize.eligibilityInfo && (
+                            <span className="text-[10px] text-slate-400 block mt-0.5">Eligibility: {prize.eligibilityInfo}</span>
+                          )}
+                        </div>
+                      </div>
+                      {prize.rewardAmount && prize.rewardAmount > 0 && (
+                        <div className="sm:text-right shrink-0">
+                          <span className="text-[10px] font-bold text-slate-400 block uppercase">Reward Value</span>
+                          <span className="text-sm font-extrabold text-emerald-700">₹{prize.rewardAmount.toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : competition.prizesSummary && competition.prizesSummary.length > 0 ? (
+                <div className="space-y-2">
+                  {competition.prizesSummary.map((prizeStr, idx) => (
+                    <div key={idx} className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+                      <Gift className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span className="text-xs font-semibold text-slate-800">{prizeStr}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-6 rounded-2xl bg-slate-50 border border-dashed border-slate-200 text-center space-y-1">
+                  <Award className="w-8 h-8 text-slate-300 mx-auto" />
+                  <p className="text-xs font-bold text-slate-600">Digital Merit & Participation Certificates</p>
+                  <p className="text-[11px] text-slate-400">Official certificates and performance distinctions will be awarded post-evaluation.</p>
+                </div>
+              )}
             </div>
           )}
 

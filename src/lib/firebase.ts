@@ -784,6 +784,94 @@ export async function updateUserProfileData(
   return updatedProfile;
 }
 
+/**
+ * Super Admin safe demographic and account detail update.
+ * Strictly prevents modification of authentication credentials, passwords, or security secrets.
+ * Role modifications must use updateUserRoles instead.
+ */
+export async function adminUpdateUserProfile(
+  targetUid: string,
+  updates: Partial<UserProfile>,
+  adminActor: { uid: string; email: string; primaryRole?: UserRole }
+): Promise<UserProfile> {
+  const userRef = doc(db, 'users', targetUid);
+  const snap = await getDoc(userRef);
+
+  if (!snap.exists()) {
+    throw new Error('User profile does not exist.');
+  }
+
+  const existing = snap.data() as UserProfile;
+
+  // Whitelist safe demographic/contact fields that Super Admin can adjust
+  const cleanAdminUpdates: Record<string, any> = {
+    updatedAt: new Date().toISOString()
+  };
+
+  if (updates.fullLegalName !== undefined) {
+    cleanAdminUpdates.fullLegalName = updates.fullLegalName.trim();
+    cleanAdminUpdates.fullName = updates.fullLegalName.trim();
+    cleanAdminUpdates.displayName = updates.fullLegalName.trim();
+  }
+  if (updates.fatherName !== undefined) cleanAdminUpdates.fatherName = updates.fatherName.trim();
+  if (updates.motherName !== undefined) cleanAdminUpdates.motherName = updates.motherName.trim();
+  if (updates.guardianName !== undefined) cleanAdminUpdates.guardianName = updates.guardianName.trim();
+  if (updates.mobileNumber !== undefined) {
+    cleanAdminUpdates.mobileNumber = updates.mobileNumber.trim();
+    cleanAdminUpdates.phoneNumber = updates.mobileNumber.trim();
+  }
+  if (updates.address !== undefined) cleanAdminUpdates.address = updates.address.trim();
+  if (updates.city !== undefined) cleanAdminUpdates.city = updates.city.trim();
+  if (updates.district !== undefined) cleanAdminUpdates.district = updates.district.trim();
+  if (updates.state !== undefined) cleanAdminUpdates.state = updates.state.trim();
+  if (updates.country !== undefined) cleanAdminUpdates.country = updates.country.trim();
+  if (updates.pincode !== undefined) cleanAdminUpdates.pincode = updates.pincode.trim();
+  if (updates.occupation !== undefined) cleanAdminUpdates.occupation = updates.occupation.trim();
+  if (updates.educationalQualification !== undefined) {
+    cleanAdminUpdates.educationalQualification = updates.educationalQualification.trim();
+    cleanAdminUpdates.qualification = updates.educationalQualification.trim();
+  }
+  if (updates.gender !== undefined) cleanAdminUpdates.gender = updates.gender;
+  if (updates.dateOfBirth !== undefined) cleanAdminUpdates.dateOfBirth = updates.dateOfBirth;
+  if (updates.bloodGroup !== undefined) cleanAdminUpdates.bloodGroup = updates.bloodGroup.trim();
+  if (updates.emergencyContact !== undefined) cleanAdminUpdates.emergencyContact = updates.emergencyContact.trim();
+  if (updates.bio !== undefined) cleanAdminUpdates.bio = updates.bio.trim();
+
+  // Re-evaluate profile completion
+  const merged: UserProfile = { ...existing, ...cleanAdminUpdates };
+  const hasEssentialFields = Boolean(
+    merged.fullLegalName &&
+    merged.mobileNumber &&
+    merged.country &&
+    merged.address &&
+    merged.city &&
+    merged.state &&
+    merged.pincode
+  );
+  cleanAdminUpdates.profileCompleted = hasEssentialFields;
+
+  await updateDoc(userRef, cleanAdminUpdates);
+
+  const updatedProfile: UserProfile = { ...existing, ...cleanAdminUpdates };
+
+  // Write immutable audit log
+  await logAuditEvent({
+    actorUid: adminActor.uid,
+    actorEmail: adminActor.email,
+    actorRole: adminActor.primaryRole || 'super_admin',
+    action: 'USER_PROFILE_UPDATED',
+    targetEntity: 'users',
+    targetId: targetUid,
+    details: {
+      actionSource: 'SUPER_ADMIN_CONSOLE',
+      modifiedFields: Object.keys(cleanAdminUpdates).filter(k => k !== 'updatedAt'),
+      targetUserEmail: existing.email
+    }
+  });
+
+  return updatedProfile;
+}
+
 export async function resendVerificationEmail(user: FirebaseUser): Promise<void> {
   await sendEmailVerification(user);
 }

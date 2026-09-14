@@ -37,7 +37,7 @@ import {
   CandidateViolationRecord 
 } from '../../types';
 import { db } from '../../lib/firebase';
-import { doc, updateDoc, setDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
 
 interface OnlineExamModalProps {
   competition: Competition;
@@ -283,37 +283,81 @@ export const OnlineExamModal: React.FC<OnlineExamModalProps> = ({
     return { score, totalMarks };
   };
 
-  // Submission
+  // Submission & Automatic Result Generation
   const handleFinalSubmit = async () => {
+    if (isSubmitting || examCompleted) return;
     setIsSubmitting(true);
     try {
+      const regDocId = registration.id || registration.registrationId;
+
+      // Check existing submission record to prevent race conditions or duplicate submissions
+      if (db && regDocId) {
+        try {
+          const checkSnap = await getDoc(doc(db, 'competition_registrations', regDocId));
+          if (checkSnap.exists()) {
+            const data = checkSnap.data();
+            if (data.examAttemptStatus === 'submitted' || data.status === 'evaluated' || data.status === 'completed') {
+              // Already submitted - show existing result without re-evaluating
+              setFinalScoreSummary({
+                autoScore: data.marksObtained || 0,
+                totalMarks: data.totalMarks || competition.maxMarks || 100,
+                percentage: data.percentage || 0,
+                status: (data.marksObtained || 0) >= (competition.passingMarks || 40) ? 'Passed' : 'Completed'
+              });
+              setExamCompleted(true);
+              setShowSubmitConfirm(false);
+              onSubmitted();
+              return;
+            }
+          }
+        } catch (checkErr) {
+          console.warn('Idempotency check note:', checkErr);
+        }
+      }
+
+      // Step 1: System automatically evaluates answers using existing scoring logic
       const { score, totalMarks } = calculateObjectiveScore();
       const max = competition.maxMarks || totalMarks || 100;
       const percentage = Number(((score / max) * 100).toFixed(1));
       const passed = score >= (competition.passingMarks || 40);
 
-      // Save to Firebase / Local state
-      if (db && registration.id) {
+      // Step 2: System automatically calculates academic grade and award category
+      let calculatedGrade = 'Needs Improvement';
+      if (percentage >= 90) calculatedGrade = 'A+ (Distinction)';
+      else if (percentage >= 75) calculatedGrade = 'A (Excellent)';
+      else if (percentage >= 60) calculatedGrade = 'B (Good)';
+      else if (percentage >= 40) calculatedGrade = 'C (Pass)';
+
+      const autoAward: 'merit' | 'participation' = passed ? 'merit' : 'participation';
+
+      // Step 3 & 4: Result automatically generated and stored in existing models
+      if (db && regDocId) {
         try {
-          await updateDoc(doc(db, 'competition_registrations', registration.id), {
+          await updateDoc(doc(db, 'competition_registrations', regDocId), {
             status: passed ? 'completed' : 'evaluated',
+            examAttemptStatus: 'submitted',
             marksObtained: score,
             totalMarks: max,
             percentage,
+            grade: calculatedGrade,
+            awardCategory: autoAward,
+            evaluatorRemarks: `Automatic Evaluation System: Scored ${score}/${max} (${percentage}% - ${calculatedGrade}). Completed on ${new Date().toLocaleDateString()}.`,
+            evaluatedAt: new Date().toISOString(),
             submittedAnswers: answers,
             submittedAt: new Date().toISOString(),
             timeTakenMinutes: Math.ceil((totalSeconds - secondsRemaining) / 60),
-            violations: violations
+            violations: violations,
+            updatedAt: new Date().toISOString()
           });
 
           // Also record in exam_attempts collection
-          await setDoc(doc(db, 'exam_attempts', `att-${registration.id}`), {
-            registrationId: registration.id,
-            participantId: registration.participantUid,
+          await setDoc(doc(db, 'exam_attempts', `att-${regDocId}`), {
+            registrationId: regDocId,
+            participantId: registration.participantId || registration.participantUid,
             competitionId: competition.id,
             competitionTitle: competition.title,
             participantUid: registration.participantUid,
-            participantName: registration.candidateName,
+            participantName: registration.candidateName || registration.participantName,
             submittedAt: new Date().toISOString(),
             timeSpentSeconds: totalSeconds - secondsRemaining,
             selectedLanguage,
@@ -321,7 +365,9 @@ export const OnlineExamModal: React.FC<OnlineExamModalProps> = ({
             autoScore: score,
             totalMarks: max,
             percentage,
-            status: 'submitted',
+            grade: calculatedGrade,
+            awardCategory: autoAward,
+            status: 'evaluated',
             violationsCount: violations.length,
             violations: violations
           });

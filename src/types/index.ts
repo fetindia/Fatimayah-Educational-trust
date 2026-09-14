@@ -1190,6 +1190,17 @@ export interface ExamStructureDetails {
   integrityConfig?: ExamIntegrityConfig;
 }
 
+export interface CompetitionPrizeTier {
+  id: string;
+  rankPosition: number; // 1, 2, 3...
+  title: string; // e.g. "1st National Prize", "Runner Up"
+  rewardAmount?: number; // e.g. 50000
+  rewardDescription: string; // e.g. "Cash Scholarship + Laptop + Trophy"
+  eligibilityInfo?: string; // e.g. "Open to All Registered Candidates"
+  winnerCount: number; // e.g. 1
+  status: 'active' | 'inactive';
+}
+
 export interface Competition {
   id?: string;
   code: string; // e.g. "FET-CMP-2026-001"
@@ -1223,6 +1234,7 @@ export interface Competition {
   bookDetails?: BookReadingDetails;
   examDetails?: ExamStructureDetails;
   prizesSummary?: string[];
+  prizeRewards?: CompetitionPrizeTier[];
 
   // Status & Governance
   status: CompetitionStatus;

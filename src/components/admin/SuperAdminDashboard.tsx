@@ -45,10 +45,13 @@ import {
   LineChart,
   Landmark,
   UserCog,
-  HardDrive
+  HardDrive,
+  Edit,
+  X,
+  Check
 } from 'lucide-react';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { db, updateUserAccountStatus, SYSTEM_SUPER_ADMIN_EMAIL } from '../../lib/firebase';
+import { db, updateUserAccountStatus, adminUpdateUserProfile, SYSTEM_SUPER_ADMIN_EMAIL } from '../../lib/firebase';
 import { FIREBASE_STORAGE_BUCKET } from '../../lib/storage';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfig } from '../../contexts/ConfigContext';
@@ -92,9 +95,12 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   const [userRoleFilter, setUserRoleFilter] = useState<string>('all');
   const [userStatusFilter, setUserStatusFilter] = useState<string>('all');
   const [selectedUserForProfile, setSelectedUserForProfile] = useState<UserProfile | null>(null);
+  const [selectedUserForEdit, setSelectedUserForEdit] = useState<UserProfile | null>(null);
   const [selectedUserForStatus, setSelectedUserForStatus] = useState<UserProfile | null>(null);
   const [statusActionReason, setStatusActionReason] = useState<string>('');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
+  const [isSavingUserEdit, setIsSavingUserEdit] = useState<boolean>(false);
+  const [editFormData, setEditFormData] = useState<Partial<UserProfile>>({});
 
   // Application foundation tab state
   const [selectedAppCategory, setSelectedAppCategory] = useState<'volunteer' | 'membership' | 'donor' | 'education'>('volunteer');
@@ -313,6 +319,69 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
       });
     } finally {
       setIsUpdatingStatus(false);
+    }
+  };
+
+  // Open Edit User Modal with current values
+  const handleOpenUserEdit = (user: UserProfile) => {
+    setSelectedUserForEdit(user);
+    setEditFormData({
+      fullLegalName: user.fullLegalName || user.fullName || user.displayName || '',
+      mobileNumber: user.mobileNumber || user.phoneNumber || '',
+      country: user.country || 'India',
+      state: user.state || '',
+      district: user.district || '',
+      city: user.city || '',
+      pincode: user.pincode || '',
+      address: user.address || '',
+      fatherName: user.fatherName || '',
+      motherName: user.motherName || '',
+      occupation: user.occupation || '',
+      educationalQualification: user.educationalQualification || user.qualification || '',
+      bloodGroup: user.bloodGroup || '',
+      emergencyContact: user.emergencyContact || '',
+      bio: user.bio || ''
+    });
+  };
+
+  // Handle Safe Demographic / Account Details Update by Super Admin
+  const handleAdminSaveUserEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserForEdit || !currentUser) return;
+    setIsSavingUserEdit(true);
+    setStatusMessage(null);
+
+    try {
+      const updated = await adminUpdateUserProfile(
+        selectedUserForEdit.uid,
+        editFormData,
+        {
+          uid: currentUser.uid,
+          email: currentUser.email || 'superadmin@fetindia.com',
+          primaryRole: 'super_admin'
+        }
+      );
+
+      // Update state locally
+      setUsers(prev => prev.map(u => u.uid === selectedUserForEdit.uid ? { ...u, ...updated } : u));
+      if (selectedUserForProfile && selectedUserForProfile.uid === selectedUserForEdit.uid) {
+        setSelectedUserForProfile({ ...selectedUserForProfile, ...updated });
+      }
+
+      setStatusMessage({
+        type: 'success',
+        text: `Updated profile details for ${selectedUserForEdit.email}. Action logged to audit trail.`
+      });
+
+      setSelectedUserForEdit(null);
+    } catch (err: any) {
+      console.error('Admin profile edit error:', err);
+      setStatusMessage({
+        type: 'error',
+        text: err.message || 'Failed to update user profile.'
+      });
+    } finally {
+      setIsSavingUserEdit(false);
     }
   };
 
@@ -950,6 +1019,16 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
 
                               {!isSysSuper && (
                                 <button
+                                  onClick={() => handleOpenUserEdit(u)}
+                                  className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 transition-colors cursor-pointer flex items-center gap-1"
+                                >
+                                  <Edit className="w-3 h-3" />
+                                  Edit
+                                </button>
+                              )}
+
+                              {!isSysSuper && (
+                                <button
                                   onClick={() => setSelectedUserForStatus(u)}
                                   className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                                     isSuspended
@@ -1381,7 +1460,22 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
 
             </div>
 
-            <div className="pt-4 border-t border-slate-100 flex justify-end">
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+              <div>
+                {selectedUserForProfile.email.toLowerCase() !== SYSTEM_SUPER_ADMIN_EMAIL.toLowerCase() && (
+                  <button
+                    onClick={() => {
+                      const target = selectedUserForProfile;
+                      setSelectedUserForProfile(null);
+                      handleOpenUserEdit(target);
+                    }}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Edit className="w-3.5 h-3.5" />
+                    Edit User Profile
+                  </button>
+                )}
+              </div>
               <button
                 onClick={() => setSelectedUserForProfile(null)}
                 className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 transition-colors cursor-pointer"
@@ -1393,6 +1487,214 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
           </div>
         </div>
       )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL 1.5: SUPER ADMIN EDIT USER PROFILE (SAFE FIELDS ONLY) */}
+      {/* ------------------------------------------------------------- */}
+      {selectedUserForEdit && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-slate-200 my-8">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-600">
+                  <UserCog className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Edit User Profile Details</h3>
+                  <p className="text-xs text-slate-500">
+                    Updating safe profile & KYC records for <span className="font-mono text-slate-700 font-semibold">{selectedUserForEdit.email}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedUserForEdit(null)}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-amber-50/80 border border-amber-200/80 text-[11px] text-amber-900 leading-relaxed flex items-start gap-2.5">
+              <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+              <div>
+                <strong>Security Policy Enforced:</strong> Super Admin can correct contact, legal name, residential address, and family KYC records. Authentication credentials (passwords, tokens, OAuth links) and core security roles cannot be changed from this form and remain completely protected.
+              </div>
+            </div>
+
+            <form onSubmit={handleAdminSaveUserEdit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Full Legal Name</label>
+                  <input
+                    type="text"
+                    value={editFormData.fullLegalName || ''}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, fullLegalName: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    placeholder="Full Legal Name as per Aadhaar / ID"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Mobile / Phone Number</label>
+                  <input
+                    type="tel"
+                    value={editFormData.mobileNumber || ''}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, mobileNumber: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    placeholder="+91 9876543210"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Father / Guardian Name</label>
+                  <input
+                    type="text"
+                    value={editFormData.fatherName || ''}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, fatherName: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    placeholder="Father's full name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Mother's Name</label>
+                  <input
+                    type="text"
+                    value={editFormData.motherName || ''}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, motherName: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    placeholder="Mother's name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Occupation</label>
+                  <input
+                    type="text"
+                    value={editFormData.occupation || ''}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, occupation: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    placeholder="e.g. Student, Teacher, Engineer"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Educational Qualification</label>
+                  <input
+                    type="text"
+                    value={editFormData.educationalQualification || ''}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, educationalQualification: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    placeholder="e.g. B.Tech, M.A., High School"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">City / Town</label>
+                  <input
+                    type="text"
+                    value={editFormData.city || ''}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, city: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    placeholder="e.g. Lucknow"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">District</label>
+                  <input
+                    type="text"
+                    value={editFormData.district || ''}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, district: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    placeholder="District"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">State / Province</label>
+                  <input
+                    type="text"
+                    value={editFormData.state || ''}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, state: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    placeholder="e.g. Uttar Pradesh"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">PIN / Postal Code</label>
+                  <input
+                    type="text"
+                    value={editFormData.pincode || ''}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, pincode: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    placeholder="e.g. 226001"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Country</label>
+                  <input
+                    type="text"
+                    value={editFormData.country || 'India'}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, country: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    placeholder="Country"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Emergency Contact</label>
+                  <input
+                    type="text"
+                    value={editFormData.emergencyContact || ''}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, emergencyContact: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    placeholder="Phone number / Name"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Full Postal / Residential Address</label>
+                <textarea
+                  value={editFormData.address || ''}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, address: e.target.value }))}
+                  rows={2}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                  placeholder="House number, Street, Area, Landmark"
+                />
+              </div>
+
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedUserForEdit(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingUserEdit}
+                  className="px-6 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isSavingUserEdit ? (
+                    'Saving Updates...'
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Save Changes
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
 
       {/* ------------------------------------------------------------- */}
       {/* MODAL 2: SUSPEND / ACTIVATE ACCOUNT CONFIRMATION */}

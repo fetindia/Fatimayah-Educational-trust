@@ -10,8 +10,8 @@
       {
         "source": "/api/**",
         "run": {
-          "serviceId": "fet-india-api",
-          "region": "asia-southeast1"
+          "serviceId": "fatimayah-educational-trust-git",
+          "region": "asia-south1"
         }
       },
       {
