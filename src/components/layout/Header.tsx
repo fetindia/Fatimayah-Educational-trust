@@ -46,7 +46,9 @@ import {
   Landmark,
   UserCog,
   Home,
-  Info
+  Info,
+  Search,
+  GraduationCap
 } from 'lucide-react';
 import { FETLogo } from '../common/FETLogo';
 import { usePWAInstall } from '../common/PWAInstallBanner';
@@ -65,9 +67,18 @@ interface HeaderProps {
   onOpenLegal?: (tab: 'terms' | 'privacy') => void;
   onOpenAbout?: (tab?: 'overview' | 'governance' | 'transparency' | 'history') => void;
   onOpenExamination?: () => void;
+  onOpenPrograms?: () => void;
+  onOpenAppeals?: () => void;
+  onOpenMembership?: () => void;
+  onOpenVolunteers?: () => void;
+  onOpenEventsNews?: () => void;
+  onOpenContact?: () => void;
   onOpenApplyExam?: () => void;
   onOpenChairmanMessage?: () => void;
   onOpenNewsBlogs?: () => void;
+  onOpenSearch?: () => void;
+  onOpenStudentResults?: () => void;
+  onOpenGeneralDonation?: (tab?: any) => void;
   activeSection: string;
   setActiveSection: (s: string) => void;
   isMobileMenuOpen?: boolean;
@@ -83,9 +94,18 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenLegal,
   onOpenAbout,
   onOpenExamination,
+  onOpenPrograms,
+  onOpenAppeals,
+  onOpenMembership,
+  onOpenVolunteers,
+  onOpenEventsNews,
+  onOpenContact,
   onOpenApplyExam,
   onOpenChairmanMessage,
   onOpenNewsBlogs,
+  onOpenSearch,
+  onOpenStudentResults,
+  onOpenGeneralDonation,
   activeSection,
   setActiveSection,
   isMobileMenuOpen,
@@ -154,6 +174,10 @@ export const Header: React.FC<HeaderProps> = ({
         setMoreMenuOpen(false);
         setActiveDropdownId(null);
         handleCloseMobileMenu();
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        onOpenSearch?.();
       }
     };
 
@@ -306,6 +330,38 @@ export const Header: React.FC<HeaderProps> = ({
       return;
     }
 
+    if (cleanTarget === 'search') {
+      if (onOpenSearch) onOpenSearch();
+      return;
+    }
+
+    if (cleanTarget === 'results' || cleanTarget === 'student_results' || cleanTarget === 'exam_results') {
+      if (onOpenStudentResults) {
+        onOpenStudentResults();
+        return;
+      }
+    }
+
+    if (
+      cleanTarget === 'donate' || 
+      cleanTarget === 'donate_now' || 
+      cleanTarget === 'general_donation' || 
+      cleanTarget === 'general-donation' || 
+      cleanTarget === 'direct_donate' ||
+      cleanTarget.startsWith('donate_')
+    ) {
+      if (onOpenGeneralDonation) {
+        let tabToOpen = 'general';
+        if (cleanTarget === 'donate_zakat') tabToOpen = 'zakat';
+        else if (cleanTarget === 'donate_fitrah') tabToOpen = 'fitrah';
+        else if (cleanTarget === 'donate_property') tabToOpen = 'property';
+        else if (cleanTarget === 'donate_material') tabToOpen = 'material';
+        else if (cleanTarget === 'donate_other') tabToOpen = 'other';
+        onOpenGeneralDonation(tabToOpen);
+        return;
+      }
+    }
+
     if (cleanTarget === 'terms' || cleanTarget === 'terms-of-trust' || cleanTarget === 'terms-and-conditions') {
       if (onOpenLegal) {
         onOpenLegal('terms');
@@ -315,7 +371,11 @@ export const Header: React.FC<HeaderProps> = ({
       return;
     }
 
-    if (cleanTarget === 'membership' || cleanTarget === 'volunteer_membership' || cleanTarget === 'volunteer') {
+    if (cleanTarget === 'membership') {
+      if (onOpenMembership) {
+        onOpenMembership();
+        return;
+      }
       setActiveSection('volunteer_membership');
       const element = document.getElementById('volunteer') || document.getElementById('volunteer_membership');
       if (element) {
@@ -324,7 +384,24 @@ export const Header: React.FC<HeaderProps> = ({
       return;
     }
 
-    if (cleanTarget === 'donate' || cleanTarget === 'crowdfunding' || cleanTarget === 'appeals') {
+    if (cleanTarget === 'volunteers' || cleanTarget === 'volunteer' || cleanTarget === 'volunteer_membership') {
+      if (onOpenVolunteers) {
+        onOpenVolunteers();
+        return;
+      }
+      setActiveSection('volunteer_membership');
+      const element = document.getElementById('volunteer') || document.getElementById('volunteer_membership');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
+
+    if (cleanTarget === 'crowdfunding' || cleanTarget === 'appeals') {
+      if (onOpenAppeals) {
+        onOpenAppeals();
+        return;
+      }
       setActiveSection('crowdfunding');
       const element = document.getElementById('crowdfunding') || document.getElementById('donate');
       if (element) {
@@ -412,7 +489,11 @@ export const Header: React.FC<HeaderProps> = ({
       return;
     }
 
-    if (cleanTarget === 'contact') {
+    if (cleanTarget === 'contact' || cleanTarget === 'contact_us' || cleanTarget === 'contact-us') {
+      if (onOpenContact) {
+        onOpenContact();
+        return;
+      }
       setActiveSection('mission_cta');
       const element = document.getElementById('contact') || document.getElementById('mission_cta');
       if (element) {
@@ -422,13 +503,14 @@ export const Header: React.FC<HeaderProps> = ({
     }
 
     if (cleanTarget === 'examinations' || cleanTarget === 'examination') {
+      if (onOpenExamination) {
+        onOpenExamination();
+        return;
+      }
       setActiveSection('examinations');
       const element = document.getElementById('examinations');
       if (element) {
         element.scrollIntoView({ behavior: 'smooth' });
-      }
-      if (onOpenExamination) {
-        onOpenExamination();
       }
       return;
     }
@@ -464,6 +546,10 @@ export const Header: React.FC<HeaderProps> = ({
     }
 
     if (cleanTarget === 'news_blogs' || cleanTarget === 'news' || cleanTarget === 'blogs') {
+      if (onOpenEventsNews) {
+        onOpenEventsNews();
+        return;
+      }
       setActiveSection('news_blogs');
       const element = document.getElementById('news_blogs');
       if (element) {
@@ -488,7 +574,11 @@ export const Header: React.FC<HeaderProps> = ({
       return;
     }
 
-    if (cleanTarget === 'events' || cleanTarget === 'events_blog' || cleanTarget === 'blog') {
+    if (cleanTarget === 'events' || cleanTarget === 'events_blog' || cleanTarget === 'blog' || cleanTarget === 'events_news' || cleanTarget === 'events-news') {
+      if (onOpenEventsNews) {
+        onOpenEventsNews();
+        return;
+      }
       setActiveSection('events_blog');
       const element = document.getElementById('events_blog') || document.getElementById('events');
       if (element) {
@@ -497,7 +587,11 @@ export const Header: React.FC<HeaderProps> = ({
       return;
     }
 
-    if (cleanTarget === 'programs' || cleanTarget === 'initiatives') {
+    if (cleanTarget === 'programs' || cleanTarget === 'initiatives' || cleanTarget === 'programs_welfare') {
+      if (onOpenPrograms) {
+        onOpenPrograms();
+        return;
+      }
       setActiveSection('programs');
       const element = document.getElementById('programs') || document.getElementById('initiatives');
       if (element) {
@@ -646,15 +740,15 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Main Navbar Bar */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2 sm:py-2.5 flex items-center justify-between gap-2 sm:gap-4">
-        {/* Brand Logo */}
+        {/* Brand Logo & Trust Branding Dedicated Area */}
         <button 
           onClick={() => handleNavClick('home')}
-          className="cursor-pointer text-left focus:outline-hidden group shrink-0"
+          className="cursor-pointer text-left focus:outline-hidden group shrink-0 max-w-[220px] sm:max-w-[300px] xl:max-w-[320px]"
           id="fet-header-logo-btn"
           aria-label="FET India Home"
         >
           <div className="hidden sm:block">
-            <FETLogo size="md" />
+            <FETLogo variant="compact" size="sm" />
           </div>
           <div className="sm:hidden">
             <FETLogo size="sm" />
@@ -990,8 +1084,36 @@ export const Header: React.FC<HeaderProps> = ({
         </nav>
 
         {/* Right-Side Header Actions & Account Area */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           
+          {/* Quick Search Trigger */}
+          {onOpenSearch && (
+            <button
+              onClick={onOpenSearch}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer text-xs font-semibold"
+              title="Search Portal (Cmd+K / Ctrl+K)"
+              aria-label="Search"
+            >
+              <Search className="w-3.5 h-3.5 text-slate-500" />
+              <span className="hidden xl:inline text-[11px] text-slate-500">Search</span>
+              <kbd className="hidden sm:inline-block px-1.5 py-0.2 text-[9px] font-mono text-slate-400 bg-white border border-slate-200 rounded">
+                ⌘K
+              </kbd>
+            </button>
+          )}
+
+          {/* Student Exam Results Portal Trigger */}
+          {onOpenStudentResults && (
+            <button
+              onClick={onOpenStudentResults}
+              className="hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-900 transition-colors cursor-pointer text-xs font-bold"
+              title="Candidate Scorecard & Results"
+            >
+              <GraduationCap className="w-3.5 h-3.5 text-emerald-700" />
+              <span className="hidden md:inline">Results</span>
+            </button>
+          )}
+
           {/* Quick Donate CTA with 80G Gold Highlight */}
           <button
             onClick={() => handleNavClick('donate')}
@@ -1487,6 +1609,34 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
                 <ChevronRight className="w-4 h-4 text-emerald-950 shrink-0" />
               </button>
+
+              {/* Quick Search & Results Controls (Mobile) */}
+              <div className="grid grid-cols-2 gap-2">
+                {onOpenSearch && (
+                  <button
+                    onClick={() => {
+                      handleCloseMobileMenu();
+                      onOpenSearch();
+                    }}
+                    className="flex items-center justify-center gap-2 p-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs border border-slate-200 transition-colors cursor-pointer"
+                  >
+                    <Search className="w-4 h-4 text-emerald-700" />
+                    <span>Search</span>
+                  </button>
+                )}
+                {onOpenStudentResults && (
+                  <button
+                    onClick={() => {
+                      handleCloseMobileMenu();
+                      onOpenStudentResults();
+                    }}
+                    className="flex items-center justify-center gap-2 p-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold text-xs border border-emerald-200 transition-colors cursor-pointer"
+                  >
+                    <GraduationCap className="w-4 h-4 text-emerald-700" />
+                    <span>Scorecards</span>
+                  </button>
+                )}
+              </div>
 
           {/* User Profile Card (if Authenticated) */}
           {currentUser ? (

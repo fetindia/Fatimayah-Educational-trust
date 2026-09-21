@@ -321,6 +321,41 @@ export const INITIAL_COMPETITIONS: Competition[] = [
         }
       ]
     },
+    prizeRewards: [
+      {
+        id: 'pz-br-1',
+        rankPosition: 1,
+        title: '1st National Rank - Kalam Memorial Gold Distinction',
+        rewardAmount: 50000,
+        rewardDescription: 'Gold Medal, Dell Latitude Core i7 Laptop, and ₹50,000 Academic Scholarship',
+        rewardType: 'scholarship',
+        winnerCount: 1,
+        eligibilityInfo: 'National Rank #1 in combined objective & analytical assessment',
+        status: 'active'
+      },
+      {
+        id: 'pz-br-2',
+        rankPosition: 2,
+        title: '2nd - 5th National Ranks - Silver Distinction',
+        rewardAmount: 25000,
+        rewardDescription: 'Silver Medals, 10-inch Samsung Tablets, and ₹25,000 Study Grant',
+        rewardType: 'scholarship',
+        winnerCount: 4,
+        eligibilityInfo: 'National Ranks #2 through #5',
+        status: 'active'
+      },
+      {
+        id: 'pz-br-3',
+        rankPosition: 3,
+        title: 'Top 100 Merit Scholars - Academic Citation',
+        rewardAmount: 5000,
+        rewardDescription: 'Certificate of Academic Merit and 1-Year FET Academic Mentorship',
+        rewardType: 'certificate',
+        winnerCount: 95,
+        eligibilityInfo: 'Scoring 70% or above in qualifying examination',
+        status: 'active'
+      }
+    ],
     prizesSummary: [
       '1st Rank: Gold Medal, Dell Latitude Core i7 Laptop, and ₹50,000 Academic Scholarship',
       '2nd-5th Rank: Silver Medals, 10-inch Samsung Tablets, and ₹25,000 Study Grant',
@@ -406,6 +441,41 @@ export const INITIAL_COMPETITIONS: Competition[] = [
         }
       ]
     },
+    prizeRewards: [
+      {
+        id: 'pz-stem-1',
+        rankPosition: 1,
+        title: '1st National Rank - Ramanujan Science Scholar',
+        rewardAmount: 100000,
+        rewardDescription: '₹1,00,000 Cash Grant + HP Omen Workstation Laptop + Gold Medal',
+        rewardType: 'scholarship',
+        winnerCount: 1,
+        eligibilityInfo: 'National Rank #1 in STEM Olympiad Assessment',
+        status: 'active'
+      },
+      {
+        id: 'pz-stem-2',
+        rankPosition: 2,
+        title: '2nd - 5th National Ranks - Silver Science Scholars',
+        rewardAmount: 50000,
+        rewardDescription: '₹50,000 Cash Grant + Silver Medal + Full Tuition Grant',
+        rewardType: 'scholarship',
+        winnerCount: 4,
+        eligibilityInfo: 'Ranks 2 through 5',
+        status: 'active'
+      },
+      {
+        id: 'pz-stem-3',
+        rankPosition: 3,
+        title: 'Top 100 National STEM Laureates',
+        rewardAmount: 15000,
+        rewardDescription: '100% FET Higher Education Degree Sponsorship & Merit Citation',
+        rewardType: 'scholarship',
+        winnerCount: 95,
+        eligibilityInfo: 'Top 100 Percentile in national assessment',
+        status: 'active'
+      }
+    ],
     prizesSummary: [
       '1st Rank: ₹1,00,000 Cash Grant + HP Omen Workstation Laptop + Gold Medal',
       '2nd-5th Rank: ₹50,000 Cash Grant + Silver Medal + Full Tuition Grant',
@@ -492,6 +562,41 @@ export const INITIAL_COMPETITIONS: Competition[] = [
         }
       ]
     },
+    prizeRewards: [
+      {
+        id: 'pz-is-1',
+        rankPosition: 1,
+        title: '1st Rank - Allama Iqbal Gold Shield & Research Award',
+        rewardAmount: 75000,
+        rewardDescription: '₹75,000 Cash Award + Allama Iqbal Gold Shield + Library Grant',
+        rewardType: 'scholarship',
+        winnerCount: 1,
+        eligibilityInfo: 'Top National Score',
+        status: 'active'
+      },
+      {
+        id: 'pz-is-2',
+        rankPosition: 2,
+        title: '2nd - 3rd Rank - Silver Shield Distinction',
+        rewardAmount: 35000,
+        rewardDescription: '₹35,000 Cash Award + Silver Shield',
+        rewardType: 'scholarship',
+        winnerCount: 2,
+        eligibilityInfo: '2nd and 3rd rank holders',
+        status: 'active'
+      },
+      {
+        id: 'pz-is-3',
+        rankPosition: 3,
+        title: 'Merit Winners - Scholarly Excellence',
+        rewardAmount: 10000,
+        rewardDescription: 'Certificate of Scholarly Excellence & Reference Book Hamper',
+        rewardType: 'certificate',
+        winnerCount: 25,
+        eligibilityInfo: 'Scoring above 75% marks',
+        status: 'active'
+      }
+    ],
     prizesSummary: [
       '1st Rank: ₹75,000 Cash Award + Allama Iqbal Gold Shield + Library Grant',
       '2nd-3rd Rank: ₹35,000 Cash Award + Silver Shield',

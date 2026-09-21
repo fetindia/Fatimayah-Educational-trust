@@ -99,13 +99,32 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
   const { config } = useConfig();
   const { unreadCount } = useNotifications();
 
-  const [activeTab, setActiveTab] = useState<MemberDashboardTab>(initialTab);
+  const validTabs: MemberDashboardTab[] = [
+    'dashboard',
+    'profile',
+    'competitions',
+    'volunteer',
+    'donor',
+    'applications',
+    'membership',
+    'donations',
+    'campaigns',
+    'notifications',
+    'settings'
+  ];
+
+  const sanitizeTab = (tab?: string): MemberDashboardTab => {
+    if (tab && validTabs.includes(tab as MemberDashboardTab)) {
+      return tab as MemberDashboardTab;
+    }
+    return 'dashboard';
+  };
+
+  const [activeTab, setActiveTab] = useState<MemberDashboardTab>(() => sanitizeTab(initialTab));
   const [profileSubView, setProfileSubView] = useState<'overview' | 'edit' | 'photo'>('overview');
 
   useEffect(() => {
-    if (initialTab) {
-      setActiveTab(initialTab);
-    }
+    setActiveTab(sanitizeTab(initialTab));
   }, [initialTab]);
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [verificationSending, setVerificationSending] = useState(false);

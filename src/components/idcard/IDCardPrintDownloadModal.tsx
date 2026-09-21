@@ -462,6 +462,7 @@ export const IDCardPrintDownloadModal: React.FC<IDCardPrintDownloadModalProps> =
                     {...commonCardProps}
                     isFlipped={false}
                     idPrefix="dual-front"
+                    showPrintWatermark={true}
                   />
                 </div>
 
@@ -474,6 +475,7 @@ export const IDCardPrintDownloadModal: React.FC<IDCardPrintDownloadModalProps> =
                     {...commonCardProps}
                     isFlipped={true}
                     idPrefix="dual-back"
+                    showPrintWatermark={true}
                   />
                 </div>
               </div>
@@ -503,13 +505,13 @@ export const IDCardPrintDownloadModal: React.FC<IDCardPrintDownloadModalProps> =
                     <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider block text-center">
                       Front Side
                     </span>
-                    <FETIdentityCard {...commonCardProps} isFlipped={false} idPrefix="offscreen-front" />
+                    <FETIdentityCard {...commonCardProps} isFlipped={false} idPrefix="offscreen-front" showPrintWatermark={true} />
                   </div>
                   <div className="space-y-1.5">
                     <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider block text-center">
                       Back Side
                     </span>
-                    <FETIdentityCard {...commonCardProps} isFlipped={true} idPrefix="offscreen-back" />
+                    <FETIdentityCard {...commonCardProps} isFlipped={true} idPrefix="offscreen-back" showPrintWatermark={true} />
                   </div>
                 </div>
                 <div className="pt-2 text-center text-[10px] text-slate-400 font-mono flex items-center justify-center gap-2">
@@ -527,7 +529,7 @@ export const IDCardPrintDownloadModal: React.FC<IDCardPrintDownloadModalProps> =
         <div className="bg-white border-t border-slate-200 p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 shrink-0">
           
           <div className="text-xs text-slate-500 hidden sm:block">
-            <span className="font-bold text-slate-800">Section 80G Certified Credential</span> • Official PVC ID Card
+            <span className="font-bold text-slate-800">Official Authenticated Credential</span> • Security Watermarked for Print & PDF
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
@@ -589,11 +591,11 @@ export const IDCardPrintDownloadModal: React.FC<IDCardPrintDownloadModalProps> =
 
           <div className="print-cards-grid">
             <div className="print-card-wrapper">
-              <FETIdentityCard {...commonCardProps} isFlipped={false} idPrefix="print-front" />
+              <FETIdentityCard {...commonCardProps} isFlipped={false} idPrefix="print-front" showPrintWatermark={true} />
             </div>
 
             <div className="print-card-wrapper">
-              <FETIdentityCard {...commonCardProps} isFlipped={true} idPrefix="print-back" />
+              <FETIdentityCard {...commonCardProps} isFlipped={true} idPrefix="print-back" showPrintWatermark={true} />
             </div>
           </div>
 

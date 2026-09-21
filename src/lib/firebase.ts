@@ -98,7 +98,8 @@ import {
   StaffEmploymentType,
   PublicStaffVerification,
   PublicCertificateRecord,
-  CompetitionCertificateRecord
+  CompetitionCertificateRecord,
+  CompetitionPrizeTier
 } from '../types';
 
 const firebaseConfig = {
@@ -131,6 +132,7 @@ export const db = firebaseConfigData.firestoreDatabaseId
 export const storage = getStorage(app, firebaseConfigData.storageBucket || 'fatimyah-educational-trust.firebasestorage.app');
 
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 // Password Reset Dispatch
 export async function sendPasswordReset(email: string): Promise<void> {
@@ -589,6 +591,44 @@ export async function getOrCreateUserProfile(
     const mergedProfile = { ...data, ...updates };
     mergedProfile.permissions = getEffectivePermissions(mergedProfile.roles || ['user'], mergedProfile.customPermissions || []);
     return mergedProfile;
+  }
+
+  // Check if an existing profile document already exists for this email address across the FET India system
+  // Prevents duplicate profile creation if user registered via email/password or another sign-in method
+  if (user.email) {
+    try {
+      const qEmail = query(collection(db, 'users'), where('email', '==', user.email.trim()));
+      const snapEmail = await getDocs(qEmail);
+      if (!snapEmail.empty) {
+        const existingDoc = snapEmail.docs[0];
+        const existingData = existingDoc.data() as UserProfile;
+        
+        // Preserve all existing roles, permissions, membership status, and activity history
+        const linkedProfile: UserProfile = {
+          ...existingData,
+          uid: user.uid,
+          email: user.email.trim(),
+          emailVerified: user.emailVerified || existingData.emailVerified || false,
+          accountStatus: user.emailVerified ? 'active' : (existingData.accountStatus || 'active'),
+          lastLoginAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+
+        // Guarantee super admin privileges ONLY for system super admin email
+        if (isSuperAdminEmail && !linkedProfile.roles.includes('super_admin')) {
+          linkedProfile.roles = [...new Set([...linkedProfile.roles, 'super_admin' as UserRole, 'core_member' as UserRole])];
+          linkedProfile.primaryRole = 'super_admin';
+          linkedProfile.role = 'super_admin';
+        }
+
+        linkedProfile.permissions = getEffectivePermissions(linkedProfile.roles || ['user'], linkedProfile.customPermissions || []);
+        
+        await setDoc(userRef, linkedProfile, { merge: true });
+        return linkedProfile;
+      }
+    } catch (lookupErr) {
+      console.warn('Existing profile lookup by email notice:', lookupErr);
+    }
   }
 
   // Strictly assign default 'user' role & 'none' membership status to public registrants (unless it's the system super admin email)
@@ -5324,6 +5364,56 @@ export async function deleteStaffDocumentRecord(
     }
   });
 }
+
+/**
+ * Super Admin Management of Competition Prize Structure
+ * Dynamically updates competition prize rewards in Firestore and synchronizes portal summaries.
+ */
+export async function updateCompetitionPrizes(
+  competitionId: string,
+  prizeTiers: CompetitionPrizeTier[],
+  adminUser: { uid: string; email: string; isSuperAdmin: boolean }
+): Promise<void> {
+  if (!adminUser.isSuperAdmin) {
+    throw new Error('Access Denied: Only Super Administrators have authority to manage competition prize configurations.');
+  }
+
+  // Generate clean prizesSummary string array for badges and portal cards
+  const prizesSummary = prizeTiers
+    .filter(t => t.status === 'active')
+    .map(t => {
+      const parts = [`#${t.rankPosition} ${t.title}`];
+      if (t.rewardAmount && t.rewardAmount > 0) {
+        parts.push(`₹${t.rewardAmount.toLocaleString()}`);
+      }
+      if (t.rewardDescription) {
+        parts.push(t.rewardDescription);
+      }
+      return parts.join(' - ');
+    });
+
+  const compRef = doc(db, 'competitions', competitionId);
+  await updateDoc(compRef, {
+    prizeRewards: prizeTiers,
+    prizesSummary,
+    updatedAt: new Date().toISOString()
+  });
+
+  await logAuditEvent({
+    actorUid: adminUser.uid,
+    actorEmail: adminUser.email,
+    actorRole: 'super_admin',
+    action: 'COMPETITION_PRIZES_UPDATED',
+    targetEntity: 'competitions',
+    targetId: competitionId,
+    details: {
+      totalTiers: prizeTiers.length,
+      activeTiers: prizeTiers.filter(t => t.status === 'active').length,
+      prizesSummary
+    }
+  });
+}
+
 
 
 

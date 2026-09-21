@@ -263,6 +263,9 @@ export const OnlineExamModal: React.FC<OnlineExamModalProps> = ({
   const calculateObjectiveScore = () => {
     let score = 0;
     let totalMarks = 0;
+    let correctAnswersCount = 0;
+    let incorrectAnswersCount = 0;
+    let unansweredCount = 0;
 
     sections.forEach(sec => {
       sec.questions.forEach(q => {
@@ -272,15 +275,21 @@ export const OnlineExamModal: React.FC<OnlineExamModalProps> = ({
           if (q.questionType === 'mcq' || q.questionType === 'true_false') {
             if (candidateAns === q.correctOptionIndex) {
               score += q.marks || 4;
-            } else if (q.negativeMarks) {
-              score = Math.max(0, score - q.negativeMarks);
+              correctAnswersCount++;
+            } else {
+              incorrectAnswersCount++;
+              if (q.negativeMarks) {
+                score = Math.max(0, score - q.negativeMarks);
+              }
             }
           }
+        } else {
+          unansweredCount++;
         }
       });
     });
 
-    return { score, totalMarks };
+    return { score, totalMarks, correctAnswersCount, incorrectAnswersCount, unansweredCount };
   };
 
   // Submission & Automatic Result Generation
@@ -316,7 +325,7 @@ export const OnlineExamModal: React.FC<OnlineExamModalProps> = ({
       }
 
       // Step 1: System automatically evaluates answers using existing scoring logic
-      const { score, totalMarks } = calculateObjectiveScore();
+      const { score, totalMarks, correctAnswersCount, incorrectAnswersCount, unansweredCount } = calculateObjectiveScore();
       const max = competition.maxMarks || totalMarks || 100;
       const percentage = Number(((score / max) * 100).toFixed(1));
       const passed = score >= (competition.passingMarks || 40);
@@ -329,6 +338,7 @@ export const OnlineExamModal: React.FC<OnlineExamModalProps> = ({
       else if (percentage >= 40) calculatedGrade = 'C (Pass)';
 
       const autoAward: 'merit' | 'participation' = passed ? 'merit' : 'participation';
+      const shouldAutoPublish = competition.autoPublishResults === true;
 
       // Step 3 & 4: Result automatically generated and stored in existing models
       if (db && regDocId) {
@@ -341,12 +351,17 @@ export const OnlineExamModal: React.FC<OnlineExamModalProps> = ({
             percentage,
             grade: calculatedGrade,
             awardCategory: autoAward,
-            evaluatorRemarks: `Automatic Evaluation System: Scored ${score}/${max} (${percentage}% - ${calculatedGrade}). Completed on ${new Date().toLocaleDateString()}.`,
+            evaluatorRemarks: `Automatic Evaluation System: Scored ${score}/${max} (${percentage}% - ${calculatedGrade}). Correct: ${correctAnswersCount}, Incorrect: ${incorrectAnswersCount}, Unanswered: ${unansweredCount}.`,
             evaluatedAt: new Date().toISOString(),
             submittedAnswers: answers,
             submittedAt: new Date().toISOString(),
             timeTakenMinutes: Math.ceil((totalSeconds - secondsRemaining) / 60),
             violations: violations,
+            correctAnswersCount,
+            incorrectAnswersCount,
+            unansweredCount,
+            isResultPublished: shouldAutoPublish,
+            resultsPublishedAt: shouldAutoPublish ? new Date().toISOString() : undefined,
             updatedAt: new Date().toISOString()
           });
 
@@ -368,6 +383,10 @@ export const OnlineExamModal: React.FC<OnlineExamModalProps> = ({
             grade: calculatedGrade,
             awardCategory: autoAward,
             status: 'evaluated',
+            correctAnswersCount,
+            incorrectAnswersCount,
+            unansweredCount,
+            isResultPublished: shouldAutoPublish,
             violationsCount: violations.length,
             violations: violations
           });

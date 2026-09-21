@@ -55,6 +55,7 @@ import { AdminReportsAnalyticsView } from './AdminReportsAnalyticsView';
 import { AdminDonorsManagementView } from './AdminDonorsManagementView';
 import { AdminFinanceAccountingView } from './AdminFinanceAccountingView';
 import { AdminStaffHRMSView } from './AdminStaffHRMSView';
+import { BlogPressAdminConsole } from './BlogPressAdminConsole';
 
 interface SpecializedConsolesProps {
   currentTab: string;
@@ -235,42 +236,7 @@ export const AdminSpecializedConsoles: React.FC<SpecializedConsolesProps> = ({ c
   // 10. BLOG / MEDIA ADMINISTRATOR CONSOLE
   // -------------------------------------------------------------
   if (currentTab === 'blog') {
-    return (
-      <div className="space-y-6" id="admin-blog-console">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <Newspaper className="w-5 h-5 text-rose-600" />
-              <h2 className="text-xl font-extrabold text-slate-900">Blog, Press & Media Console</h2>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Publish official trust bulletins, press releases, newsletters, and educational articles.
-            </p>
-          </div>
-          <button 
-            onClick={() => showNotification('Article editor opened.')}
-            className="px-3 py-1.5 bg-rose-700 text-white rounded-lg text-xs font-bold hover:bg-rose-800 cursor-pointer flex items-center gap-1.5"
-          >
-            <Plus className="w-3.5 h-3.5" /> Publish New Bulletin
-          </button>
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <h3 className="text-xs font-bold text-slate-900 mb-3">Published Trust Bulletins</h3>
-          <div className="divide-y divide-slate-100 text-xs">
-            <div className="py-2.5 flex items-center justify-between">
-              <div>
-                <span className="font-bold text-slate-900">Fatimyah Educational Trust Announces Merit Scholarship 2026-27</span>
-                <p className="text-[11px] text-slate-500">Published: August 15, 2026 • Author: Blog Admin</p>
-              </div>
-              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded text-[10px] font-bold">
-                Live Public
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <BlogPressAdminConsole onNotify={showNotification} />;
   }
 
   // -------------------------------------------------------------

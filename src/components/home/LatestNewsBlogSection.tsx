@@ -71,6 +71,33 @@ export const LatestNewsBlogSection: React.FC<LatestNewsBlogSectionProps> = ({
     let isMounted = true;
     async function loadDynamicNews() {
       try {
+        // Query official news collection updated by Blog Admin Console
+        const newsSnap = await getDocs(collection(db, 'news'));
+        if (!newsSnap.empty && isMounted) {
+          const loaded: NewsArticle[] = [];
+          newsSnap.forEach((doc) => {
+            const d = doc.data();
+            if (d.status === 'draft') return; // Skip drafts on public page
+            loaded.push({
+              id: doc.id,
+              title: d.title || 'Untitled Bulletin',
+              category: d.category || 'Trust Announcement',
+              date: d.date || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+              summary: d.summary || d.content?.slice(0, 150) || '',
+              content: d.content || d.summary,
+              imageUrl: d.imageUrl || d.coverImageUrl,
+              author: d.author || 'FET Editorial Bureau',
+              readTime: d.readTime || '3 min read',
+              tag: d.tag || 'Official Bulletin'
+            });
+          });
+          if (loaded.length > 0) {
+            setArticles(loaded.slice(0, 3));
+            return;
+          }
+        }
+
+        // Fallback check to legacy posts collection if news collection is empty
         const postsQuery = query(collection(db, 'posts'), where('status', '==', 'published'));
         const snap = await getDocs(postsQuery);
         if (!snap.empty && isMounted) {

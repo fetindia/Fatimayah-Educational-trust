@@ -51,6 +51,8 @@ export type UserRole =
   | 'crowdfunding_admin'
   | 'examination_admin'
   | 'exam_admin'
+  | 'exam_controller'
+  | 'examiner'
   | 'school_admin'
   | 'madrasa_admin'
   | 'finance_admin'
@@ -71,7 +73,9 @@ export type AppPermission =
   | 'members.manage'
   | 'modules.manage'
   | 'settings.manage'
-  | 'finance.manage';
+  | 'finance.manage'
+  | 'exams.manage'
+  | 'exams.evaluate';
 
 export interface PermissionDefinition {
   id: AppPermission;
@@ -322,6 +326,7 @@ export interface HeroSlide {
   mediaType?: 'image' | 'video';
   videoUrl?: string;
   order?: number;
+  showTextOverlay?: boolean;
 }
 
 export interface OrgConfig {
@@ -423,17 +428,178 @@ export interface OrgConfig {
   activeDonorsCount?: number;
 
   // Official Trust Bank & UPI Details
-  bankDetails?: {
-    accountBeneficiary?: string;
-    bankName?: string;
-    branch?: string;
-    accountNumber?: string;
-    ifscCode?: string;
-    upiId?: string;
+  bankDetails?: ManualDonationBankDetails;
+
+  // Dedicated Super Admin Managed About Trust Content
+  aboutTrust?: AboutTrustContentConfig;
+
+  // Chairman's Official Message & Profile
+  chairmanMessage?: {
+    name: string;
+    designation: string;
+    photoUrl?: string;
+    message: string;
+    vision?: string;
+    leadershipStatement?: string;
   };
+
+  // Role-Specific Verified Quranic Verses (Super Admin Controlled)
+  roleQuranicVerses?: Record<string, RoleQuranicVerseSetting>;
 
   updatedAt: string;
   updatedBy: string;
+}
+
+export interface TrusteeProfile {
+  id: string;
+  name: string;
+  designation: string;
+  isChairman?: boolean;
+  photoUrl?: string;
+  overview?: string;
+  biography?: string;
+  vision?: string;
+  message?: string;
+  responsibilities?: string[];
+  contactEmail?: string;
+  contactPhone?: string;
+  displayOrder: number;
+  isEnabled: boolean;
+}
+
+export interface OfficialSignatoryConfig {
+  name: string;
+  designation: string;
+  photoUrl?: string;
+  signatureUrl?: string;
+  signatureEnabled: boolean;
+  authorizationStatement?: string;
+  termValidUntil?: string;
+  // Official Institutional Seal
+  officialSealUrl?: string;
+  officialSealEnabled: boolean;
+  sealResolution?: string;
+  // Document placement toggles
+  useOn80GReceipts?: boolean;
+  useOnMembershipCards?: boolean;
+  useOnCertificates?: boolean;
+  useOnOfficialLetters?: boolean;
+}
+
+export interface AboutTrustContentConfig {
+  // 1. Institutional Overview
+  overviewIntroduction?: string;
+  purpose?: string;
+  educationalWorkSummary?: string;
+  welfareWorkSummary?: string;
+  communityServiceSummary?: string;
+  empowermentObjectives?: string;
+  areasOfWork?: string[];
+  
+  // 2. Mission & Objectives
+  missionStatement?: string;
+  visionStatement?: string;
+  coreObjectives?: string[];
+  educationObjectives?: string[];
+  welfareObjectives?: string[];
+  communityDevelopment?: string;
+  serviceEmpowerment?: string;
+  longTermGoals?: string[];
+
+  // 3. Governance & Structure
+  governanceDescription?: string;
+  structureTiers?: {
+    tierNumber: number;
+    title: string;
+    description: string;
+    bodyName: string;
+  }[];
+
+  // 4. RBAC, Roles & Responsibilities Public Explanation
+  rbacDescription?: string;
+  rolesOverview?: {
+    roleKey: string;
+    roleTitle: string;
+    responsibility: string;
+    scope: string;
+  }[];
+
+  // 5. History & Milestones
+  historyDescription?: string;
+  milestones?: {
+    id: string;
+    year: string;
+    title: string;
+    description: string;
+    category: 'Foundation' | 'Education' | 'Welfare' | 'Legal' | 'Digital';
+    isKeyMilestone?: boolean;
+  }[];
+
+  // 6. Legal & Tax Status
+  registrationAuthority?: string;
+  registrationDate?: string;
+  panNumberPublic?: string;
+  darpanNgoId?: string;
+  section12ADetails?: string;
+  section80GDetails?: string;
+  fcraStatus?: string;
+  taxDeductionNote?: string;
+  complianceStatement?: string;
+
+  // 7. Leadership, Chairman & Trustees
+  chairmanProfile?: TrusteeProfile;
+  trustees?: TrusteeProfile[];
+
+  // 7b. Core Values & Pillars
+  coreValues?: {
+    id?: string;
+    title: string;
+    description: string;
+    icon?: string;
+  }[];
+
+  // 7c. Advisory Board Members
+  advisoryMembers?: TrusteeProfile[];
+
+  // 8. Authorized Signatory & Official Institutional Seal
+  signatory?: OfficialSignatoryConfig;
+
+  // 9. Audit & Transparency
+  auditStatement?: string;
+  financialTransparency?: string;
+  auditorFirmName?: string;
+  annualReturnStatus?: string;
+  publicAccountabilityStatement?: string;
+  fundDeploymentRatios?: {
+    category: string;
+    percentage: number;
+    description: string;
+  }[];
+}
+
+export interface RoleQuranicVerseSetting {
+  roleKey: string;
+  arabicText: string;
+  reference: string;
+  arabicReference?: string;
+  surahName?: string;
+  englishTranslation?: string;
+  enabled: boolean;
+  isCustom?: boolean;
+  customSource?: string;
+}
+
+export interface ManualDonationBankDetails {
+  accountBeneficiary: string;
+  bankName: string;
+  accountNumber: string;
+  ifscCode: string;
+  branch: string;
+  accountType?: string;
+  upiId?: string;
+  instructions?: string;
+  referenceInstructions?: string;
+  isEnabled: boolean;
 }
 
 export interface ModuleChapter {
@@ -1169,6 +1335,10 @@ export interface BookReadingDetails {
   submissionRequirements?: string;
   bookCoverUrl?: string;
   pdfReadingMaterialUrl?: string;
+  pdfFileName?: string;
+  pdfFileSizeBytes?: number;
+  pdfSourceType?: 'upload' | 'external_url';
+  pdfExternalUrl?: string;
 }
 
 export interface ExamStructureDetails {
@@ -1199,6 +1369,7 @@ export interface CompetitionPrizeTier {
   eligibilityInfo?: string; // e.g. "Open to All Registered Candidates"
   winnerCount: number; // e.g. 1
   status: 'active' | 'inactive';
+  rewardType?: 'cash' | 'scholarship' | 'medal_trophy' | 'certificate' | 'gadget_book' | 'other' | string;
 }
 
 export interface Competition {
@@ -1232,9 +1403,22 @@ export interface Competition {
   rules: string[];
   coverImageUrl?: string;
   bookDetails?: BookReadingDetails;
+  pdfReadingMaterialUrl?: string;
+  pdfFileName?: string;
+  pdfFileSizeBytes?: number;
+  pdfSourceType?: 'upload' | 'external_url';
   examDetails?: ExamStructureDetails;
   prizesSummary?: string[];
   prizeRewards?: CompetitionPrizeTier[];
+
+  // Participation Fee & Evaluation Configuration
+  isPaid?: boolean; // Free vs Paid Examination toggle
+  participationFee?: number; // Fee in INR (e.g. 50, 100, 250)
+  autoEvaluateResults?: boolean; // System evaluates objective MCQs automatically
+  autoPublishResults?: boolean; // System automatically publishes scores upon submission
+  showInPublicTop100?: boolean; // Eligible for inclusion in Public Top 100 showcase
+  assignedExaminerUids?: string[]; // Examiners authorized to grade this examination
+  assignedExaminerEmails?: string[];
 
   // Status & Governance
   status: CompetitionStatus;
@@ -1295,6 +1479,7 @@ export interface CompetitionRegistration {
   examAttemptStatus?: 'not_started' | 'in_progress' | 'submitted' | 'evaluated';
   examStartedAt?: string;
   examSubmittedAt?: string;
+  submittedAt?: string;
   attemptId?: string;
   submittedAnswers?: Record<string, any>;
 
@@ -1310,8 +1495,23 @@ export interface CompetitionRegistration {
   evaluatedByEmail?: string;
   evaluatedAt?: string;
 
+  // Auto-evaluation counts
+  correctAnswersCount?: number;
+  incorrectAnswersCount?: number;
+  unansweredCount?: number;
+
+  // Payment Status (for Paid Examinations)
+  isPaid?: boolean;
+  participationFee?: number;
+  paymentFeeAmount?: number;
+  paymentStatus?: 'not_required' | 'free' | 'pending' | 'paid' | 'refunded';
+  paymentId?: string;
+  orderId?: string;
+  paymentCompletedAt?: string;
+
   // Result & Certificate
   isResultPublished?: boolean;
+  resultsPublishedAt?: string;
   certificateIssued?: boolean;
   certificateId?: string; // "FET-CERT-CMP-2026-0101"
   certificateIssuedAt?: string;

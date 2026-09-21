@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { FETLogo } from '../common/FETLogo';
 import { useConfig } from '../../contexts/ConfigContext';
+import { getRoleQuranicVerse, RoleQuranicVerseSetting } from '../../data/quranicVerses';
 
 export type IDCardCategory = 
   | 'general_member' 
@@ -45,7 +46,10 @@ export type IDCardCategory =
   | 'volunteer' 
   | 'donor' 
   | 'staff'
-  | 'management';
+  | 'management'
+  | 'student'
+  | 'teacher'
+  | 'administrator';
 
 export interface FETIdentityCardProps {
   category: IDCardCategory;
@@ -76,6 +80,7 @@ export interface FETIdentityCardProps {
   idPrefix?: string;
   scale?: number;
   className?: string;
+  showPrintWatermark?: boolean;
 }
 
 export const FETIdentityCard: React.FC<FETIdentityCardProps> = ({
@@ -105,7 +110,8 @@ export const FETIdentityCard: React.FC<FETIdentityCardProps> = ({
   onFlip,
   onOpenVerification,
   idPrefix = 'card',
-  className = ''
+  className = '',
+  showPrintWatermark = false
 }) => {
   const { config } = useConfig();
 
@@ -126,7 +132,6 @@ export const FETIdentityCard: React.FC<FETIdentityCardProps> = ({
       slogan: 'TOGETHER WE BUILD A BETTER TOMORROW',
       icon: Award,
       headerTitle: 'FATIMYAH EDUCATIONAL TRUST',
-      tagline: 'Minar-ul-Zulmat Ila-Noor',
       defaultRole: 'GENERAL MEMBER',
       idLabel: 'Member ID',
       extraLabel: 'Blood Group',
@@ -147,7 +152,6 @@ export const FETIdentityCard: React.FC<FETIdentityCardProps> = ({
       slogan: 'A LIFETIME COMMITMENT TO EDUCATION',
       icon: Crown,
       headerTitle: 'FATIMYAH EDUCATIONAL TRUST',
-      tagline: 'Minar-ul-Zulmat Ila-Noor',
       defaultRole: 'CORE COMMITTEE MEMBER',
       idLabel: 'Member ID',
       extraLabel: 'Blood Group',
@@ -168,7 +172,6 @@ export const FETIdentityCard: React.FC<FETIdentityCardProps> = ({
       slogan: 'SERVICE TO HUMANITY IS SERVICE TO ALLAH',
       icon: HeartHandshake,
       headerTitle: 'FATIMYAH EDUCATIONAL TRUST',
-      tagline: 'Minar-ul-Zulmat Ila-Noor',
       defaultRole: volunteerWing ? `${volunteerWing.toUpperCase()} VOLUNTEER` : 'COMMUNITY VOLUNTEER',
       idLabel: 'Volunteer ID',
       extraLabel: 'Role',
@@ -189,7 +192,6 @@ export const FETIdentityCard: React.FC<FETIdentityCardProps> = ({
       slogan: 'YOUR SUPPORT, THEIR FUTURE',
       icon: BadgeDollarSign,
       headerTitle: 'FATIMYAH EDUCATIONAL TRUST',
-      tagline: 'Minar-ul-Zulmat Ila-Noor',
       defaultRole: donorType === 'organization' ? 'CORPORATE PATRON' : 'REGULAR DONOR',
       idLabel: 'Donor ID',
       extraLabel: 'Contribution Type',
@@ -210,7 +212,6 @@ export const FETIdentityCard: React.FC<FETIdentityCardProps> = ({
       slogan: 'DEDICATED SERVICE • EXCELLENCE IN EDUCATION',
       icon: UserCheck,
       headerTitle: 'FATIMYAH EDUCATIONAL TRUST',
-      tagline: 'Minar-ul-Zulmat Ila-Noor',
       defaultRole: designation || roleTitle || 'OFFICIAL STAFF',
       idLabel: 'Staff ID',
       extraLabel: 'Department',
@@ -231,11 +232,70 @@ export const FETIdentityCard: React.FC<FETIdentityCardProps> = ({
       slogan: 'LEADING WITH VISION • SERVING WITH INTEGRITY',
       icon: ShieldCheck,
       headerTitle: 'FATIMYAH EDUCATIONAL TRUST',
-      tagline: 'Minar-ul-Zulmat Ila-Noor',
       defaultRole: 'TRUST MANAGEMENT',
       idLabel: 'ID No.',
       extraLabel: 'Phone',
       extraValue: mobileNumber || '+91 98765 43210'
+    },
+    administrator: {
+      categoryLabel: 'SECRETARIAT & GOVERNANCE',
+      shortLabel: 'ADMIN',
+      badgeBg: 'bg-slate-900 text-amber-300',
+      badgeBorder: 'border-slate-800',
+      headerAccent: 'text-slate-900',
+      primaryHex: '#0f172a',
+      cardBg: '#ffffff',
+      cardBorder: '#334155',
+      idText: 'text-slate-800',
+      ribbonBg: 'bg-slate-950',
+      ribbonHex: '#020617',
+      slogan: 'LEADING WITH VISION • SERVING WITH INTEGRITY',
+      icon: ShieldCheck,
+      headerTitle: 'FATIMYAH EDUCATIONAL TRUST',
+      defaultRole: designation || roleTitle || 'TRUST ADMINISTRATOR',
+      idLabel: 'Admin ID',
+      extraLabel: 'Phone',
+      extraValue: mobileNumber || '+91 98765 43210'
+    },
+    student: {
+      categoryLabel: 'REGISTERED STUDENT SCHOLAR',
+      shortLabel: 'STUDENT',
+      badgeBg: 'bg-blue-900 text-white',
+      badgeBorder: 'border-blue-700',
+      headerAccent: 'text-blue-900',
+      primaryHex: '#1e3a8a',
+      cardBg: '#ffffff',
+      cardBorder: '#2563eb',
+      idText: 'text-blue-800',
+      ribbonBg: 'bg-blue-950',
+      ribbonHex: '#172554',
+      slogan: 'DEDICATED TO LEARNING & EXCELLENCE',
+      icon: Award,
+      headerTitle: 'FATIMYAH EDUCATIONAL TRUST',
+      defaultRole: designation || roleTitle || 'STUDENT SCHOLAR',
+      idLabel: 'Student ID',
+      extraLabel: 'Course / School',
+      extraValue: department || 'School / College Scholar'
+    },
+    teacher: {
+      categoryLabel: 'HONORABLE EDUCATOR & FACULTY',
+      shortLabel: 'TEACHER',
+      badgeBg: 'bg-teal-900 text-white',
+      badgeBorder: 'border-teal-700',
+      headerAccent: 'text-teal-950',
+      primaryHex: '#134e4a',
+      cardBg: '#ffffff',
+      cardBorder: '#0d9488',
+      idText: 'text-teal-800',
+      ribbonBg: 'bg-teal-950',
+      ribbonHex: '#042f2e',
+      slogan: 'GUIDING MINDS • SHAPING FUTURES',
+      icon: Compass,
+      headerTitle: 'FATIMYAH EDUCATIONAL TRUST',
+      defaultRole: designation || roleTitle || 'FACULTY EDUCATOR',
+      idLabel: 'Teacher ID',
+      extraLabel: 'Department',
+      extraValue: department || 'Academics & Instruction'
     }
   }[category] || {
     categoryLabel: 'MEMBER',
@@ -252,7 +312,6 @@ export const FETIdentityCard: React.FC<FETIdentityCardProps> = ({
     slogan: 'TOGETHER WE BUILD A BETTER TOMORROW',
     icon: Award,
     headerTitle: 'FATIMYAH EDUCATIONAL TRUST',
-    tagline: 'Minar-ul-Zulmat Ila-Noor',
     defaultRole: 'MEMBER',
     idLabel: 'Member ID',
     extraLabel: 'Blood Group',
@@ -260,6 +319,9 @@ export const FETIdentityCard: React.FC<FETIdentityCardProps> = ({
   };
 
   const CategoryIcon = themeConfig.icon;
+
+  // Resolve role-specific Quranic verse (Super Admin configurable with verified defaults)
+  const verseSetting = getRoleQuranicVerse(category, config.roleQuranicVerses);
 
   const formattedIssueDate = issueDate.includes('T') 
     ? new Date(issueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -287,8 +349,26 @@ export const FETIdentityCard: React.FC<FETIdentityCardProps> = ({
       id={`${idPrefix}-${cardId}`}
     >
       {/* Trust Watermark Crest in Center Background */}
-      <div className="absolute right-12 top-1/2 -translate-y-1/2 opacity-[0.07] pointer-events-none scale-125">
-        <FETLogo size="lg" showTagline={false} />
+      <div className="absolute right-12 top-1/2 -translate-y-1/2 opacity-[0.06] pointer-events-none scale-125 z-0">
+        <FETLogo variant="emblem" size="lg" showTagline={false} hideBadge={true} />
+      </div>
+
+      {/* Official Trust Print & PDF Watermark: FATIMYAH EDUCATIONAL TRUST */}
+      {/* Positioned subtly behind content (z-0); visible in print and PDF/PNG exports */}
+      <div 
+        className={`absolute inset-0 z-0 items-center justify-center pointer-events-none overflow-hidden select-none ${
+          showPrintWatermark ? 'flex' : 'hidden print:flex'
+        }`}
+        aria-hidden="true"
+      >
+        <div className="transform -rotate-12 text-center pointer-events-none px-4">
+          <span className="block font-serif font-black tracking-[0.22em] uppercase text-slate-800/[0.055] text-[13px] sm:text-[15.5px] whitespace-nowrap">
+            FATIMYAH EDUCATIONAL TRUST
+          </span>
+          <span className="block text-[6.5px] sm:text-[7.5px] font-mono tracking-[0.2em] uppercase text-emerald-950/[0.045] font-bold mt-0.5">
+            GOVT. REGN. NO. E-19842 (BOM) • VERIFIED CREDENTIAL
+          </span>
+        </div>
       </div>
 
       {/* Fine Border Inset */}
@@ -306,16 +386,21 @@ export const FETIdentityCard: React.FC<FETIdentityCardProps> = ({
             {/* Trust Logo & Name */}
             <div className="flex items-center gap-2 sm:gap-2.5">
               <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-50 border border-slate-200 p-0.5 flex items-center justify-center shrink-0 shadow-xs">
-                <FETLogo size="sm" showTagline={false} />
+                <FETLogo variant="emblem" size="sm" showTagline={false} hideBadge={true} />
               </div>
 
               <div>
                 <h3 className="text-[10px] sm:text-xs font-black text-slate-900 tracking-wide uppercase leading-tight font-serif">
                   {themeConfig.headerTitle}
                 </h3>
-                <p className="text-[7.5px] sm:text-[9px] text-emerald-800 font-bold font-serif leading-tight">
-                  Minar-ul-Zulmat Ila-Noor
-                </p>
+                <div 
+                  className="text-[8px] sm:text-[9.5px] font-bold text-emerald-800 leading-tight mt-0.5 select-none tracking-normal"
+                  dir="rtl"
+                  style={{ fontFamily: "'Amiri', 'Noto Naskh Arabic', serif" }}
+                  title={`${verseSetting.reference} • ${verseSetting.arabicText}`}
+                >
+                  {verseSetting.arabicText}
+                </div>
               </div>
             </div>
 
@@ -469,21 +554,41 @@ export const FETIdentityCard: React.FC<FETIdentityCardProps> = ({
           <div className="border-b border-slate-200 pb-1.5 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <div className="w-6 h-6 rounded-lg bg-slate-50 border border-slate-200 p-0.5 flex items-center justify-center">
-                <FETLogo size="xs" showTagline={false} />
+                <FETLogo variant="emblem" size="xs" showTagline={false} hideBadge={true} />
               </div>
               <div>
                 <h4 className="font-black text-[9px] sm:text-[10.5px] text-slate-900 uppercase tracking-wide leading-tight">
                   FATIMYAH EDUCATIONAL TRUST
                 </h4>
-                <p className="text-[6.5px] sm:text-[7.5px] text-emerald-800 font-bold">
-                  Minar-ul-Zulmat Ila-Noor
-                </p>
+                <div 
+                  className="text-[7.5px] sm:text-[9px] font-bold text-emerald-800 leading-tight mt-0.5 select-none"
+                  dir="rtl"
+                  style={{ fontFamily: "'Amiri', 'Noto Naskh Arabic', serif" }}
+                >
+                  {verseSetting.arabicText}
+                </div>
               </div>
             </div>
             <span className={`text-[7px] sm:text-[8px] font-mono font-black ${themeConfig.idText}`}>
               SERIAL: {cardId}
             </span>
           </div>
+
+          {/* Role-Specific Quranic Inscription Panel (Back View) */}
+          {verseSetting?.enabled && verseSetting.arabicText && (
+            <div className="my-1 py-1 px-2.5 rounded-lg bg-emerald-50/90 border border-emerald-200/90 text-center shadow-2xs">
+              <p 
+                className="font-serif font-bold text-[9px] sm:text-[10.5px] text-emerald-950 leading-tight" 
+                dir="rtl"
+                style={{ fontFamily: "'Amiri', 'Noto Naskh Arabic', serif" }}
+              >
+                {verseSetting.arabicText}
+              </p>
+              <span className="text-[6px] sm:text-[7px] text-emerald-800 font-bold font-sans tracking-wide block mt-0.5" dir="ltr">
+                {verseSetting.reference}
+              </span>
+            </div>
+          )}
 
           {/* Guidelines & Terms (Matching Reference Image 3) */}
           <div className="py-1 space-y-1.5 text-[6.5px] sm:text-[8px] text-slate-700 leading-snug">
@@ -528,19 +633,23 @@ export const FETIdentityCard: React.FC<FETIdentityCardProps> = ({
             </div>
 
             <div className="text-right flex flex-col items-end">
-              <FETLogo size="xs" showTagline={false} />
+              <FETLogo variant="emblem" size="xs" showTagline={false} hideBadge={true} />
               <span className="text-[6px] sm:text-[7px] font-black text-slate-800 uppercase mt-0.5">
                 FATIMYAH EDUCATIONAL TRUST
               </span>
-              <span className="text-[5.5px] sm:text-[6px] text-emerald-800 font-bold">
-                Minar-ul-Zulmat Ila-Noor
+              <span 
+                className="text-[6px] sm:text-[7px] text-emerald-800 font-bold"
+                dir="rtl"
+                style={{ fontFamily: "'Amiri', 'Noto Naskh Arabic', serif" }}
+              >
+                {verseSetting.arabicText}
               </span>
             </div>
           </div>
 
           {/* Bottom Back Ribbon */}
           <div className={`-mx-3.5 -mb-3.5 sm:-mx-4.5 sm:-mb-4.5 py-1 px-3 flex items-center justify-between text-[6.5px] sm:text-[7.5px] font-bold text-white ${themeConfig.ribbonBg}`}>
-            <span>FATIMYAH EDUCATIONAL TRUST • INDIA</span>
+            <span>FATIMYAH EDUCATIONAL TRUST</span>
             <span className="font-mono opacity-90 uppercase">OFFICIAL ACCREDITED CREDENTIAL</span>
           </div>
 

@@ -51,16 +51,42 @@ import { AuthModal } from './components/auth/AuthModal';
 import { MembershipVerificationModal } from './components/membership/MembershipVerificationModal';
 import { LegalDocumentModal } from './components/legal/LegalDocumentModal';
 import { AboutTrustModal, AboutTab } from './components/common/AboutTrustModal';
+import { AboutTrustFullPage, AboutSectionId } from './components/about/AboutTrustFullPage';
 import { DonationModal } from './components/common/DonationModal';
+import { PublicSearchModal } from './components/common/PublicSearchModal';
+import { GeneralDonationView, DonationTab } from './components/donation/GeneralDonationView';
+import { Top100ResultsShowcase } from './components/home/Top100ResultsShowcase';
+import { StudentResultPortalModal } from './components/competitions/StudentResultPortalModal';
 import { MobileBottomNav } from './components/layout/MobileBottomNav';
 import { OfflineNotice } from './components/common/OfflineNotice';
 import { PWAInstallBanner } from './components/common/PWAInstallBanner';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { ProgramsPage } from './components/pages/ProgramsPage';
+import { AppealsPage } from './components/pages/AppealsPage';
+import { MembershipPage } from './components/pages/MembershipPage';
+import { VolunteersPage } from './components/pages/VolunteersPage';
+import { EventsNewsPage } from './components/pages/EventsNewsPage';
+import { ContactUsPage } from './components/pages/ContactUsPage';
+import { ExaminationPage } from './components/pages/ExaminationPage';
+
+export type AppExperience = 
+  | 'public' 
+  | 'donate' 
+  | 'dashboard' 
+  | 'admin' 
+  | 'about' 
+  | 'programs' 
+  | 'appeals' 
+  | 'membership' 
+  | 'volunteers' 
+  | 'events_news' 
+  | 'contact' 
+  | 'examination';
 
 const FETIndiaPlatform: React.FC = () => {
   const { currentUser } = useAuth();
   const { config } = useConfig();
-  const [currentExperience, setCurrentExperience] = useState<'public' | 'dashboard' | 'admin'>('public');
+  const [currentExperience, setCurrentExperience] = useState<AppExperience>('public');
   const [dashboardInitialTab, setDashboardInitialTab] = useState<MemberDashboardTab>('dashboard');
   const [activeSection, setActiveSection] = useState<string>('home');
   const [adminInitialView, setAdminInitialView] = useState<string>('dashboard');
@@ -71,6 +97,7 @@ const FETIndiaPlatform: React.FC = () => {
   const [legalModalTab, setLegalModalTab] = useState<'terms' | 'privacy'>('terms');
   const [isAboutModalOpen, setIsAboutModalOpen] = useState<boolean>(false);
   const [aboutModalTab, setAboutModalTab] = useState<AboutTab>('overview');
+  const [aboutInitialSection, setAboutInitialSection] = useState<AboutSectionId>('overview');
   const [isDonationModalOpen, setIsDonationModalOpen] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
@@ -84,11 +111,17 @@ const FETIndiaPlatform: React.FC = () => {
   const [isExamApplyOpen, setIsExamApplyOpen] = useState<boolean>(false);
   const [selectedExamForInfo, setSelectedExamForInfo] = useState<Competition | null>(null);
   const [isExamInfoOpen, setIsExamInfoOpen] = useState<boolean>(false);
-  const [examInfoTab, setExamInfoTab] = useState<'instructions' | 'book_mastery' | 'eligibility'>('instructions');
+  const [examInfoTab, setExamInfoTab] = useState<'instructions' | 'book_mastery' | 'eligibility' | 'prizes'>('instructions');
 
   const [isChairmanModalOpen, setIsChairmanModalOpen] = useState<boolean>(false);
   const [selectedArticleForReader, setSelectedArticleForReader] = useState<NewsArticle | null>(null);
   const [isNewsReaderOpen, setIsNewsReaderOpen] = useState<boolean>(false);
+
+  // Search, General Donation & Student Examination Result states
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState<boolean>(false);
+  const [generalDonationTab, setGeneralDonationTab] = useState<DonationTab>('general');
+  const [isStudentResultModalOpen, setIsStudentResultModalOpen] = useState<boolean>(false);
+  const [studentResultPrefill, setStudentResultPrefill] = useState<string>('');
 
   // Lock body scroll when mobile menu is open
   useEffect(() => {
@@ -154,30 +187,46 @@ const FETIndiaPlatform: React.FC = () => {
         setIsLegalModalOpen(true);
         setCurrentExperience('public');
       } else if (hash === '#about' || hash === '#about_trust' || hash === '#about-trust' || path.startsWith('/about')) {
-        setAboutModalTab('overview');
-        setIsAboutModalOpen(true);
-        setCurrentExperience('public');
+        setAboutInitialSection('overview');
+        setCurrentExperience('about');
       } else if (hash === '#governance' || path.startsWith('/governance')) {
-        setAboutModalTab('governance');
-        setIsAboutModalOpen(true);
-        setCurrentExperience('public');
+        setAboutInitialSection('governance');
+        setCurrentExperience('about');
+      } else if (hash === '#roles_matrix' || hash === '#roles' || path.startsWith('/roles')) {
+        setAboutInitialSection('roles_matrix');
+        setCurrentExperience('about');
       } else if (hash === '#history' || path.startsWith('/history')) {
-        setAboutModalTab('history');
-        setIsAboutModalOpen(true);
-        setCurrentExperience('public');
+        setAboutInitialSection('history');
+        setCurrentExperience('about');
       } else if (hash === '#transparency' || path.startsWith('/transparency')) {
-        setAboutModalTab('transparency');
-        setIsAboutModalOpen(true);
-        setCurrentExperience('public');
+        setAboutInitialSection('transparency');
+        setCurrentExperience('about');
+      } else if (hash === '#legal_tax' || hash === '#tax' || hash === '#80g' || path.startsWith('/tax')) {
+        setAboutInitialSection('legal_tax');
+        setCurrentExperience('about');
+      } else if (hash === '#signatory' || path.startsWith('/signatory')) {
+        setAboutInitialSection('signatory');
+        setCurrentExperience('about');
+      } else if (hash === '#mission_vision' || hash === '#mission' || hash === '#vision') {
+        setAboutInitialSection('mission_vision');
+        setCurrentExperience('about');
+      } else if (hash === '#programs' || hash === '#programs_welfare' || path.startsWith('/programs')) {
+        setCurrentExperience('programs');
+      } else if (hash === '#appeals' || hash === '#crowdfunding' || hash === '#crowdfunding_appeals' || path.startsWith('/appeals')) {
+        setCurrentExperience('appeals');
+      } else if (hash === '#membership' || path.startsWith('/membership')) {
+        setCurrentExperience('membership');
+      } else if (hash === '#volunteers' || hash === '#volunteer' || path.startsWith('/volunteers') || path.startsWith('/volunteer')) {
+        setCurrentExperience('volunteers');
+      } else if (hash === '#events-news' || hash === '#events_news' || hash === '#events' || hash === '#news' || path.startsWith('/events') || path.startsWith('/news')) {
+        setCurrentExperience('events_news');
+      } else if (hash === '#contact' || hash === '#contact-us' || path.startsWith('/contact')) {
+        setCurrentExperience('contact');
+      } else if (hash === '#examinations' || hash === '#examination' || path.startsWith('/examination')) {
+        setCurrentExperience('examination');
       } else if (hash === '#chairman' || hash === '#chairman_message' || hash === '#chairmans_message') {
         setIsChairmanModalOpen(true);
         setCurrentExperience('public');
-      } else if (hash === '#examinations' || hash === '#examination' || path.startsWith('/examinations')) {
-        setActiveSection('examinations');
-        setCurrentExperience('public');
-        setTimeout(() => {
-          document.getElementById('examinations')?.scrollIntoView({ behavior: 'smooth' });
-        }, 80);
       } else if (hash === '#apply_exam' || hash === '#exam_apply') {
         const exam = INITIAL_COMPETITIONS[0] || null;
         setSelectedExamForApply(exam);
@@ -190,14 +239,22 @@ const FETIndiaPlatform: React.FC = () => {
           document.getElementById('featured_cases')?.scrollIntoView({ behavior: 'smooth' });
         }, 80);
       } else if (hash === '#news_blogs' || hash === '#news' || hash === '#blogs') {
-        setActiveSection('news_blogs');
+        setCurrentExperience('events_news');
+      } else if (hash === '#search' || path.startsWith('/search')) {
+        setIsSearchModalOpen(true);
         setCurrentExperience('public');
-        setTimeout(() => {
-          document.getElementById('news_blogs')?.scrollIntoView({ behavior: 'smooth' });
-        }, 80);
-      } else if (hash === '#donate' || path.startsWith('/donate')) {
-        setIsDonationModalOpen(true);
+      } else if (hash === '#results' || hash === '#student_results' || hash === '#scorecard' || path.startsWith('/results')) {
+        setIsStudentResultModalOpen(true);
         setCurrentExperience('public');
+      } else if (hash === '#donate' || hash === '#donate_now' || hash === '#general_donation' || hash === '#general-donation' || hash.startsWith('#donate_') || path.startsWith('/donate')) {
+        let initialTab: DonationTab = 'general';
+        if (hash === '#donate_zakat' || hash === '#zakat') initialTab = 'zakat';
+        else if (hash === '#donate_fitrah' || hash === '#fitrah') initialTab = 'fitrah';
+        else if (hash === '#donate_property' || hash === '#property') initialTab = 'property';
+        else if (hash === '#donate_material' || hash === '#material') initialTab = 'material';
+        else if (hash === '#donate_other' || hash === '#other') initialTab = 'other';
+        setGeneralDonationTab(initialTab);
+        setCurrentExperience('donate');
       } else {
         setCurrentExperience('public');
       }
@@ -217,13 +274,185 @@ const FETIndiaPlatform: React.FC = () => {
     setIsLegalModalOpen(true);
   };
 
-  const handleOpenAbout = (tab: AboutTab = 'overview') => {
-    setAboutModalTab(tab);
-    setIsAboutModalOpen(true);
+  const handleOpenAbout = (tab: AboutTab | AboutSectionId = 'overview') => {
+    let section: AboutSectionId = 'overview';
+    if (tab === 'governance') section = 'governance';
+    else if (tab === 'history') section = 'history';
+    else if (tab === 'transparency') section = 'transparency';
+    else if (tab === 'roles_matrix') section = 'roles_matrix';
+    else if (tab === 'legal_tax') section = 'legal_tax';
+    else if (tab === 'signatory') section = 'signatory';
+    else if (tab === 'mission_vision') section = 'mission_vision';
+    setAboutInitialSection(section);
+    setCurrentExperience('about');
+    window.history.pushState(null, '', section === 'overview' ? '#about' : `#${section}`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleOpenDonate = () => {
-    setIsDonationModalOpen(true);
+  const handleOpenDonate = (tab: DonationTab = 'general') => {
+    setGeneralDonationTab(tab);
+    setCurrentExperience('donate');
+    window.history.pushState(null, '', tab === 'general' ? '#donate' : `#donate_${tab}`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOpenPrograms = () => {
+    setCurrentExperience('programs');
+    window.history.pushState(null, '', '/programs');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOpenAppeals = () => {
+    setCurrentExperience('appeals');
+    window.history.pushState(null, '', '/appeals');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOpenMembership = () => {
+    setCurrentExperience('membership');
+    window.history.pushState(null, '', '/membership');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOpenVolunteers = () => {
+    setCurrentExperience('volunteers');
+    window.history.pushState(null, '', '/volunteers');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOpenEventsNews = () => {
+    setCurrentExperience('events_news');
+    window.history.pushState(null, '', '/events-news');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOpenContact = () => {
+    setCurrentExperience('contact');
+    window.history.pushState(null, '', '/contact');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOpenExamination = () => {
+    setCurrentExperience('examination');
+    window.history.pushState(null, '', '/examination');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Synchronize document title and description based on current experience
+  useEffect(() => {
+    const titles: Record<AppExperience, { title: string; desc: string }> = {
+      public: {
+        title: 'FET India | Fatimyah Educational Trust India — Education • Service • Empowerment',
+        desc: 'Official digital platform for Fatimyah Educational Trust India (FET India). Education • Service • Empowerment. Established 1994.'
+      },
+      donate: {
+        title: 'Official 80G Tax-Exempt Donation Gateway | Fatimyah Educational Trust India',
+        desc: 'Contribute to educational sponsorships, student support, and medical relief. Eligible for 50% tax exemption under Section 80G.'
+      },
+      about: {
+        title: 'About Trust, Governance & Transparency | Fatimyah Educational Trust India',
+        desc: 'Explore the mission, vision, Board of Trustees, legal status, and audited public accountability of Fatimyah Educational Trust India.'
+      },
+      programs: {
+        title: 'Programs & Welfare Initiatives | Fatimyah Educational Trust India',
+        desc: 'Comprehensive educational, medical, and community welfare programs empowering underprivileged families across India.'
+      },
+      appeals: {
+        title: 'Emergency Relief & Humanitarian Appeals | Fatimyah Educational Trust India',
+        desc: 'Support verified educational scholarships, critical medical emergencies, and urgent humanitarian relief appeals with 100% distribution.'
+      },
+      membership: {
+        title: 'Trust Membership & Digital Identity | Fatimyah Educational Trust India',
+        desc: 'Join Fatimyah Educational Trust. Explore membership tiers, secure digital identity cards, and community stewardship.'
+      },
+      volunteers: {
+        title: 'Volunteer Network & Field Corps | Fatimyah Educational Trust India',
+        desc: 'Enroll in the FET India volunteer corps. Serve communities through education, disaster response, and field welfare drives.'
+      },
+      events_news: {
+        title: 'Events, Circulars & Official News | Fatimyah Educational Trust India',
+        desc: 'Official announcements, academic circulars, press releases, and upcoming community initiatives by Fatimyah Educational Trust India.'
+      },
+      contact: {
+        title: 'Contact Head Secretariat & Directory | Fatimyah Educational Trust India',
+        desc: 'Connect with Fatimyah Educational Trust offices, department directorates, emergency hotlines, and official correspondence desks.'
+      },
+      examination: {
+        title: 'National Examination Bureau & Talent Search | Fatimyah Educational Trust India',
+        desc: 'National book reading competitions, academic olympiads, syllabus guides, and verified candidate results by FET India.'
+      },
+      dashboard: {
+        title: 'Member & Volunteer Portal | Fatimyah Educational Trust India',
+        desc: 'Access your official digital member card, service logs, event passes, and donation history.'
+      },
+      admin: {
+        title: 'Institutional Control & CMS Console | Fatimyah Educational Trust India',
+        desc: 'Centralized administrative console for verification, CMS management, and governance.'
+      }
+    };
+
+    const currentMeta = titles[currentExperience] || titles.public;
+    document.title = currentMeta.title;
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute('content', currentMeta.desc);
+    }
+  }, [currentExperience]);
+
+  const handleSearchNavigate = (actionType: string, targetId: string) => {
+    setIsSearchModalOpen(false);
+    if (targetId === 'student_results' || targetId === 'results' || targetId === 'exam_results') {
+      setIsStudentResultModalOpen(true);
+      return;
+    }
+    if (targetId === 'general_donation' || targetId === 'donate') {
+      handleOpenDonate('general');
+      return;
+    }
+    if (targetId === 'chairman_message') {
+      setIsChairmanModalOpen(true);
+      return;
+    }
+    if (targetId === 'exam_apply') {
+      handleOpenApplyExamDirect();
+      return;
+    }
+    if (targetId === 'programs') {
+      handleOpenPrograms();
+      return;
+    }
+    if (targetId === 'appeals' || targetId === 'crowdfunding') {
+      handleOpenAppeals();
+      return;
+    }
+    if (targetId === 'membership') {
+      handleOpenMembership();
+      return;
+    }
+    if (targetId === 'volunteers' || targetId === 'volunteer') {
+      handleOpenVolunteers();
+      return;
+    }
+    if (targetId === 'events' || targetId === 'news') {
+      handleOpenEventsNews();
+      return;
+    }
+    if (targetId === 'contact') {
+      handleOpenContact();
+      return;
+    }
+    if (targetId === 'examinations' || targetId === 'examination') {
+      handleOpenExamination();
+      return;
+    }
+    if (actionType === 'scroll') {
+      handleScrollToSection(targetId);
+      return;
+    }
+    if (actionType === 'dashboard') {
+      handleOpenUserDashboard(targetId as MemberDashboardTab);
+      return;
+    }
   };
 
   const handleViewCase = (campaign: CrowdfundingCampaign) => {
@@ -312,6 +541,34 @@ const FETIndiaPlatform: React.FC = () => {
       handleOpenDonate();
       return;
     }
+    if (sectionId === 'programs' || sectionId === 'programs_welfare') {
+      handleOpenPrograms();
+      return;
+    }
+    if (sectionId === 'appeals' || sectionId === 'crowdfunding' || sectionId === 'crowdfunding_appeals') {
+      handleOpenAppeals();
+      return;
+    }
+    if (sectionId === 'membership') {
+      handleOpenMembership();
+      return;
+    }
+    if (sectionId === 'volunteers' || sectionId === 'volunteer' || sectionId === 'volunteer_membership') {
+      handleOpenVolunteers();
+      return;
+    }
+    if (sectionId === 'events' || sectionId === 'events_news' || sectionId === 'news' || sectionId === 'events_blog' || sectionId === 'news_blogs') {
+      handleOpenEventsNews();
+      return;
+    }
+    if (sectionId === 'contact' || sectionId === 'contact_us') {
+      handleOpenContact();
+      return;
+    }
+    if (sectionId === 'examination' || sectionId === 'examinations') {
+      handleOpenExamination();
+      return;
+    }
 
     setActiveSection(sectionId);
     if (currentExperience !== 'public') {
@@ -359,12 +616,12 @@ const FETIndiaPlatform: React.FC = () => {
         />
       )}
 
-      {/* EXPERIENCE A: PUBLIC WEBSITE */}
-      {currentExperience === 'public' && (
+      {/* EXPERIENCE A: PUBLIC WEBSITE & DONATE NOW FULL PAGE */}
+      {(currentExperience === 'public' || currentExperience === 'donate') && (
         <div className="min-h-screen bg-white text-slate-900 flex flex-col pb-16 md:pb-0 selection:bg-emerald-100 selection:text-emerald-900" id="fet-india-app">
           {/* Public Header */}
           <Header
-            activeSection={activeSection}
+            activeSection={currentExperience === 'donate' ? 'donate' : activeSection}
             setActiveSection={handleScrollToSection}
             onOpenAuth={() => {
               setIsMobileMenuOpen(false);
@@ -387,10 +644,22 @@ const FETIndiaPlatform: React.FC = () => {
               handleOpenLegal(tab);
             }}
             onOpenAbout={handleOpenAbout}
-            onOpenExamination={() => handleScrollToSection('examinations')}
+            onOpenPrograms={handleOpenPrograms}
+            onOpenAppeals={handleOpenAppeals}
+            onOpenMembership={handleOpenMembership}
+            onOpenVolunteers={handleOpenVolunteers}
+            onOpenEventsNews={handleOpenEventsNews}
+            onOpenContact={handleOpenContact}
+            onOpenExamination={handleOpenExamination}
             onOpenApplyExam={handleOpenApplyExamDirect}
             onOpenChairmanMessage={() => setIsChairmanModalOpen(true)}
-            onOpenNewsBlogs={() => handleScrollToSection('news_blogs')}
+            onOpenNewsBlogs={handleOpenEventsNews}
+            onOpenSearch={() => setIsSearchModalOpen(true)}
+            onOpenStudentResults={() => {
+              setStudentResultPrefill('');
+              setIsStudentResultModalOpen(true);
+            }}
+            onOpenGeneralDonation={(tab?: any) => handleOpenDonate(tab || 'general')}
             isMobileMenuOpen={isMobileMenuOpen}
             onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
             onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
@@ -398,7 +667,19 @@ const FETIndiaPlatform: React.FC = () => {
 
           {/* Main Public Website Body */}
           <main className="flex-1">
-            {(() => {
+            {currentExperience === 'donate' ? (
+              <GeneralDonationView
+                initialTab={generalDonationTab}
+                isFullPage={true}
+                onClose={() => {
+                  setCurrentExperience('public');
+                  window.history.pushState(null, '', '/');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onOpenAuth={() => setIsAuthModalOpen(true)}
+              />
+            ) : (
+              (() => {
               const defaultOrder = [
                 'hero',
                 'crowdfunding',
@@ -406,6 +687,7 @@ const FETIndiaPlatform: React.FC = () => {
                 'education_support',
                 'programs',
                 'examinations',
+                'top_100_results',
                 'events_blog',
                 'news_blogs',
                 'chairmans_message',
@@ -504,6 +786,17 @@ const FETIndiaPlatform: React.FC = () => {
                             onViewAllExams={() => handleScrollToSection('examinations')}
                           />
                         );
+                      case 'top_100_results':
+                        return (
+                          <Top100ResultsShowcase
+                            key={itemKey}
+                            onOpenExamPortal={() => handleScrollToSection('examinations')}
+                            onViewCandidateResult={(rollId) => {
+                              setStudentResultPrefill(rollId);
+                              setIsStudentResultModalOpen(true);
+                            }}
+                          />
+                        );
                       case 'events_blog':
                         return <EventsBlogSection key={itemKey} />;
                       case 'news_blogs':
@@ -564,8 +857,9 @@ const FETIndiaPlatform: React.FC = () => {
                   })}
                 </>
               );
-            })()}
-          </main>
+            })()
+          )}
+        </main>
 
           {/* Institutional Footer */}
           <Footer
@@ -579,6 +873,688 @@ const FETIndiaPlatform: React.FC = () => {
           {/* Native Mobile Bottom Navigation Bar */}
           <MobileBottomNav
             activeSection={activeSection}
+            setActiveSection={handleScrollToSection}
+            onOpenAuth={() => {
+              setIsMobileMenuOpen(false);
+              setIsAuthModalOpen(true);
+            }}
+            onOpenUserDashboard={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenUserDashboard(tab);
+            }}
+            onOpenMoreMenu={() => setIsMobileMenuOpen(true)}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+          />
+        </div>
+      )}
+
+      {/* EXPERIENCE E: ABOUT TRUST DEDICATED FULL PAGE EXPERIENCE */}
+      {currentExperience === 'about' && (
+        <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col pb-16 md:pb-0 selection:bg-emerald-100 selection:text-emerald-900" id="fet-india-about-experience">
+          {/* Public Header */}
+          <Header
+            activeSection="about"
+            setActiveSection={(sec) => {
+              if (sec === 'donate') {
+                handleOpenDonate();
+              } else if (sec === 'about') {
+                handleOpenAbout('overview');
+              } else {
+                setCurrentExperience('public');
+                handleScrollToSection(sec);
+              }
+            }}
+            onOpenAuth={() => {
+              setIsMobileMenuOpen(false);
+              setIsAuthModalOpen(true);
+            }}
+            onOpenUserDashboard={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenUserDashboard(tab);
+            }}
+            onOpenAdminConsole={(view) => {
+              setIsMobileMenuOpen(false);
+              handleOpenAdmin(view);
+            }}
+            onOpenVerification={(memberId) => {
+              setIsMobileMenuOpen(false);
+              handleOpenVerification(memberId);
+            }}
+            onOpenLegal={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenLegal(tab);
+            }}
+            onOpenAbout={handleOpenAbout}
+            onOpenPrograms={handleOpenPrograms}
+            onOpenAppeals={handleOpenAppeals}
+            onOpenMembership={handleOpenMembership}
+            onOpenVolunteers={handleOpenVolunteers}
+            onOpenEventsNews={handleOpenEventsNews}
+            onOpenContact={handleOpenContact}
+            onOpenExamination={handleOpenExamination}
+            onOpenApplyExam={handleOpenApplyExamDirect}
+            onOpenChairmanMessage={() => setIsChairmanModalOpen(true)}
+            onOpenNewsBlogs={handleOpenEventsNews}
+            onOpenSearch={() => setIsSearchModalOpen(true)}
+            onOpenStudentResults={() => {
+              setStudentResultPrefill('');
+              setIsStudentResultModalOpen(true);
+            }}
+            onOpenGeneralDonation={(tab?: any) => handleOpenDonate(tab || 'general')}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+            onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
+          />
+
+          {/* Full Page Body */}
+          <AboutTrustFullPage
+            initialSection={aboutInitialSection}
+            onReturnToHome={handleReturnToPublic}
+            onOpenDonate={() => handleOpenDonate('general')}
+            onOpenVolunteer={handleOpenVolunteers}
+            onOpenExamination={handleOpenExamination}
+            onOpenContact={handleOpenContact}
+          />
+
+          {/* Institutional Footer */}
+          <Footer
+            onOpenSection={handleScrollToSection}
+            onOpenAdmin={handleOpenAdmin}
+            onOpenVerification={handleOpenVerification}
+            onOpenLegal={handleOpenLegal}
+            onOpenAbout={handleOpenAbout}
+          />
+
+          {/* Native Mobile Bottom Navigation Bar */}
+          <MobileBottomNav
+            activeSection="about"
+            setActiveSection={handleScrollToSection}
+            onOpenAuth={() => {
+              setIsMobileMenuOpen(false);
+              setIsAuthModalOpen(true);
+            }}
+            onOpenUserDashboard={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenUserDashboard(tab);
+            }}
+            onOpenMoreMenu={() => setIsMobileMenuOpen(true)}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+          />
+        </div>
+      )}
+
+      {/* EXPERIENCE F: PROGRAMS & WELFARE DEDICATED FULL WEBPAGE */}
+      {currentExperience === 'programs' && (
+        <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col pb-16 md:pb-0 selection:bg-emerald-100 selection:text-emerald-900" id="fet-india-programs-experience">
+          <Header
+            activeSection="programs"
+            setActiveSection={handleScrollToSection}
+            onOpenAuth={() => {
+              setIsMobileMenuOpen(false);
+              setIsAuthModalOpen(true);
+            }}
+            onOpenUserDashboard={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenUserDashboard(tab);
+            }}
+            onOpenAdminConsole={(view) => {
+              setIsMobileMenuOpen(false);
+              handleOpenAdmin(view);
+            }}
+            onOpenVerification={(memberId) => {
+              setIsMobileMenuOpen(false);
+              handleOpenVerification(memberId);
+            }}
+            onOpenLegal={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenLegal(tab);
+            }}
+            onOpenAbout={handleOpenAbout}
+            onOpenPrograms={handleOpenPrograms}
+            onOpenAppeals={handleOpenAppeals}
+            onOpenMembership={handleOpenMembership}
+            onOpenVolunteers={handleOpenVolunteers}
+            onOpenEventsNews={handleOpenEventsNews}
+            onOpenContact={handleOpenContact}
+            onOpenExamination={handleOpenExamination}
+            onOpenApplyExam={handleOpenApplyExamDirect}
+            onOpenChairmanMessage={() => setIsChairmanModalOpen(true)}
+            onOpenNewsBlogs={handleOpenEventsNews}
+            onOpenSearch={() => setIsSearchModalOpen(true)}
+            onOpenStudentResults={() => {
+              setStudentResultPrefill('');
+              setIsStudentResultModalOpen(true);
+            }}
+            onOpenGeneralDonation={(tab?: any) => handleOpenDonate(tab || 'general')}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+            onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
+          />
+
+          <main className="flex-1">
+            <ProgramsPage
+              onOpenDonate={(tab) => handleOpenDonate(tab || 'general')}
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+              onOpenExamination={handleOpenExamination}
+              onOpenContact={handleOpenContact}
+              onReturnToHome={handleReturnToPublic}
+            />
+          </main>
+
+          <Footer
+            onOpenSection={handleScrollToSection}
+            onOpenAdmin={handleOpenAdmin}
+            onOpenVerification={handleOpenVerification}
+            onOpenLegal={handleOpenLegal}
+            onOpenAbout={handleOpenAbout}
+          />
+
+          <MobileBottomNav
+            activeSection="programs"
+            setActiveSection={handleScrollToSection}
+            onOpenAuth={() => {
+              setIsMobileMenuOpen(false);
+              setIsAuthModalOpen(true);
+            }}
+            onOpenUserDashboard={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenUserDashboard(tab);
+            }}
+            onOpenMoreMenu={() => setIsMobileMenuOpen(true)}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+          />
+        </div>
+      )}
+
+      {/* EXPERIENCE G: APPEALS & RELIEF DEDICATED FULL WEBPAGE */}
+      {currentExperience === 'appeals' && (
+        <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col pb-16 md:pb-0 selection:bg-emerald-100 selection:text-emerald-900" id="fet-india-appeals-experience">
+          <Header
+            activeSection="appeals"
+            setActiveSection={handleScrollToSection}
+            onOpenAuth={() => {
+              setIsMobileMenuOpen(false);
+              setIsAuthModalOpen(true);
+            }}
+            onOpenUserDashboard={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenUserDashboard(tab);
+            }}
+            onOpenAdminConsole={(view) => {
+              setIsMobileMenuOpen(false);
+              handleOpenAdmin(view);
+            }}
+            onOpenVerification={(memberId) => {
+              setIsMobileMenuOpen(false);
+              handleOpenVerification(memberId);
+            }}
+            onOpenLegal={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenLegal(tab);
+            }}
+            onOpenAbout={handleOpenAbout}
+            onOpenPrograms={handleOpenPrograms}
+            onOpenAppeals={handleOpenAppeals}
+            onOpenMembership={handleOpenMembership}
+            onOpenVolunteers={handleOpenVolunteers}
+            onOpenEventsNews={handleOpenEventsNews}
+            onOpenContact={handleOpenContact}
+            onOpenExamination={handleOpenExamination}
+            onOpenApplyExam={handleOpenApplyExamDirect}
+            onOpenChairmanMessage={() => setIsChairmanModalOpen(true)}
+            onOpenNewsBlogs={handleOpenEventsNews}
+            onOpenSearch={() => setIsSearchModalOpen(true)}
+            onOpenStudentResults={() => {
+              setStudentResultPrefill('');
+              setIsStudentResultModalOpen(true);
+            }}
+            onOpenGeneralDonation={(tab?: any) => handleOpenDonate(tab || 'general')}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+            onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
+          />
+
+          <main className="flex-1">
+            <AppealsPage
+              onSupportCampaign={handleSupportCase}
+              onViewCampaignDetails={handleViewCase}
+              onOpenDonate={(tab) => handleOpenDonate(tab || 'general')}
+              onReturnToHome={handleReturnToPublic}
+            />
+          </main>
+
+          <Footer
+            onOpenSection={handleScrollToSection}
+            onOpenAdmin={handleOpenAdmin}
+            onOpenVerification={handleOpenVerification}
+            onOpenLegal={handleOpenLegal}
+            onOpenAbout={handleOpenAbout}
+          />
+
+          <MobileBottomNav
+            activeSection="appeals"
+            setActiveSection={handleScrollToSection}
+            onOpenAuth={() => {
+              setIsMobileMenuOpen(false);
+              setIsAuthModalOpen(true);
+            }}
+            onOpenUserDashboard={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenUserDashboard(tab);
+            }}
+            onOpenMoreMenu={() => setIsMobileMenuOpen(true)}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+          />
+        </div>
+      )}
+
+      {/* EXPERIENCE H: MEMBERSHIP DEDICATED FULL WEBPAGE */}
+      {currentExperience === 'membership' && (
+        <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col pb-16 md:pb-0 selection:bg-emerald-100 selection:text-emerald-900" id="fet-india-membership-experience">
+          <Header
+            activeSection="membership"
+            setActiveSection={handleScrollToSection}
+            onOpenAuth={() => {
+              setIsMobileMenuOpen(false);
+              setIsAuthModalOpen(true);
+            }}
+            onOpenUserDashboard={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenUserDashboard(tab);
+            }}
+            onOpenAdminConsole={(view) => {
+              setIsMobileMenuOpen(false);
+              handleOpenAdmin(view);
+            }}
+            onOpenVerification={(memberId) => {
+              setIsMobileMenuOpen(false);
+              handleOpenVerification(memberId);
+            }}
+            onOpenLegal={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenLegal(tab);
+            }}
+            onOpenAbout={handleOpenAbout}
+            onOpenPrograms={handleOpenPrograms}
+            onOpenAppeals={handleOpenAppeals}
+            onOpenMembership={handleOpenMembership}
+            onOpenVolunteers={handleOpenVolunteers}
+            onOpenEventsNews={handleOpenEventsNews}
+            onOpenContact={handleOpenContact}
+            onOpenExamination={handleOpenExamination}
+            onOpenApplyExam={handleOpenApplyExamDirect}
+            onOpenChairmanMessage={() => setIsChairmanModalOpen(true)}
+            onOpenNewsBlogs={handleOpenEventsNews}
+            onOpenSearch={() => setIsSearchModalOpen(true)}
+            onOpenStudentResults={() => {
+              setStudentResultPrefill('');
+              setIsStudentResultModalOpen(true);
+            }}
+            onOpenGeneralDonation={(tab?: any) => handleOpenDonate(tab || 'general')}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+            onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
+          />
+
+          <main className="flex-1">
+            <MembershipPage
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+              onOpenMemberVerification={handleOpenVerification}
+              onOpenUserDashboard={() => handleOpenUserDashboard('membership')}
+              onReturnToHome={handleReturnToPublic}
+              onOpenDonate={() => handleOpenDonate('general')}
+            />
+          </main>
+
+          <Footer
+            onOpenSection={handleScrollToSection}
+            onOpenAdmin={handleOpenAdmin}
+            onOpenVerification={handleOpenVerification}
+            onOpenLegal={handleOpenLegal}
+            onOpenAbout={handleOpenAbout}
+          />
+
+          <MobileBottomNav
+            activeSection="membership"
+            setActiveSection={handleScrollToSection}
+            onOpenAuth={() => {
+              setIsMobileMenuOpen(false);
+              setIsAuthModalOpen(true);
+            }}
+            onOpenUserDashboard={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenUserDashboard(tab);
+            }}
+            onOpenMoreMenu={() => setIsMobileMenuOpen(true)}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+          />
+        </div>
+      )}
+
+      {/* EXPERIENCE I: VOLUNTEERS DEDICATED FULL WEBPAGE */}
+      {currentExperience === 'volunteers' && (
+        <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col pb-16 md:pb-0 selection:bg-emerald-100 selection:text-emerald-900" id="fet-india-volunteers-experience">
+          <Header
+            activeSection="volunteers"
+            setActiveSection={handleScrollToSection}
+            onOpenAuth={() => {
+              setIsMobileMenuOpen(false);
+              setIsAuthModalOpen(true);
+            }}
+            onOpenUserDashboard={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenUserDashboard(tab);
+            }}
+            onOpenAdminConsole={(view) => {
+              setIsMobileMenuOpen(false);
+              handleOpenAdmin(view);
+            }}
+            onOpenVerification={(memberId) => {
+              setIsMobileMenuOpen(false);
+              handleOpenVerification(memberId);
+            }}
+            onOpenLegal={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenLegal(tab);
+            }}
+            onOpenAbout={handleOpenAbout}
+            onOpenPrograms={handleOpenPrograms}
+            onOpenAppeals={handleOpenAppeals}
+            onOpenMembership={handleOpenMembership}
+            onOpenVolunteers={handleOpenVolunteers}
+            onOpenEventsNews={handleOpenEventsNews}
+            onOpenContact={handleOpenContact}
+            onOpenExamination={handleOpenExamination}
+            onOpenApplyExam={handleOpenApplyExamDirect}
+            onOpenChairmanMessage={() => setIsChairmanModalOpen(true)}
+            onOpenNewsBlogs={handleOpenEventsNews}
+            onOpenSearch={() => setIsSearchModalOpen(true)}
+            onOpenStudentResults={() => {
+              setStudentResultPrefill('');
+              setIsStudentResultModalOpen(true);
+            }}
+            onOpenGeneralDonation={(tab?: any) => handleOpenDonate(tab || 'general')}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+            onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
+          />
+
+          <main className="flex-1">
+            <VolunteersPage
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+              onOpenUserDashboard={() => handleOpenUserDashboard('volunteer')}
+              onReturnToHome={handleReturnToPublic}
+              onOpenDonate={() => handleOpenDonate('general')}
+            />
+          </main>
+
+          <Footer
+            onOpenSection={handleScrollToSection}
+            onOpenAdmin={handleOpenAdmin}
+            onOpenVerification={handleOpenVerification}
+            onOpenLegal={handleOpenLegal}
+            onOpenAbout={handleOpenAbout}
+          />
+
+          <MobileBottomNav
+            activeSection="volunteers"
+            setActiveSection={handleScrollToSection}
+            onOpenAuth={() => {
+              setIsMobileMenuOpen(false);
+              setIsAuthModalOpen(true);
+            }}
+            onOpenUserDashboard={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenUserDashboard(tab);
+            }}
+            onOpenMoreMenu={() => setIsMobileMenuOpen(true)}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+          />
+        </div>
+      )}
+
+      {/* EXPERIENCE J: EVENTS & NEWS DEDICATED FULL WEBPAGE */}
+      {currentExperience === 'events_news' && (
+        <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col pb-16 md:pb-0 selection:bg-emerald-100 selection:text-emerald-900" id="fet-india-events-news-experience">
+          <Header
+            activeSection="events_news"
+            setActiveSection={handleScrollToSection}
+            onOpenAuth={() => {
+              setIsMobileMenuOpen(false);
+              setIsAuthModalOpen(true);
+            }}
+            onOpenUserDashboard={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenUserDashboard(tab);
+            }}
+            onOpenAdminConsole={(view) => {
+              setIsMobileMenuOpen(false);
+              handleOpenAdmin(view);
+            }}
+            onOpenVerification={(memberId) => {
+              setIsMobileMenuOpen(false);
+              handleOpenVerification(memberId);
+            }}
+            onOpenLegal={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenLegal(tab);
+            }}
+            onOpenAbout={handleOpenAbout}
+            onOpenPrograms={handleOpenPrograms}
+            onOpenAppeals={handleOpenAppeals}
+            onOpenMembership={handleOpenMembership}
+            onOpenVolunteers={handleOpenVolunteers}
+            onOpenEventsNews={handleOpenEventsNews}
+            onOpenContact={handleOpenContact}
+            onOpenExamination={handleOpenExamination}
+            onOpenApplyExam={handleOpenApplyExamDirect}
+            onOpenChairmanMessage={() => setIsChairmanModalOpen(true)}
+            onOpenNewsBlogs={handleOpenEventsNews}
+            onOpenSearch={() => setIsSearchModalOpen(true)}
+            onOpenStudentResults={() => {
+              setStudentResultPrefill('');
+              setIsStudentResultModalOpen(true);
+            }}
+            onOpenGeneralDonation={(tab?: any) => handleOpenDonate(tab || 'general')}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+            onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
+          />
+
+          <main className="flex-1">
+            <EventsNewsPage
+              onReadArticle={handleReadArticle}
+              onReturnToHome={handleReturnToPublic}
+              onOpenDonate={() => handleOpenDonate('general')}
+            />
+          </main>
+
+          <Footer
+            onOpenSection={handleScrollToSection}
+            onOpenAdmin={handleOpenAdmin}
+            onOpenVerification={handleOpenVerification}
+            onOpenLegal={handleOpenLegal}
+            onOpenAbout={handleOpenAbout}
+          />
+
+          <MobileBottomNav
+            activeSection="events_news"
+            setActiveSection={handleScrollToSection}
+            onOpenAuth={() => {
+              setIsMobileMenuOpen(false);
+              setIsAuthModalOpen(true);
+            }}
+            onOpenUserDashboard={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenUserDashboard(tab);
+            }}
+            onOpenMoreMenu={() => setIsMobileMenuOpen(true)}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+          />
+        </div>
+      )}
+
+      {/* EXPERIENCE K: CONTACT US DEDICATED FULL WEBPAGE */}
+      {currentExperience === 'contact' && (
+        <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col pb-16 md:pb-0 selection:bg-emerald-100 selection:text-emerald-900" id="fet-india-contact-experience">
+          <Header
+            activeSection="contact"
+            setActiveSection={handleScrollToSection}
+            onOpenAuth={() => {
+              setIsMobileMenuOpen(false);
+              setIsAuthModalOpen(true);
+            }}
+            onOpenUserDashboard={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenUserDashboard(tab);
+            }}
+            onOpenAdminConsole={(view) => {
+              setIsMobileMenuOpen(false);
+              handleOpenAdmin(view);
+            }}
+            onOpenVerification={(memberId) => {
+              setIsMobileMenuOpen(false);
+              handleOpenVerification(memberId);
+            }}
+            onOpenLegal={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenLegal(tab);
+            }}
+            onOpenAbout={handleOpenAbout}
+            onOpenPrograms={handleOpenPrograms}
+            onOpenAppeals={handleOpenAppeals}
+            onOpenMembership={handleOpenMembership}
+            onOpenVolunteers={handleOpenVolunteers}
+            onOpenEventsNews={handleOpenEventsNews}
+            onOpenContact={handleOpenContact}
+            onOpenExamination={handleOpenExamination}
+            onOpenApplyExam={handleOpenApplyExamDirect}
+            onOpenChairmanMessage={() => setIsChairmanModalOpen(true)}
+            onOpenNewsBlogs={handleOpenEventsNews}
+            onOpenSearch={() => setIsSearchModalOpen(true)}
+            onOpenStudentResults={() => {
+              setStudentResultPrefill('');
+              setIsStudentResultModalOpen(true);
+            }}
+            onOpenGeneralDonation={(tab?: any) => handleOpenDonate(tab || 'general')}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+            onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
+          />
+
+          <main className="flex-1">
+            <ContactUsPage
+              onReturnToHome={handleReturnToPublic}
+              onOpenDonate={() => handleOpenDonate('general')}
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+            />
+          </main>
+
+          <Footer
+            onOpenSection={handleScrollToSection}
+            onOpenAdmin={handleOpenAdmin}
+            onOpenVerification={handleOpenVerification}
+            onOpenLegal={handleOpenLegal}
+            onOpenAbout={handleOpenAbout}
+          />
+
+          <MobileBottomNav
+            activeSection="contact"
+            setActiveSection={handleScrollToSection}
+            onOpenAuth={() => {
+              setIsMobileMenuOpen(false);
+              setIsAuthModalOpen(true);
+            }}
+            onOpenUserDashboard={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenUserDashboard(tab);
+            }}
+            onOpenMoreMenu={() => setIsMobileMenuOpen(true)}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+          />
+        </div>
+      )}
+
+      {/* EXPERIENCE L: EXAMINATION DEDICATED FULL WEBPAGE */}
+      {currentExperience === 'examination' && (
+        <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col pb-16 md:pb-0 selection:bg-emerald-100 selection:text-emerald-900" id="fet-india-examination-experience">
+          <Header
+            activeSection="examinations"
+            setActiveSection={handleScrollToSection}
+            onOpenAuth={() => {
+              setIsMobileMenuOpen(false);
+              setIsAuthModalOpen(true);
+            }}
+            onOpenUserDashboard={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenUserDashboard(tab);
+            }}
+            onOpenAdminConsole={(view) => {
+              setIsMobileMenuOpen(false);
+              handleOpenAdmin(view);
+            }}
+            onOpenVerification={(memberId) => {
+              setIsMobileMenuOpen(false);
+              handleOpenVerification(memberId);
+            }}
+            onOpenLegal={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenLegal(tab);
+            }}
+            onOpenAbout={handleOpenAbout}
+            onOpenPrograms={handleOpenPrograms}
+            onOpenAppeals={handleOpenAppeals}
+            onOpenMembership={handleOpenMembership}
+            onOpenVolunteers={handleOpenVolunteers}
+            onOpenEventsNews={handleOpenEventsNews}
+            onOpenContact={handleOpenContact}
+            onOpenExamination={handleOpenExamination}
+            onOpenApplyExam={handleOpenApplyExamDirect}
+            onOpenChairmanMessage={() => setIsChairmanModalOpen(true)}
+            onOpenNewsBlogs={handleOpenEventsNews}
+            onOpenSearch={() => setIsSearchModalOpen(true)}
+            onOpenStudentResults={() => {
+              setStudentResultPrefill('');
+              setIsStudentResultModalOpen(true);
+            }}
+            onOpenGeneralDonation={(tab?: any) => handleOpenDonate(tab || 'general')}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+            onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
+          />
+
+          <main className="flex-1">
+            <ExaminationPage
+              onApplyExam={handleApplyExam}
+              onViewExamInfo={handleViewExamInfo}
+              onOpenStudentResults={() => {
+                setStudentResultPrefill('');
+                setIsStudentResultModalOpen(true);
+              }}
+              onOpenVerification={handleOpenVerification}
+              onReturnToHome={handleReturnToPublic}
+              onOpenDonate={() => handleOpenDonate('general')}
+            />
+          </main>
+
+          <Footer
+            onOpenSection={handleScrollToSection}
+            onOpenAdmin={handleOpenAdmin}
+            onOpenVerification={handleOpenVerification}
+            onOpenLegal={handleOpenLegal}
+            onOpenAbout={handleOpenAbout}
+          />
+
+          <MobileBottomNav
+            activeSection="examinations"
             setActiveSection={handleScrollToSection}
             onOpenAuth={() => {
               setIsMobileMenuOpen(false);
@@ -734,6 +1710,23 @@ const FETIndiaPlatform: React.FC = () => {
           setIsNewsReaderOpen(false);
           setSelectedArticleForReader(null);
         }}
+      />
+
+      {/* Global Public Search Modal (Cmd+K / Ctrl+K / Header Search) */}
+      <PublicSearchModal
+        isOpen={isSearchModalOpen}
+        onClose={() => setIsSearchModalOpen(false)}
+        onNavigate={handleSearchNavigate}
+      />
+
+      {/* Student Result Portal Modal */}
+      <StudentResultPortalModal
+        isOpen={isStudentResultModalOpen}
+        onClose={() => {
+          setIsStudentResultModalOpen(false);
+          setStudentResultPrefill('');
+        }}
+        prefillRollNumber={studentResultPrefill}
       />
     </>
   );

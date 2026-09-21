@@ -34,11 +34,13 @@ import {
   Newspaper,
   ShoppingBag,
   Plane,
-  LineChart
+  LineChart,
+  Building2
 } from 'lucide-react';
 import { FETLogo } from '../common/FETLogo';
 import { SuperAdminDashboard } from './SuperAdminDashboard';
 import { AdminCMSView } from './AdminCMSView';
+import { AdminAboutTrustCMSView } from './AdminAboutTrustCMSView';
 import { AdminModulesView } from './AdminModulesView';
 import { AdminRolesView } from './AdminRolesView';
 import { AdminAuditView } from './AdminAuditView';
@@ -66,7 +68,20 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
   const { currentUser, userProfile, activeRole, setActiveRole, isSuperAdmin, hasAdminAccess, signOut, isLoading } = useAuth();
   const { modules, lifecycleStats } = useModules();
 
-  const [currentView, setCurrentView] = useState<string>(initialView);
+  const isExaminer = activeRole === 'examiner' || userProfile?.roles?.includes('examiner');
+  const isExamController = activeRole === 'exam_controller' || userProfile?.roles?.includes('exam_controller');
+  const isExamPersonnel = isExaminer || isExamController;
+  const isExamPersonnelOnly = !isSuperAdmin && Boolean(isExamPersonnel) && !userProfile?.roles?.some(r => ['super_admin', 'platform_super_admin'].includes(r));
+  const effectiveInitialView = (isExamPersonnelOnly && (initialView === 'dashboard' || initialView === 'super_admin')) ? 'exams' : initialView;
+
+  const [currentView, setCurrentView] = useState<string>(effectiveInitialView);
+
+  // Security enforcement: lock Exam Personnel strictly to exams view
+  React.useEffect(() => {
+    if (isExamPersonnelOnly && currentView !== 'exams') {
+      setCurrentView('exams');
+    }
+  }, [isExamPersonnelOnly, currentView]);
 
   // 1. Loading State
   if (isLoading) {
@@ -180,8 +195,9 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
   const coreAdminItems = [
     { id: 'super_admin', label: 'Super Admin Dashboard', icon: ShieldCheck, description: 'Overview, Users, RBAC, Apps, Settings & Audit', requiresSuper: true },
     { id: 'dashboard', label: 'Platform Overview', icon: Activity, description: 'Health, active series & stats' },
-    { id: 'modules', label: '27-Chapter Lifecycle Matrix', icon: Layers, description: '5-Stage state machine (Draft, Testing, Ready, Published, Disabled)', requiresSuper: true },
+    { id: 'about_cms', label: 'About Trust CMS & Leadership', icon: Building2, description: 'Overview, Governance, Trustees, Seal & Tax 12A/80G', requiresSuper: true },
     { id: 'cms', label: 'Branding & Dynamic CMS', icon: Palette, description: 'Display name, 3 colors, hero sliders (Legal name locked)', requiresSuper: true },
+    { id: 'modules', label: '27-Chapter Lifecycle Matrix', icon: Layers, description: '5-Stage state machine (Draft, Testing, Ready, Published, Disabled)', requiresSuper: true },
     { id: 'roles', label: 'RBAC Multi-Role Governance', icon: ShieldCheck, description: 'Super & 13 Administrator scopes', requiresSuper: true },
     { id: 'audit', label: 'Audit & Activity Logs', icon: FileText, description: 'Immutable transaction records' },
     { id: 'notifications', label: 'Broadcast Center', icon: Bell, description: 'Global and role announcements' }
@@ -206,6 +222,10 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
   // Filter specialized items based on user's roles
   const allowedSpecializedItems = specializedAdminItems.filter(item => {
     if (isSuperAdmin) return true;
+    if (isExamPersonnelOnly) {
+      return item.id === 'exams';
+    }
+    if (item.id === 'exams' && (isExamPersonnel || activeRole === 'exam_admin' || userProfile?.roles?.includes('exam_admin'))) return true;
     return activeRole === item.role || userProfile?.roles?.includes(item.role as any);
   });
 
@@ -283,18 +303,20 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
               className="flex-1 px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 cursor-pointer"
               id="admin-mobile-view-select"
             >
-              <optgroup label="Super Admin Governance">
-                {coreAdminItems.map((item) => (
-                  <option 
-                    key={item.id} 
-                    value={item.id}
-                    disabled={item.requiresSuper && !isSuperAdmin}
-                  >
-                    {item.label} {item.requiresSuper && !isSuperAdmin ? '(Locked)' : ''}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="Specialized Consoles">
+              {!isExamPersonnelOnly && (
+                <optgroup label="Super Admin Governance">
+                  {coreAdminItems.map((item) => (
+                    <option 
+                      key={item.id} 
+                      value={item.id}
+                      disabled={item.requiresSuper && !isSuperAdmin}
+                    >
+                      {item.label} {item.requiresSuper && !isSuperAdmin ? '(Locked)' : ''}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label={isExamPersonnelOnly ? "Examination Authority" : "Specialized Consoles"}>
                 {allowedSpecializedItems.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.label}
@@ -309,37 +331,39 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
         <aside className="hidden lg:block lg:col-span-3 space-y-4">
           
           {/* Master Super Admin Menu */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-3 space-y-1">
-            <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-              Super Admin Control
-            </div>
-            {coreAdminItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = currentView === item.id;
-              const isLocked = item.requiresSuper && !isSuperAdmin;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => !isLocked && setCurrentView(item.id)}
-                  disabled={isLocked}
-                  className={`w-full text-left p-2.5 rounded-xl transition-all flex items-start gap-2.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
-                    isActive 
-                      ? 'bg-slate-900 text-white shadow-md' 
-                      : 'text-slate-700 hover:bg-slate-50'
-                  }`}
-                  id={`admin-nav-${item.id}`}
-                >
-                  <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${isActive ? 'text-amber-400' : 'text-slate-500'}`} />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-bold flex items-center justify-between">
-                      <span className="truncate">{item.label}</span>
-                      {isLocked && <Lock className="w-3 h-3 text-slate-400 shrink-0 ml-1" />}
+          {!isExamPersonnelOnly && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-3 space-y-1">
+              <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                Super Admin Control
+              </div>
+              {coreAdminItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = currentView === item.id;
+                const isLocked = item.requiresSuper && !isSuperAdmin;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => !isLocked && setCurrentView(item.id)}
+                    disabled={isLocked}
+                    className={`w-full text-left p-2.5 rounded-xl transition-all flex items-start gap-2.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                      isActive 
+                        ? 'bg-slate-900 text-white shadow-md' 
+                        : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                    id={`admin-nav-${item.id}`}
+                  >
+                    <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${isActive ? 'text-amber-400' : 'text-slate-500'}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-bold flex items-center justify-between">
+                        <span className="truncate">{item.label}</span>
+                        {isLocked && <Lock className="w-3 h-3 text-slate-400 shrink-0 ml-1" />}
+                      </div>
                     </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Specialized Portfolios Menu */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-3 space-y-1 max-h-[380px] overflow-y-auto">
@@ -511,6 +535,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
               onOpenUserDashboard={onOpenUserDashboard} 
             />
           )}
+          {currentView === 'about_cms' && <AdminAboutTrustCMSView />}
           {currentView === 'cms' && <AdminCMSView />}
           {currentView === 'modules' && <AdminModulesView />}
           {currentView === 'roles' && <AdminRolesView />}

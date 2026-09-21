@@ -14,6 +14,7 @@ interface FETLogoProps {
   variant?: 'full' | 'emblem' | 'compact' | 'light';
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   showTagline?: boolean;
+  hideBadge?: boolean;
   className?: string;
 }
 
@@ -21,6 +22,7 @@ export const FETLogo: React.FC<FETLogoProps> = ({
   variant = 'full',
   size = 'md',
   showTagline = true,
+  hideBadge = false,
   className = ''
 }) => {
   const { config } = useConfig();
@@ -147,6 +149,36 @@ export const FETLogo: React.FC<FETLogoProps> = ({
     );
   }
 
+  if (variant === 'compact') {
+    return (
+      <div className={`flex items-center gap-2 sm:gap-2.5 max-w-full ${className}`} id="fet-logo-compact-wrapper">
+        {CustomOrSvgEmblem}
+        <div className="flex flex-col justify-center select-none text-left min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="font-extrabold tracking-tight text-slate-900 text-sm sm:text-base leading-tight truncate">
+              {config.displayName || 'Fatimyah Educational Trust'}
+            </span>
+            {!hideBadge && (
+              <span 
+                className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase tracking-wider text-white shadow-2xs shrink-0"
+                style={{ backgroundColor: primaryGreen }}
+              >
+                {config.shortBrand || 'FET India'}
+              </span>
+            )}
+          </div>
+          {showTagline && (
+            <span 
+              className="text-[10px] font-semibold tracking-wider uppercase text-emerald-800 opacity-90 truncate leading-none mt-0.5"
+            >
+              {config.tagline || 'Education • Service • Empowerment'}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   const isLight = variant === 'light';
 
   return (
@@ -164,12 +196,14 @@ export const FETLogo: React.FC<FETLogoProps> = ({
               config.displayName || 'Fatimyah Educational Trust'
             )}
           </span>
-          <span 
-            className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider text-white shadow-xs shrink-0"
-            style={{ backgroundColor: primaryGreen }}
-          >
-            {config.shortBrand || 'FET India'}
-          </span>
+          {!hideBadge && (
+            <span 
+              className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider text-white shadow-xs shrink-0"
+              style={{ backgroundColor: primaryGreen }}
+            >
+              {config.shortBrand || 'FET India'}
+            </span>
+          )}
         </div>
         {showTagline && (
           <span 

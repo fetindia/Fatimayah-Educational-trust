@@ -28,6 +28,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { CampaignDonation } from '../../types';
+import { PrintableDonationReceiptModal } from '../donor/PrintableDonationReceiptModal';
 
 export interface DonationRecord {
   id: string;
@@ -390,93 +391,24 @@ export const MemberDonationsView: React.FC<MemberDonationsViewProps> = ({ onNoti
 
       {/* 80G RECEIPT / CERTIFICATE MODAL */}
       {selectedReceipt && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
-            
-            <div className="flex items-start justify-between border-b border-slate-100 pb-4">
-              <div>
-                <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 uppercase tracking-wider">
-                  Official Section 80G Tax Exemption Receipt
-                </span>
-                <h3 className="text-lg font-bold text-slate-900 mt-1">
-                  Fatimyah Educational Trust India
-                </h3>
-                <p className="text-xs text-slate-500 font-mono">
-                  URN: AAATF1234AF20214 • Form 10BE Compliant
-                </p>
-              </div>
-
-              <button
-                onClick={() => setSelectedReceipt(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase">Receipt Number</span>
-                  <p className="font-mono font-bold text-slate-900">{selectedReceipt.receiptNo}</p>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase">Contribution Date</span>
-                  <p className="font-semibold text-slate-900">{selectedReceipt.date}</p>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase">Donor Name</span>
-                  <p className="font-semibold text-slate-900">{selectedReceipt.donorName || userProfile?.fullLegalName || currentUser?.displayName || 'Registered Donor'}</p>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase">Donor PAN</span>
-                  <p className="font-mono font-semibold text-slate-900">{selectedReceipt.panQuoted || userProfile?.panNumber || 'Available in Trust 10BD'}</p>
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-slate-200">
-                <span className="text-[10px] text-slate-400 font-bold uppercase">Cause / Purpose</span>
-                <p className="font-bold text-slate-900 text-sm mt-0.5">{selectedReceipt.cause}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200">
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase">Payment Mode & Ref</span>
-                  <p className="font-semibold text-slate-900">{selectedReceipt.mode} ({selectedReceipt.transactionRef || 'TRX-VERIFIED'})</p>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase">Donated Amount</span>
-                  <p className="text-xl font-black text-emerald-800">{selectedReceipt.amount}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-[11px] text-emerald-950 flex items-start gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
-              <span>
-                This donation qualifies for deduction under Section 80G(5)(vi) of Income Tax Act 1961. Retain this digital certificate along with Trust Form 10BD statement.
-              </span>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                onClick={() => {
-                  window.print();
-                }}
-                className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 cursor-pointer flex items-center gap-2"
-              >
-                <Printer className="w-4 h-4" /> Print / Save PDF
-              </button>
-              <button
-                onClick={() => setSelectedReceipt(null)}
-                className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200 cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-
-          </div>
-        </div>
+        <PrintableDonationReceiptModal
+          isOpen={!!selectedReceipt}
+          onClose={() => setSelectedReceipt(null)}
+          receipt={{
+            receiptNumber: selectedReceipt.receiptNo,
+            donationDate: selectedReceipt.date,
+            donorName: selectedReceipt.donorName || userProfile?.fullLegalName || currentUser?.displayName || 'Valued Donor',
+            donorPan: selectedReceipt.panQuoted || userProfile?.panNumber,
+            donorEmail: currentUser?.email || undefined,
+            donorPhone: userProfile?.mobileNumber || (userProfile as any)?.phone || undefined,
+            amount: selectedReceipt.amountNumeric || selectedReceipt.amount,
+            paymentMode: selectedReceipt.mode,
+            transactionReference: selectedReceipt.transactionRef || selectedReceipt.id,
+            causeTitle: selectedReceipt.cause,
+            paymentStatus: selectedReceipt.status,
+            is80GClaimed: true
+          }}
+        />
       )}
 
     </div>

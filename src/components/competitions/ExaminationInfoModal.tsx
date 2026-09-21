@@ -5,7 +5,7 @@
  * Education • Service • Empowerment
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   BookOpen, 
@@ -20,9 +20,14 @@ import {
   Download,
   AlertCircle,
   Trophy,
-  Gift
+  Gift,
+  Lock,
+  ExternalLink
 } from 'lucide-react';
-import { Competition } from '../../types';
+import { Competition, CompetitionRegistration } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
+import { db } from '../../lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface ExaminationInfoModalProps {
   competition: Competition | null;
@@ -39,9 +44,48 @@ export const ExaminationInfoModal: React.FC<ExaminationInfoModalProps> = ({
   onApply,
   initialTab = 'instructions'
 }) => {
+  const { currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<'instructions' | 'book_mastery' | 'eligibility' | 'prizes'>(initialTab);
+  const [userRegistration, setUserRegistration] = useState<CompetitionRegistration | null>(null);
+  const [isCheckingReg, setIsCheckingReg] = useState(false);
+
+  useEffect(() => {
+    if (!currentUser?.uid || !competition?.id) {
+      setUserRegistration(null);
+      return;
+    }
+
+    let isMounted = true;
+    setIsCheckingReg(true);
+    const regId = `reg-${competition.id}-${currentUser.uid}`;
+    getDoc(doc(db, 'competition_registrations', regId))
+      .then((docSnap) => {
+        if (isMounted) {
+          if (docSnap.exists()) {
+            setUserRegistration(docSnap.data() as CompetitionRegistration);
+          } else {
+            setUserRegistration(null);
+          }
+          setIsCheckingReg(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) setIsCheckingReg(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser?.uid, competition?.id]);
 
   if (!isOpen || !competition) return null;
+
+  const isRegistered = Boolean(userRegistration);
+  const isPaid = competition.isPaid ? (userRegistration?.isPaid && userRegistration?.paymentStatus === 'paid') : true;
+  const canAccessMaterial = isRegistered && isPaid;
+  const pdfUrl = competition.pdfReadingMaterialUrl || competition.bookDetails?.pdfReadingMaterialUrl;
+  const pdfFileName = competition.pdfFileName || competition.bookDetails?.pdfFileName || `${competition.bookDetails?.bookTitle || 'Examination_Curriculum'}.pdf`;
+  const pdfFileSize = competition.pdfFileSizeBytes || competition.bookDetails?.pdfFileSizeBytes;
 
   return (
     <div 
@@ -93,7 +137,7 @@ export const ExaminationInfoModal: React.FC<ExaminationInfoModalProps> = ({
             <span>Examination Instructions</span>
           </button>
 
-          {competition.bookDetails && (
+          {(competition.bookDetails || competition.pdfReadingMaterialUrl) && (
             <button
               onClick={() => setActiveTab('book_mastery')}
               className={`px-4 py-2.5 border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
@@ -103,7 +147,7 @@ export const ExaminationInfoModal: React.FC<ExaminationInfoModalProps> = ({
               }`}
             >
               <BookOpen className="w-4 h-4" />
-              <span>Book Mastery Syllabus</span>
+              <span>Curriculum & Study Material</span>
             </button>
           )}
 
@@ -191,38 +235,112 @@ export const ExaminationInfoModal: React.FC<ExaminationInfoModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: BOOK MASTERY */}
-          {activeTab === 'book_mastery' && competition.bookDetails && (
+          {/* TAB 2: CURRICULUM & STUDY MATERIAL (PDF) */}
+          {activeTab === 'book_mastery' && (competition.bookDetails || pdfUrl) && (
             <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 space-y-2">
-                <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider block">
-                  Prescribed Reading Volume
-                </span>
-                <h3 className="text-base font-extrabold text-slate-900">
-                  {competition.bookDetails.bookTitle}
-                </h3>
-                <p className="text-xs text-slate-600">
-                  <strong>Author:</strong> {competition.bookDetails.author}
-                </p>
-                {competition.bookDetails.recommendedPublisher && (
+              {competition.bookDetails && (
+                <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 space-y-2">
+                  <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider block">
+                    Prescribed Reading Volume
+                  </span>
+                  <h3 className="text-base font-extrabold text-slate-900">
+                    {competition.bookDetails.bookTitle}
+                  </h3>
                   <p className="text-xs text-slate-600">
-                    <strong>Edition/Publisher:</strong> {competition.bookDetails.recommendedPublisher}
+                    <strong>Author:</strong> {competition.bookDetails.author}
                   </p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-                  <span className="text-[10px] font-bold uppercase text-slate-400">Required Chapters</span>
-                  <p className="text-xs font-semibold text-slate-800">{competition.bookDetails.requiredChapters}</p>
+                  {competition.bookDetails.recommendedPublisher && (
+                    <p className="text-xs text-slate-600">
+                      <strong>Edition/Publisher:</strong> {competition.bookDetails.recommendedPublisher}
+                    </p>
+                  )}
                 </div>
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-                  <span className="text-[10px] font-bold uppercase text-slate-400">Recommended Reading Pace</span>
-                  <p className="text-xs font-semibold text-slate-800">{competition.bookDetails.readingDurationWeeks} Weeks</p>
-                </div>
-              </div>
+              )}
 
-              {competition.bookDetails.submissionRequirements && (
+              {competition.bookDetails && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                    <span className="text-[10px] font-bold uppercase text-slate-400">Required Chapters / Reading Scope</span>
+                    <p className="text-xs font-semibold text-slate-800">{competition.bookDetails.requiredChapters || 'Entire Syllabus Handbook'}</p>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                    <span className="text-[10px] font-bold uppercase text-slate-400">Recommended Reading Pace</span>
+                    <p className="text-xs font-semibold text-slate-800">{competition.bookDetails.readingDurationWeeks || 4} Weeks</p>
+                  </div>
+                </div>
+              )}
+
+              {/* PDF Study Material Card (Verified Candidate Access) */}
+              {pdfUrl && (
+                <div className={`p-4 rounded-2xl border transition-all ${
+                  canAccessMaterial 
+                    ? 'bg-emerald-50/90 border-emerald-200 shadow-xs' 
+                    : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        {canAccessMaterial ? (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-emerald-700 text-white flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>Candidate Access Unlocked</span>
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-600 text-white flex items-center gap-1">
+                            <Lock className="w-3 h-3" />
+                            <span>Enrolled Candidates Only</span>
+                          </span>
+                        )}
+                        <span className="text-[11px] font-bold text-slate-600">Official Curriculum PDF</span>
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-900">
+                        {pdfFileName}
+                      </h4>
+                      <p className="text-xs text-slate-600">
+                        {canAccessMaterial 
+                          ? 'Your candidate registration is verified. You have full access to download and study this official material.'
+                          : competition.isPaid
+                            ? `This examination curriculum is reserved for registered candidates who have completed the ₹${competition.participationFee} verified participation fee.`
+                            : 'This curriculum is reserved for enrolled candidates. Complete your free candidate registration to immediately unlock download access.'}
+                      </p>
+                      {pdfFileSize ? (
+                        <p className="text-[11px] text-slate-500 font-mono">
+                          File Size: {(pdfFileSize / (1024 * 1024)).toFixed(2)} MB
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div className="shrink-0">
+                      {canAccessMaterial ? (
+                        <a
+                          href={pdfUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          download={pdfFileName}
+                          className="px-4 py-2.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl font-bold text-xs flex items-center gap-2 cursor-pointer shadow-md transition-all hover:scale-[1.02]"
+                        >
+                          <Download className="w-4 h-4" />
+                          <span>Download PDF</span>
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onClose();
+                            onApply(competition);
+                          }}
+                          className="px-4 py-2.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all hover:scale-[1.02]"
+                        >
+                          <span>Enroll to Unlock</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {competition.bookDetails?.submissionRequirements && (
                 <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
                   <span className="text-[10px] font-bold uppercase text-slate-400">Assessment & Evaluation Format</span>
                   <p className="text-xs text-slate-700">{competition.bookDetails.submissionRequirements}</p>
@@ -270,14 +388,14 @@ export const ExaminationInfoModal: React.FC<ExaminationInfoModalProps> = ({
                 </div>
               </div>
 
-              {competition.prizeRewards && competition.prizeRewards.length > 0 ? (
+              {competition.prizeRewards && competition.prizeRewards.filter(p => p.status !== 'inactive').length > 0 ? (
                 <div className="space-y-3">
-                  {competition.prizeRewards.map((prize, idx) => (
+                  {competition.prizeRewards.filter(p => p.status !== 'inactive').map((prize, idx) => (
                     <div 
                       key={prize.id || idx}
                       className="p-4 rounded-2xl border bg-white border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-start sm:items-center gap-3">
                         <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 ${
                           prize.rankPosition === 1 ? 'bg-amber-100 text-amber-900 border border-amber-300' :
                           prize.rankPosition === 2 ? 'bg-slate-100 text-slate-800 border border-slate-300' :
@@ -287,8 +405,20 @@ export const ExaminationInfoModal: React.FC<ExaminationInfoModalProps> = ({
                           #{prize.rankPosition}
                         </div>
                         <div>
-                          <h5 className="font-bold text-slate-900 text-sm">{prize.title}</h5>
-                          <p className="text-xs text-slate-600">{prize.rewardDescription}</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h5 className="font-bold text-slate-900 text-sm">{prize.title}</h5>
+                            {prize.rewardType && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-600 border border-slate-200">
+                                {prize.rewardType.replace('_', ' ')}
+                              </span>
+                            )}
+                            {prize.winnerCount && prize.winnerCount > 1 ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                {prize.winnerCount} Recipients
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="text-xs text-slate-600 mt-0.5">{prize.rewardDescription}</p>
                           {prize.eligibilityInfo && (
                             <span className="text-[10px] text-slate-400 block mt-0.5">Eligibility: {prize.eligibilityInfo}</span>
                           )}

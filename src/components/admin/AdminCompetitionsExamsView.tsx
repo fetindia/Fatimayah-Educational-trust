@@ -38,8 +38,12 @@ import {
   ExternalLink,
   Lock,
   AlertTriangle,
-  Trophy
+  Trophy,
+  CreditCard,
+  Paperclip,
+  Upload
 } from 'lucide-react';
+import { uploadExamPdfMaterial } from '../../lib/storage';
 import { 
   Competition, 
   CompetitionRegistration, 
@@ -68,6 +72,7 @@ import { CertificateVerificationModal } from '../competitions/CertificateVerific
 import { AdminQuestionBanksManager } from './exam/AdminQuestionBanksManager';
 import { AdminPaperBuilderModal } from './exam/AdminPaperBuilderModal';
 import { AdminExamIntegrityAuditModal } from './exam/AdminExamIntegrityAuditModal';
+import { AdminCompetitionPrizesModal } from './competitions/AdminCompetitionPrizesModal';
 
 export const AdminCompetitionsExamsView: React.FC = () => {
   const { currentUser, userProfile, isSuperAdmin } = useAuth();
@@ -79,6 +84,7 @@ export const AdminCompetitionsExamsView: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeAdminTab, setActiveAdminTab] = useState<'catalog' | 'banks' | 'participants' | 'evaluations' | 'results' | 'certificates'>('catalog');
+  const [managingPrizesComp, setManagingPrizesComp] = useState<Competition | null>(null);
 
   // Certificate Management State
   const [certSearchQuery, setCertSearchQuery] = useState<string>('');
@@ -632,6 +638,33 @@ export const AdminCompetitionsExamsView: React.FC = () => {
                       </div>
                     </div>
 
+                    {/* Dynamic Prizes Preview Strip */}
+                    {comp.prizeRewards && comp.prizeRewards.length > 0 && (
+                      <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/80 text-xs space-y-1">
+                        <div className="flex items-center justify-between text-amber-900 font-bold">
+                          <span className="flex items-center gap-1">
+                            <Trophy className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Prizes & Awards Matrix:</span>
+                          </span>
+                          <span className="text-[10px] text-amber-800 font-extrabold">
+                            {comp.prizeRewards.filter(p => p.status === 'active').length} Active Tiers
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 pt-0.5">
+                          {comp.prizeRewards.filter(p => p.status === 'active').slice(0, 3).map((p, pIdx) => (
+                            <span key={p.id || pIdx} className="px-2 py-0.5 rounded-md bg-white border border-amber-200 text-[11px] font-semibold text-slate-800 shadow-2xs">
+                              #{p.rankPosition} {p.title.split('-')[0].trim()}: {p.rewardAmount && p.rewardAmount > 0 ? `₹${p.rewardAmount.toLocaleString()}` : (p.rewardDescription.length > 22 ? p.rewardDescription.slice(0, 22) + '...' : p.rewardDescription)}
+                            </span>
+                          ))}
+                          {comp.prizeRewards.filter(p => p.status === 'active').length > 3 && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                              +{comp.prizeRewards.filter(p => p.status === 'active').length - 3} more
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                   </div>
 
                   {/* Footer Actions */}
@@ -659,14 +692,26 @@ export const AdminCompetitionsExamsView: React.FC = () => {
 
                     <div className="flex items-center gap-1">
                       {isSuperAdmin && (
-                        <button
-                          onClick={() => setEditingComp(comp)}
-                          className="px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 hover:bg-amber-100 text-amber-900 font-bold text-xs cursor-pointer flex items-center gap-1"
-                          title="Edit Examination & Prizes Structure"
-                        >
-                          <Edit3 className="w-3.5 h-3.5 text-amber-700" />
-                          <span>Edit & Prizes</span>
-                        </button>
+                        <>
+                          <button
+                            onClick={() => setManagingPrizesComp(comp)}
+                            className="px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-300 hover:bg-amber-100 text-amber-900 font-bold text-xs cursor-pointer flex items-center gap-1 shadow-2xs"
+                            title="Manage Dynamic Prize Structure & Awards for this Competition"
+                            id={`manage-prizes-btn-${comp.id}`}
+                          >
+                            <Trophy className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Prizes ({comp.prizeRewards?.filter(p => p.status === 'active').length || comp.prizeRewards?.length || 0})</span>
+                          </button>
+
+                          <button
+                            onClick={() => setEditingComp(comp)}
+                            className="px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-300 hover:bg-slate-200 text-slate-800 font-bold text-xs cursor-pointer flex items-center gap-1"
+                            title="Edit Full Program Details"
+                          >
+                            <Edit3 className="w-3.5 h-3.5 text-slate-600" />
+                            <span>Edit</span>
+                          </button>
+                        </>
                       )}
 
                       {comp.status === 'under_evaluation' || comp.status === 'result_pending' ? (
@@ -1473,6 +1518,21 @@ export const AdminCompetitionsExamsView: React.FC = () => {
       )}
 
       {/* ------------------------------------------------------------- */}
+      {/* MODAL: SUPER ADMIN COMPETITION PRIZES & REWARDS MANAGER */}
+      {/* ------------------------------------------------------------- */}
+      {managingPrizesComp && (
+        <AdminCompetitionPrizesModal
+          competition={managingPrizesComp}
+          onClose={() => setManagingPrizesComp(null)}
+          onSuccess={(updatedComp) => {
+            setCompetitions(prev => prev.map(c => c.id === updatedComp.id ? updatedComp : c));
+            setManagingPrizesComp(null);
+            notify(`Prize configuration for "${updatedComp.title}" saved and updated successfully!`);
+          }}
+        />
+      )}
+
+      {/* ------------------------------------------------------------- */}
       {/* MODAL 2: GRADE / SCORE CANDIDATE */}
       {/* ------------------------------------------------------------- */}
       {evaluatingReg && (
@@ -1570,8 +1630,59 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
     durationMinutes: initialCompetition?.examDetails?.durationMinutes ?? 45,
     coverImageUrl: initialCompetition?.coverImageUrl || 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=800&q=80',
     status: (initialCompetition?.status || 'registration_open') as CompetitionStatus,
-    prizesSummary: initialCompetition?.prizesSummary?.join(', ') || '1st Prize: ₹25,000 Gold Medal & Trophy, 2nd Prize: ₹15,000 Silver Medal, 3rd Prize: ₹10,000 Bronze Medal, Top 10 Distinction Certificates'
+    prizesSummary: initialCompetition?.prizesSummary?.join(', ') || '1st Prize: ₹25,000 Gold Medal & Trophy, 2nd Prize: ₹15,000 Silver Medal, 3rd Prize: ₹10,000 Bronze Medal, Top 10 Distinction Certificates',
+    // Participation Fee & Evaluation Automation
+    isPaid: initialCompetition?.isPaid ?? false,
+    participationFee: initialCompetition?.participationFee ?? 0,
+    autoEvaluateResults: initialCompetition?.autoEvaluateResults ?? true,
+    autoPublishResults: initialCompetition?.autoPublishResults ?? false,
+    // Examination Book / PDF Reading Material
+    pdfReadingMaterialUrl: initialCompetition?.pdfReadingMaterialUrl || initialCompetition?.bookDetails?.pdfReadingMaterialUrl || '',
+    pdfFileName: initialCompetition?.pdfFileName || initialCompetition?.bookDetails?.pdfFileName || '',
+    pdfFileSizeBytes: initialCompetition?.pdfFileSizeBytes || initialCompetition?.bookDetails?.pdfFileSizeBytes || 0,
+    pdfSourceType: (initialCompetition?.pdfSourceType || initialCompetition?.bookDetails?.pdfSourceType || 'upload') as 'upload' | 'external_url',
+    pdfExternalUrl: initialCompetition?.bookDetails?.pdfExternalUrl || (initialCompetition?.pdfSourceType === 'external_url' ? initialCompetition?.pdfReadingMaterialUrl : '') || ''
   });
+
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
+  const [pdfUploadProgress, setPdfUploadProgress] = useState(0);
+  const [pdfUploadError, setPdfUploadError] = useState<string | null>(null);
+  const pdfFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handlePdfFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      setPdfUploadError('Please select a valid PDF file.');
+      return;
+    }
+
+    if (file.size > 25 * 1024 * 1024) {
+      setPdfUploadError('PDF exceeds 25 MB limit.');
+      return;
+    }
+
+    setIsUploadingPdf(true);
+    setPdfUploadProgress(10);
+    setPdfUploadError(null);
+
+    try {
+      const examId = initialCompetition?.id || `cmp-${Date.now()}`;
+      const res = await uploadExamPdfMaterial(file, examId, (pct) => setPdfUploadProgress(pct));
+      setFormData(prev => ({
+        ...prev,
+        pdfReadingMaterialUrl: res.url,
+        pdfFileName: res.fileName,
+        pdfFileSizeBytes: res.sizeBytes,
+        pdfSourceType: 'upload'
+      }));
+    } catch (err: any) {
+      setPdfUploadError(err?.message || 'Failed to upload PDF.');
+    } finally {
+      setIsUploadingPdf(false);
+    }
+  };
 
   const [prizeTiers, setPrizeTiers] = useState<CompetitionPrizeTier[]>(
     initialCompetition?.prizeRewards && initialCompetition.prizeRewards.length > 0
@@ -1669,16 +1780,29 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
         passingMarks: Number(formData.passingMarks),
         prizesSummary: prizesList,
         prizeRewards: prizeTiers,
+        isPaid: Boolean(formData.isPaid),
+        participationFee: formData.isPaid ? Math.max(0, Number(formData.participationFee)) : 0,
+        autoEvaluateResults: Boolean(formData.autoEvaluateResults),
+        autoPublishResults: Boolean(formData.autoPublishResults),
         rules: initialCompetition?.rules || [
           'Candidate must bring official admit pass or login at the scheduled exam time.',
           'All answers must be the original, independent work of the candidate.'
         ],
         coverImageUrl: formData.coverImageUrl,
-        bookDetails: formData.category === 'book_reading' ? {
+        bookDetails: (formData.category === 'book_reading' || Boolean(formData.pdfReadingMaterialUrl || formData.pdfExternalUrl || formData.bookTitle)) ? {
           bookTitle: formData.bookTitle,
           author: formData.author,
-          requiredChapters: formData.requiredChapters
+          requiredChapters: formData.requiredChapters,
+          pdfReadingMaterialUrl: formData.pdfSourceType === 'external_url' ? formData.pdfExternalUrl : formData.pdfReadingMaterialUrl,
+          pdfFileName: formData.pdfFileName,
+          pdfFileSizeBytes: formData.pdfFileSizeBytes,
+          pdfSourceType: formData.pdfSourceType,
+          pdfExternalUrl: formData.pdfExternalUrl
         } : undefined,
+        pdfReadingMaterialUrl: formData.pdfSourceType === 'external_url' ? formData.pdfExternalUrl : formData.pdfReadingMaterialUrl,
+        pdfFileName: formData.pdfFileName,
+        pdfFileSizeBytes: formData.pdfFileSizeBytes,
+        pdfSourceType: formData.pdfSourceType,
         examDetails: initialCompetition?.examDetails || {
           isOnlineExam: formData.isOnlineExam,
           durationMinutes: Number(formData.durationMinutes),
@@ -1794,29 +1918,172 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
               />
             </div>
 
-            {/* Book Reading specifics */}
-            {formData.category === 'book_reading' && (
-              <>
+            {/* Prescribed Curriculum, Book & Attached PDF Material */}
+            <div className="sm:col-span-2 p-4 bg-amber-50/70 rounded-2xl border border-amber-200/90 space-y-3.5">
+              <div className="flex items-center justify-between">
                 <div>
-                  <label className="block font-bold text-amber-900 mb-1">Prescribed Book Title</label>
+                  <h4 className="font-bold text-slate-900 flex items-center gap-2 text-xs">
+                    <BookOpen className="w-4 h-4 text-amber-700" />
+                    <span>Prescribed Curriculum, Book & Syllabus Material</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-600">
+                    Attach an official PDF book, reading curriculum, or syllabus guide accessible to enrolled candidates.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 text-xs mb-1">Prescribed Book / Material Title</label>
                   <input
                     type="text"
+                    placeholder="e.g. Wings of Fire / Foundation Biology Handbook"
                     value={formData.bookTitle}
                     onChange={(e) => setFormData({ ...formData, bookTitle: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-amber-300 bg-amber-50 text-slate-900 font-bold"
+                    className="w-full px-3 py-2 rounded-xl border border-amber-300 bg-white text-slate-900 font-bold text-xs"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-amber-900 mb-1">Author Name</label>
+                  <label className="block font-bold text-slate-700 text-xs mb-1">Author / Academic Source</label>
                   <input
                     type="text"
+                    placeholder="e.g. Dr. A.P.J. Abdul Kalam / FET Academic Council"
                     value={formData.author}
                     onChange={(e) => setFormData({ ...formData, author: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-amber-300 bg-amber-50 text-slate-900 font-bold"
+                    className="w-full px-3 py-2 rounded-xl border border-amber-300 bg-white text-slate-900 font-bold text-xs"
                   />
                 </div>
-              </>
-            )}
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 text-xs mb-1">Required Chapters / Reading Scope</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Chapters 1 to 6 / Sections A, B & Appendix"
+                  value={formData.requiredChapters}
+                  onChange={(e) => setFormData({ ...formData, requiredChapters: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-amber-300 bg-white text-slate-900 text-xs"
+                />
+              </div>
+
+              {/* PDF Attachment Controls */}
+              <div className="pt-2 border-t border-amber-200/80 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="block font-bold text-slate-800 text-xs">
+                    Attach Official Curriculum PDF (Optional)
+                  </label>
+                  <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-amber-300 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, pdfSourceType: 'upload' })}
+                      className={`px-2.5 py-0.5 rounded-md font-semibold cursor-pointer ${
+                        formData.pdfSourceType === 'upload' ? 'bg-amber-600 text-white' : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Upload File
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, pdfSourceType: 'external_url' })}
+                      className={`px-2.5 py-0.5 rounded-md font-semibold cursor-pointer ${
+                        formData.pdfSourceType === 'external_url' ? 'bg-amber-600 text-white' : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      External URL / Drive
+                    </button>
+                  </div>
+                </div>
+
+                {formData.pdfSourceType === 'upload' ? (
+                  <div>
+                    <input
+                      ref={pdfFileInputRef}
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      onChange={handlePdfFileUpload}
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => pdfFileInputRef.current?.click()}
+                        disabled={isUploadingPdf}
+                        className="px-3 py-2 bg-white hover:bg-amber-100 border border-amber-300 rounded-xl text-xs font-bold text-amber-900 flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                      >
+                        <Paperclip className="w-3.5 h-3.5" />
+                        <span>{isUploadingPdf ? `Uploading (${pdfUploadProgress}%)...` : 'Select PDF to Upload'}</span>
+                      </button>
+                      <span className="text-[11px] text-slate-500">PDF up to 25 MB supported</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <input
+                      type="url"
+                      placeholder="https://drive.google.com/... or https://domain.com/handbook.pdf"
+                      value={formData.pdfExternalUrl}
+                      onChange={(e) => setFormData({ 
+                        ...formData, 
+                        pdfExternalUrl: e.target.value,
+                        pdfReadingMaterialUrl: e.target.value,
+                        pdfFileName: formData.pdfFileName || 'Prescribed_Curriculum.pdf'
+                      })}
+                      className="w-full px-3 py-2 rounded-xl border border-amber-300 bg-white text-xs font-mono"
+                    />
+                  </div>
+                )}
+
+                {/* Attached PDF Display */}
+                {(formData.pdfReadingMaterialUrl || formData.pdfExternalUrl) && (
+                  <div className="p-2.5 bg-white rounded-xl border border-emerald-300 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText className="w-4 h-4 text-emerald-700 shrink-0" />
+                      <div className="truncate">
+                        <span className="font-bold text-slate-900 block truncate">
+                          {formData.pdfFileName || 'Attached_Curriculum_Material.pdf'}
+                        </span>
+                        <span className="text-[10px] text-emerald-700 font-semibold">
+                          {formData.pdfFileSizeBytes ? `${(formData.pdfFileSizeBytes / (1024 * 1024)).toFixed(2)} MB • ` : ''}
+                          {formData.pdfSourceType === 'external_url' ? 'External PDF Link' : 'Cloud Storage Verified'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <a
+                        href={formData.pdfSourceType === 'external_url' ? formData.pdfExternalUrl : formData.pdfReadingMaterialUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-1.5 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg"
+                        title="Preview PDF"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({
+                          ...formData,
+                          pdfReadingMaterialUrl: '',
+                          pdfFileName: '',
+                          pdfFileSizeBytes: 0,
+                          pdfExternalUrl: ''
+                        })}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
+                        title="Remove Attached PDF"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {pdfUploadError && (
+                  <p className="text-xs text-rose-600 font-semibold flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    <span>{pdfUploadError}</span>
+                  </p>
+                )}
+              </div>
+            </div>
 
             {/* Prizes & Awards Configuration */}
             <div className="sm:col-span-2 p-3 bg-indigo-50/70 rounded-2xl border border-indigo-200 space-y-3">
@@ -1949,6 +2216,101 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
                 <option value="draft">Draft</option>
                 <option value="under_evaluation">Under Evaluation</option>
               </select>
+            </div>
+
+            {/* Participation Fee & Payment Settings (Part 2) */}
+            <div className="sm:col-span-2 p-3.5 bg-amber-50/70 rounded-2xl border border-amber-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-slate-900 flex items-center gap-1.5 text-xs">
+                    <CreditCard className="w-4 h-4 text-amber-700" />
+                    <span>Participation Fee & Payment Mode</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-600">
+                    Configure whether this examination requires an entry fee (collected securely via Razorpay) or is 100% free.
+                  </p>
+                </div>
+
+                {/* Free vs Paid Toggle */}
+                <div className="flex items-center gap-1 p-1 bg-white rounded-xl border border-amber-300">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, isPaid: false, participationFee: 0 })}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                      !formData.isPaid ? 'bg-emerald-700 text-white' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Free
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, isPaid: true, participationFee: formData.participationFee || 100 })}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                      formData.isPaid ? 'bg-amber-600 text-white' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Paid
+                  </button>
+                </div>
+              </div>
+
+              {formData.isPaid && (
+                <div className="pt-2 border-t border-amber-200/80 flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex-1">
+                    <label className="block font-bold text-amber-950 mb-1">Participation Fee (₹ INR) *</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 font-bold text-slate-500 text-xs">₹</span>
+                      <input
+                        type="number"
+                        min="1"
+                        required={formData.isPaid}
+                        value={formData.participationFee}
+                        onChange={(e) => setFormData({ ...formData, participationFee: Math.max(0, Number(e.target.value)) })}
+                        placeholder="e.g. 50, 100"
+                        className="w-full pl-7 pr-3 py-1.5 rounded-xl border border-amber-300 bg-white font-mono font-bold text-slate-900 text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div className="text-[11px] text-amber-900/90 leading-tight">
+                    Candidates will pay via the Razorpay gateway during enrollment and receive an official payment confirmation receipt.
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Evaluation & Result Automation Settings (Part 4) */}
+            <div className="sm:col-span-2 p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
+              <h4 className="font-bold text-slate-900 flex items-center gap-1.5 text-xs">
+                <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                <span>Evaluation & Result Automation</span>
+              </h4>
+              <div className="space-y-2">
+                <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700 select-none">
+                  <input
+                    type="checkbox"
+                    checked={formData.autoEvaluateResults}
+                    onChange={(e) => setFormData({ ...formData, autoEvaluateResults: e.target.checked })}
+                    className="mt-0.5 w-4 h-4 rounded text-emerald-700 focus:ring-emerald-500 border-slate-300"
+                  />
+                  <div>
+                    <span className="font-bold text-slate-900 block">Automatic Objective Scoring</span>
+                    <span className="text-[11px] text-slate-500">Automatically compute scores, percentages, and performance grades upon submission for objective question sections.</span>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700 select-none">
+                  <input
+                    type="checkbox"
+                    checked={formData.autoPublishResults}
+                    onChange={(e) => setFormData({ ...formData, autoPublishResults: e.target.checked })}
+                    className="mt-0.5 w-4 h-4 rounded text-emerald-700 focus:ring-emerald-500 border-slate-300"
+                  />
+                  <div>
+                    <span className="font-bold text-slate-900 block">Immediate Auto-Publish to Candidate Portal</span>
+                    <span className="text-[11px] text-slate-500">If checked, candidates can immediately view official scorecards without waiting for manual batch publication.</span>
+                  </div>
+                </label>
+              </div>
             </div>
 
           </div>

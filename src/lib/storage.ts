@@ -441,3 +441,70 @@ export async function uploadUserProfilePhoto(
   }
 }
 
+/**
+ * Upload Examination Curriculum / Book PDF to Cloud Storage
+ * Path: examination_materials/{examId}/{timestamp}_{filename}
+ */
+export async function uploadExamPdfMaterial(
+  file: File,
+  examId: string,
+  onProgress?: (progressPercent: number) => void
+): Promise<UploadResult> {
+  const validation = validateDocumentFile(file, 25);
+  if (!validation.valid) {
+    throw new Error(validation.error || 'Invalid file. Please upload an official PDF document.');
+  }
+
+  if (onProgress) onProgress(15);
+
+  const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const storagePath = `examination_materials/${examId}/${Date.now()}_${sanitizedName}`;
+
+  if (onProgress) onProgress(40);
+
+  try {
+    const storageRef = ref(storage, storagePath);
+    const uploadTask = uploadBytesResumable(storageRef, file, {
+      contentType: file.type || 'application/pdf',
+      customMetadata: {
+        examId,
+        uploadedAt: new Date().toISOString(),
+        originalFileName: file.name,
+        purpose: 'examination_reading_material'
+      }
+    });
+
+    uploadTask.on('state_changed', (snapshot) => {
+      if (snapshot.totalBytes > 0 && onProgress) {
+        const pct = Math.min(95, Math.max(40, Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)));
+        onProgress(pct);
+      }
+    });
+
+    const snap = await withTimeout<UploadTaskSnapshot>(uploadTask, 35000, 'PDF upload timed out after 35 seconds');
+    if (onProgress) onProgress(95);
+
+    const downloadUrl = await getDownloadURL(snap.ref);
+    if (onProgress) onProgress(100);
+
+    return {
+      url: downloadUrl,
+      fileName: file.name,
+      sizeBytes: file.size,
+      mimeType: file.type || 'application/pdf'
+    };
+  } catch (storageErr: any) {
+    console.info('Storage fallback for examination PDF (using resilient stream):', storageErr?.message || storageErr);
+    if (onProgress) onProgress(75);
+    const dataUrl = await fileToDataUrl(file);
+    if (onProgress) onProgress(100);
+
+    return {
+      url: dataUrl,
+      fileName: file.name,
+      sizeBytes: file.size,
+      mimeType: file.type || 'application/pdf'
+    };
+  }
+}
+

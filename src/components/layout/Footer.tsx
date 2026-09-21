@@ -102,8 +102,13 @@ export const Footer: React.FC<FooterProps> = ({
             {/* Social Links if enabled */}
             {footerSettings.showSocialLinks !== false && (
               <div className="pt-2 flex flex-wrap items-center gap-3">
-                {socialLinks.whatsapp && (
-                  <a href={socialLinks.whatsapp} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/50 text-[11px] font-bold transition-colors">
+                {(socialLinks.whatsapp || socialLinks.whatsappCommunity) && (
+                  <a 
+                    href={socialLinks.whatsapp || socialLinks.whatsappCommunity} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="px-2.5 py-1 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/50 text-[11px] font-bold transition-colors"
+                  >
                     WhatsApp
                   </a>
                 )}
@@ -288,22 +293,71 @@ export const Footer: React.FC<FooterProps> = ({
             <span className="hidden sm:inline"> Digital Platform: <span className="text-slate-300 font-semibold">{config.displayName}</span> ({config.shortBrand}).</span>
           </div>
           
-          <div className="flex flex-wrap items-center gap-4 text-[11px]">
+          <div className="flex flex-wrap items-center gap-3 text-[11px]">
             {onOpenVerification && (
               <button
                 type="button"
                 onClick={() => onOpenVerification()}
                 className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer"
               >
-                <span>Verify Certificate & Credential (QR)</span>
+                <span>Verify Credential (QR)</span>
               </button>
             )}
             <span>•</span>
             <button 
-              onClick={() => onOpenAbout ? onOpenAbout('overview') : onOpenSection('mission_cta')} 
-              className="hover:text-slate-300 cursor-pointer font-bold text-slate-400"
+              onClick={() => onOpenAbout ? onOpenAbout('overview') : onOpenSection('about')} 
+              className="hover:text-slate-300 cursor-pointer font-bold text-slate-300"
             >
-              About FET India
+              About Trust
+            </button>
+            <span>•</span>
+            <button 
+              onClick={() => onOpenSection('programs')} 
+              className="hover:text-slate-300 cursor-pointer"
+            >
+              Programs
+            </button>
+            <span>•</span>
+            <button 
+              onClick={() => onOpenSection('appeals')} 
+              className="text-emerald-400 hover:text-emerald-300 cursor-pointer font-medium"
+            >
+              Appeals (80G)
+            </button>
+            <span>•</span>
+            <button 
+              onClick={() => onOpenSection('examinations')} 
+              className="hover:text-slate-300 cursor-pointer"
+            >
+              Examination
+            </button>
+            <span>•</span>
+            <button 
+              onClick={() => onOpenSection('membership')} 
+              className="hover:text-slate-300 cursor-pointer"
+            >
+              Membership
+            </button>
+            <span>•</span>
+            <button 
+              onClick={() => onOpenSection('volunteers')} 
+              className="hover:text-slate-300 cursor-pointer"
+            >
+              Volunteers
+            </button>
+            <span>•</span>
+            <button 
+              onClick={() => onOpenSection('events_news')} 
+              className="hover:text-slate-300 cursor-pointer"
+            >
+              Events & News
+            </button>
+            <span>•</span>
+            <button 
+              onClick={() => onOpenSection('contact')} 
+              className="hover:text-slate-300 cursor-pointer"
+            >
+              Contact Us
             </button>
             <span>•</span>
             <button 
@@ -317,11 +371,7 @@ export const Footer: React.FC<FooterProps> = ({
               onClick={() => onOpenLegal ? onOpenLegal('terms') : onOpenSection('mission_cta')} 
               className="hover:text-slate-300 cursor-pointer"
             >
-              Terms of Trust
-            </button>
-            <span>•</span>
-            <button onClick={() => onOpenSection('crowdfunding')} className="text-emerald-400 hover:underline cursor-pointer font-semibold">
-              80G Tax Exemption
+              Terms
             </button>
           </div>
         </div>

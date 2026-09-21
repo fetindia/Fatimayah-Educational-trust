@@ -23,14 +23,39 @@ interface ConfigContextType {
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 
 export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [config, setConfig] = useState<OrgConfig>(DEFAULT_ORG_CONFIG);
+  const [config, setConfig] = useState<OrgConfig>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('fet_org_config_cache');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          return {
+            ...DEFAULT_ORG_CONFIG,
+            ...parsed,
+            legalName: 'Fatimyah Educational Trust'
+          };
+        }
+      } catch (e) {
+        console.warn('Failed to parse cached org config:', e);
+      }
+    }
+    return DEFAULT_ORG_CONFIG;
+  });
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     // Initial fetch
     fetchOrgConfig().then((cfg) => {
-      setConfig(cfg);
+      const merged: OrgConfig = {
+        ...DEFAULT_ORG_CONFIG,
+        ...cfg,
+        legalName: 'Fatimyah Educational Trust' as const
+      };
+      setConfig(merged);
       setIsLoading(false);
+      try {
+        localStorage.setItem('fet_org_config_cache', JSON.stringify(merged));
+      } catch (e) {}
     });
 
     // Real-time listener for Firestore CMS updates
@@ -38,11 +63,15 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const unsub = onSnapshot(doc(db, 'organization_config', 'main_config'), (snapshot) => {
         if (snapshot.exists()) {
           const remoteData = snapshot.data() as OrgConfig;
-          setConfig({
+          const merged: OrgConfig = {
             ...DEFAULT_ORG_CONFIG,
             ...remoteData,
-            legalName: 'Fatimyah Educational Trust' // Strictly enforce legal protection
-          });
+            legalName: 'Fatimyah Educational Trust' as const // Strictly enforce legal protection
+          };
+          setConfig(merged);
+          try {
+            localStorage.setItem('fet_org_config_cache', JSON.stringify(merged));
+          } catch (e) {}
         }
       }, (err) => {
         console.warn('Realtime config listener notice:', err);
@@ -70,11 +99,17 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   ) => {
     const updated = await saveOrgConfig(newConfig, adminUser);
     setConfig(updated);
+    try {
+      localStorage.setItem('fet_org_config_cache', JSON.stringify(updated));
+    } catch (e) {}
   };
 
   const resetToDefaults = async (adminUser: { uid: string; email: string; role: UserRole }) => {
     const updated = await saveOrgConfig(DEFAULT_ORG_CONFIG, adminUser);
     setConfig(updated);
+    try {
+      localStorage.setItem('fet_org_config_cache', JSON.stringify(updated));
+    } catch (e) {}
   };
 
   return (

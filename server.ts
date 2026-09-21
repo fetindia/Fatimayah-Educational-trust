@@ -139,9 +139,9 @@ app.post('/api/razorpay/create-order', async (req: Request, res: Response) => {
     } = req.body;
 
     const numericAmount = Number(amount);
-    if (!numericAmount || isNaN(numericAmount) || numericAmount < 100) {
+    if (!numericAmount || isNaN(numericAmount) || numericAmount < 1) {
       res.status(400).json({
-        error: 'Invalid contribution amount. Minimum contribution amount is ₹100.'
+        error: 'Invalid amount. Minimum amount is ₹1.'
       });
       return;
     }

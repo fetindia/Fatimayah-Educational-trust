@@ -173,6 +173,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     'crowdfunding_admin',
     'examination_admin',
     'exam_admin',
+    'exam_controller',
+    'examiner',
     'school_admin',
     'madrasa_admin',
     'finance_admin',
@@ -309,7 +311,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const cred = await signInWithPopup(auth, googleProvider);
     const profile = await getOrCreateUserProfile(cred.user);
     setUserProfile(profile);
-    setActiveRole(profile.primaryRole || 'member');
+    setActiveRole(profile.primaryRole || (profile.roles?.[0] as UserRole) || 'user');
   };
 
   const updateProfileData = async (data: Partial<UserProfile>): Promise<UserProfile> => {
@@ -336,7 +338,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await firebaseSignOut(auth);
     setCurrentUser(null);
     setUserProfile(null);
-    setActiveRole('member');
+    setActiveRole('user');
   };
 
   return (

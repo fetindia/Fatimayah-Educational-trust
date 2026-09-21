@@ -19,7 +19,8 @@ import {
   AlertCircle,
   HelpCircle,
   ShieldCheck,
-  ChevronRight
+  ChevronRight,
+  Trophy
 } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
@@ -29,7 +30,7 @@ import { useConfig } from '../../contexts/ConfigContext';
 
 interface FETIndiaExaminationsSectionProps {
   onApplyExam: (competition: Competition) => void;
-  onViewExamInfo: (competition: Competition, tab?: 'instructions' | 'book_mastery' | 'eligibility') => void;
+  onViewExamInfo: (competition: Competition, tab?: 'instructions' | 'book_mastery' | 'eligibility' | 'prizes') => void;
   onViewAllExams?: () => void;
 }
 
@@ -244,17 +245,53 @@ export const FETIndiaExaminationsSection: React.FC<FETIndiaExaminationsSectionPr
                   </div>
                 )}
 
+                {/* Dynamic Prizes & Rewards Summary */}
+                {activeCompetition.prizeRewards && activeCompetition.prizeRewards.filter(p => p.status !== 'inactive').length > 0 && (
+                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-300 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-black text-amber-950 uppercase tracking-wider">
+                      <div className="flex items-center gap-1.5">
+                        <Trophy className="w-4 h-4 text-amber-600" />
+                        <span>Honors & Merit Scholarships</span>
+                      </div>
+                      <span className="text-[10px] text-amber-800 font-extrabold">
+                        {activeCompetition.prizeRewards.filter(p => p.status !== 'inactive').length} Prize Tiers
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {activeCompetition.prizeRewards.filter(p => p.status !== 'inactive').slice(0, 3).map((prize, pIdx) => (
+                        <div key={prize.id || pIdx} className="p-2.5 rounded-xl bg-white border border-amber-200/80 shadow-2xs space-y-0.5">
+                          <div className="flex items-center justify-between text-xs font-extrabold text-slate-900">
+                            <span>#{prize.rankPosition} {prize.title.split('-')[0].trim()}</span>
+                            {prize.rewardAmount && prize.rewardAmount > 0 && (
+                              <span className="text-emerald-700 font-mono font-bold">₹{prize.rewardAmount.toLocaleString()}</span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-500 line-clamp-1">{prize.rewardDescription}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Prominent Action Strip */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-slate-200">
                   
                   {/* Secondary info buttons */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       onClick={() => onViewExamInfo(activeCompetition, 'instructions')}
                       className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer border border-slate-300 flex items-center gap-1.5"
                     >
                       <FileText className="w-3.5 h-3.5 text-slate-600" />
-                      <span>Examination Instructions</span>
+                      <span>Instructions</span>
+                    </button>
+
+                    <button
+                      onClick={() => onViewExamInfo(activeCompetition, 'prizes')}
+                      className="px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs transition-colors cursor-pointer border border-amber-300 flex items-center gap-1.5"
+                    >
+                      <Trophy className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Prizes & Awards</span>
                     </button>
 
                     {activeCompetition.bookDetails && (

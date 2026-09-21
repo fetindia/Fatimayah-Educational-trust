@@ -40,7 +40,8 @@ import {
   ChevronDown,
   Layers,
   ArrowUpRight,
-  Users
+  Users,
+  Landmark
 } from 'lucide-react';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { 
@@ -57,6 +58,7 @@ import {
   UserProfile 
 } from '../../types';
 import { AdminDonorApplicationsView } from './AdminDonorApplicationsView';
+import { AdminManualDonationSettings } from './settings/AdminManualDonationSettings';
 
 export const AdminDonorsManagementView: React.FC = () => {
   const { currentUser, userProfile, isSuperAdmin } = useAuth();
@@ -67,7 +69,7 @@ export const AdminDonorsManagementView: React.FC = () => {
   const [campaigns, setCampaigns] = useState<CrowdfundingCampaign[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'transactions' | 'donors' | 'campaigns' | 'applications'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'transactions' | 'donors' | 'campaigns' | 'applications' | 'bank_settings'>('overview');
 
   // Filter & Search State
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -629,6 +631,19 @@ export const AdminDonorsManagementView: React.FC = () => {
         >
           <ShieldCheck className="w-4 h-4 text-amber-700" />
           <span>5. Patron Accreditation Intake</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('bank_settings')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTab === 'bank_settings'
+              ? 'bg-emerald-800 text-white font-black shadow-md'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+          id="tab-manual-donation-bank-settings"
+        >
+          <Landmark className="w-4 h-4 text-emerald-300" />
+          <span>6. Manual Bank Transfer Details</span>
         </button>
       </div>
 
@@ -1269,6 +1284,15 @@ export const AdminDonorsManagementView: React.FC = () => {
       {activeTab === 'applications' && (
         <div className="space-y-4" id="patron-applications-container">
           <AdminDonorApplicationsView />
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* TAB 6: MANUAL DONATION BANK TRANSFER SETTINGS */}
+      {/* ------------------------------------------------------------- */}
+      {activeTab === 'bank_settings' && (
+        <div className="space-y-6" id="manual-donation-bank-settings-tab">
+          <AdminManualDonationSettings />
         </div>
       )}
 

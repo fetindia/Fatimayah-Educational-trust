@@ -18,12 +18,15 @@ import {
   Mail, 
   BookOpen,
   ArrowRight,
-  ShieldCheck
+  ShieldCheck,
+  CreditCard,
+  Lock
 } from 'lucide-react';
 import { Competition, CompetitionRegistration } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { db, cleanFirestoreData } from '../../lib/firebase';
 import { doc, setDoc, updateDoc, increment, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { initiateRazorpayContribution, PaymentVerificationResult } from '../../lib/razorpay';
 
 interface CompetitionRegistrationModalProps {
   competition: Competition;
@@ -100,83 +103,145 @@ export const CompetitionRegistrationModal: React.FC<CompetitionRegistrationModal
     setIsSubmitting(true);
     setErrorMsg(null);
 
-    try {
-      // Generate Unique Participant Roll ID
-      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-      const participantId = `FET-PRT-${new Date().getFullYear()}-${randomSuffix}`;
-      const registrationDocId = `reg-${competition.id || 'cmp'}-${currentUser.uid}`;
+    const isPaidExam = Boolean(competition.isPaid && (competition.participationFee ?? 0) > 0);
+    const feeAmount = competition.participationFee || 0;
 
-      const newRegistration: CompetitionRegistration = {
-        registrationId: registrationDocId,
-        participantId: participantId,
-        competitionId: competition.id || 'cmp-default',
-        competitionCode: competition.code,
-        competitionTitle: competition.title,
-        competitionCategory: competition.category,
-        
-        participantUid: currentUser.uid,
-        participantName: formData.participantName.trim(),
-        parentName: formData.parentName.trim(),
-        dateOfBirth: formData.dateOfBirth,
-        gender: formData.gender,
-        mobileNumber: formData.mobileNumber.trim(),
-        email: formData.email.trim(),
-        country: formData.country.trim(),
-        state: formData.state.trim(),
-        district: formData.district.trim(),
-        schoolInstitution: formData.schoolInstitution.trim(),
-        classGrade: formData.classGrade,
+    const executeRegistrationSave = async (paymentDetails?: {
+      orderId?: string;
+      paymentId?: string;
+      paymentStatus: 'free' | 'paid';
+      amount: number;
+    }) => {
+      try {
+        // Generate Unique Participant Roll ID
+        const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+        const participantId = `FET-PRT-${new Date().getFullYear()}-${randomSuffix}`;
+        const registrationDocId = `reg-${competition.id || 'cmp'}-${currentUser.uid}`;
 
-        registeredAt: new Date().toISOString(),
-        status: 'registered',
-        examAttemptStatus: 'not_started',
-        totalMarks: competition.maxMarks,
-        isResultPublished: false,
-        certificateIssued: false,
-        updatedAt: new Date().toISOString()
-      };
+        const newRegistration: CompetitionRegistration = {
+          registrationId: registrationDocId,
+          participantId: participantId,
+          competitionId: competition.id || 'cmp-default',
+          competitionCode: competition.code,
+          competitionTitle: competition.title,
+          competitionCategory: competition.category,
+          
+          participantUid: currentUser.uid,
+          participantName: formData.participantName.trim(),
+          parentName: formData.parentName.trim(),
+          dateOfBirth: formData.dateOfBirth,
+          gender: formData.gender,
+          mobileNumber: formData.mobileNumber.trim(),
+          email: formData.email.trim(),
+          country: formData.country.trim(),
+          state: formData.state.trim(),
+          district: formData.district.trim(),
+          schoolInstitution: formData.schoolInstitution.trim(),
+          classGrade: formData.classGrade,
 
-      // Write to Firestore
-      await setDoc(doc(db, 'competition_registrations', registrationDocId), cleanFirestoreData(newRegistration));
+          // Payment Metadata
+          isPaid: isPaidExam,
+          participationFee: feeAmount,
+          paymentFeeAmount: paymentDetails?.amount || 0,
+          paymentStatus: paymentDetails?.paymentStatus || (isPaidExam ? 'paid' : 'free'),
+          orderId: paymentDetails?.orderId,
+          paymentId: paymentDetails?.paymentId,
+          paymentCompletedAt: paymentDetails ? new Date().toISOString() : undefined,
 
-      // Increment registered count in competition document
-      if (competition.id) {
-        const compRef = doc(db, 'competitions', competition.id);
-        await updateDoc(compRef, {
-          registeredCount: increment(1),
+          registeredAt: new Date().toISOString(),
+          status: 'registered',
+          examAttemptStatus: 'not_started',
+          totalMarks: competition.maxMarks,
+          isResultPublished: false,
+          certificateIssued: false,
           updatedAt: new Date().toISOString()
-        }).catch(() => {
-          // ignore if document does not exist yet
-        });
+        };
+
+        // Write to Firestore
+        await setDoc(doc(db, 'competition_registrations', registrationDocId), cleanFirestoreData(newRegistration));
+
+        // Increment registered count in competition document
+        if (competition.id) {
+          const compRef = doc(db, 'competitions', competition.id);
+          await updateDoc(compRef, {
+            registeredCount: increment(1),
+            updatedAt: new Date().toISOString()
+          }).catch(() => {
+            // ignore if document does not exist yet
+          });
+        }
+
+        // Record in In-App Notifications for Candidate
+        await addDoc(collection(db, 'user_notifications'), cleanFirestoreData({
+          userId: currentUser.uid,
+          userEmail: currentUser.email || '',
+          title: `Registration Confirmed: ${competition.title}`,
+          message: `You have successfully enrolled in ${competition.title}. Your assigned Participant Roll ID is ${participantId}${isPaidExam ? ` (Examination Fee Paid: ₹${feeAmount})` : ''}.`,
+          type: 'competition_registration',
+          module: 'exams',
+          read: false,
+          createdAt: new Date().toISOString()
+        })).catch(() => {});
+
+        // Record in Audit Log
+        await addDoc(collection(db, 'audit_logs'), cleanFirestoreData({
+          action: 'COMPETITION_REGISTRATION_CREATED',
+          userId: currentUser.uid,
+          userEmail: currentUser.email || '',
+          details: `Registered candidate ${formData.participantName} for ${competition.title} with Participant ID ${participantId}${isPaidExam ? ` (Paid: ₹${feeAmount})` : ' (Free)'}`,
+          timestamp: new Date().toISOString()
+        })).catch(() => {});
+
+        if (onSuccess) {
+          onSuccess(registrationDocId);
+        }
+      } catch (err: any) {
+        console.error('Error submitting competition registration:', err);
+        setErrorMsg(err?.message || 'Failed to submit registration. Please try again.');
+      } finally {
+        setIsSubmitting(false);
       }
+    };
 
-      // Record in In-App Notifications for Candidate
-      await addDoc(collection(db, 'user_notifications'), cleanFirestoreData({
-        userId: currentUser.uid,
-        userEmail: currentUser.email || '',
-        title: `Registration Confirmed: ${competition.title}`,
-        message: `You have successfully enrolled in ${competition.title}. Your assigned Participant Roll ID is ${participantId}.`,
-        type: 'competition_registration',
-        module: 'exams',
-        read: false,
-        createdAt: new Date().toISOString()
-      })).catch(() => {});
-
-      // Record in Audit Log
-      await addDoc(collection(db, 'audit_logs'), cleanFirestoreData({
-        action: 'COMPETITION_REGISTRATION_CREATED',
-        userId: currentUser.uid,
-        userEmail: currentUser.email || '',
-        details: `Registered candidate ${formData.participantName} for ${competition.title} with Participant ID ${participantId}`,
-        timestamp: new Date().toISOString()
-      })).catch(() => {});
-
-      onSuccess(registrationDocId);
-    } catch (err: any) {
-      console.error('Error submitting competition registration:', err);
-      setErrorMsg(err?.message || 'Failed to submit registration. Please try again.');
-    } finally {
-      setIsSubmitting(false);
+    if (isPaidExam) {
+      try {
+        await initiateRazorpayContribution({
+          orderParams: {
+            amount: feeAmount,
+            donorName: formData.participantName.trim(),
+            donorEmail: formData.email.trim(),
+            donorPhone: formData.mobileNumber.trim(),
+            campaignId: competition.id || 'examination_fee',
+            campaignTitle: `Examination Fee: ${competition.title}`,
+            donorUid: currentUser.uid
+          },
+          preferredMethod: 'all',
+          onSuccess: async (result: PaymentVerificationResult) => {
+            await executeRegistrationSave({
+              orderId: result.internalReference || result.receiptNumber || 'EXAM-ORDER',
+              paymentId: result.paymentId || 'PAY-ONLINE',
+              paymentStatus: 'paid',
+              amount: feeAmount
+            });
+          },
+          onError: (errorMessage: string) => {
+            setIsSubmitting(false);
+            setErrorMsg(`Payment error: ${errorMessage}`);
+          },
+          onDismiss: () => {
+            setIsSubmitting(false);
+          }
+        });
+      } catch (payErr: any) {
+        setIsSubmitting(false);
+        setErrorMsg(payErr?.message || 'Failed to launch secure payment gateway.');
+      }
+    } else {
+      // Free examination
+      await executeRegistrationSave({
+        paymentStatus: 'free',
+        amount: 0
+      });
     }
   };
 
@@ -423,6 +488,35 @@ export const CompetitionRegistrationModal: React.FC<CompetitionRegistrationModal
 
           </div>
 
+          {/* Fee & Payment Notice */}
+          <div className="pt-2 border-t border-slate-200">
+            {competition.isPaid && (competition.participationFee ?? 0) > 0 ? (
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 text-amber-950 font-bold">
+                  <CreditCard className="w-4 h-4 text-amber-700 shrink-0" />
+                  <div>
+                    <span>Official Participation Fee: </span>
+                    <span className="text-sm font-black text-amber-900">₹{competition.participationFee}</span>
+                    <span className="block text-[10px] text-amber-700 font-normal">Processed securely via Razorpay (UPI, Cards, NetBanking)</span>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 shrink-0">
+                  Paid Entry
+                </span>
+              </div>
+            ) : (
+              <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs text-emerald-950 font-bold">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>Free Participation • Sponsored by Fatimyah Educational Trust</span>
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-900">
+                  100% Free
+                </span>
+              </div>
+            )}
+          </div>
+
           {/* Guidelines Confirmation Checkbox */}
           <div className="pt-2 border-t border-slate-200">
             <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700 select-none">
@@ -453,10 +547,14 @@ export const CompetitionRegistrationModal: React.FC<CompetitionRegistrationModal
               className="px-6 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs disabled:opacity-50 cursor-pointer shadow-md flex items-center gap-1.5"
             >
               {isSubmitting ? (
-                <span>Registering Candidate...</span>
+                <span>{competition.isPaid ? 'Launching Payment...' : 'Registering Candidate...'}</span>
               ) : (
                 <>
-                  <span>Complete Enrollment</span>
+                  <span>
+                    {competition.isPaid && (competition.participationFee ?? 0) > 0
+                      ? `Pay ₹${competition.participationFee} & Enroll`
+                      : 'Complete Free Enrollment'}
+                  </span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}

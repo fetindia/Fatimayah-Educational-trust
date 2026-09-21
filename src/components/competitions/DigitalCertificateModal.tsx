@@ -5,6 +5,9 @@
  */
 
 import React, { useRef, useState } from 'react';
+import html2canvas from 'html2canvas-pro';
+import * as htmlToImage from 'html-to-image';
+import { jsPDF } from 'jspdf';
 import { 
   X, 
   Download, 
@@ -31,6 +34,41 @@ interface DigitalCertificateModalProps {
   onOpenVerifyModal?: (id: string) => void;
 }
 
+// Helper to capture certificate to canvas/image
+async function renderCertificateToImageData(element: HTMLElement, scale: number = 2.5): Promise<{ dataUrl: string; width: number; height: number }> {
+  try {
+    const canvas = await html2canvas(element, {
+      scale,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false
+    });
+    return {
+      dataUrl: canvas.toDataURL('image/png'),
+      width: canvas.width,
+      height: canvas.height
+    };
+  } catch (canvasErr) {
+    console.warn('html2canvas-pro fallback to html-to-image for certificate:', canvasErr);
+    const dataUrl = await htmlToImage.toPng(element, {
+      pixelRatio: scale,
+      cacheBust: true,
+      backgroundColor: '#ffffff'
+    });
+    const img = new Image();
+    await new Promise((resolve) => {
+      img.onload = resolve;
+      img.src = dataUrl;
+    });
+    return {
+      dataUrl,
+      width: img.naturalWidth || 1600,
+      height: img.naturalHeight || 1130
+    };
+  }
+}
+
 export const DigitalCertificateModal: React.FC<DigitalCertificateModalProps> = ({
   certificate,
   onClose,
@@ -38,6 +76,8 @@ export const DigitalCertificateModal: React.FC<DigitalCertificateModalProps> = (
 }) => {
   const printRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isGeneratingPng, setIsGeneratingPng] = useState(false);
 
   const isRevoked = certificate.status === 'revoked';
   const isExpired = certificate.status === 'expired';
@@ -50,6 +90,50 @@ export const DigitalCertificateModal: React.FC<DigitalCertificateModalProps> = (
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!printRef.current) return;
+    setIsGeneratingPdf(true);
+    try {
+      const { dataUrl, width, height } = await renderCertificateToImageData(printRef.current, 3);
+      // Landscape A4 PDF: 297mm x 210mm
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth(); // 297
+      const pdfHeight = pdf.internal.pageSize.getHeight(); // 210
+      const margin = 10;
+      const targetWidth = pdfWidth - (margin * 2);
+      const targetHeight = (height * targetWidth) / width;
+
+      pdf.addImage(dataUrl, 'PNG', margin, margin, targetWidth, Math.min(targetHeight, pdfHeight - (margin * 2)));
+      pdf.save(`FET_Certificate_${certificate.participantName.replace(/[^a-zA-Z0-9_-]/g, '_')}_${certificate.certificateId}.pdf`);
+    } catch (err) {
+      console.error('Failed to generate Certificate PDF:', err);
+      window.print();
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleDownloadPng = async () => {
+    if (!printRef.current) return;
+    setIsGeneratingPng(true);
+    try {
+      const { dataUrl } = await renderCertificateToImageData(printRef.current, 3);
+      const link = document.createElement('a');
+      link.download = `FET_Certificate_${certificate.participantName.replace(/[^a-zA-Z0-9_-]/g, '_')}_${certificate.certificateId}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error('Failed to save Certificate image:', err);
+    } finally {
+      setIsGeneratingPng(false);
+    }
   };
 
   const handleCopyLink = () => {
@@ -120,7 +204,7 @@ export const DigitalCertificateModal: React.FC<DigitalCertificateModalProps> = (
       <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl overflow-hidden my-auto border border-slate-200">
         
         {/* Modal Top Bar */}
-        <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+        <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between no-print">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400">
               <Award className="w-5 h-5" />
@@ -157,7 +241,7 @@ export const DigitalCertificateModal: React.FC<DigitalCertificateModalProps> = (
               title="Print Certificate"
             >
               <Printer className="w-4 h-4" />
-              <span className="hidden sm:inline">Print / Save PDF</span>
+              <span className="hidden sm:inline">Print</span>
             </button>
             <button
               onClick={onClose}
@@ -190,6 +274,7 @@ export const DigitalCertificateModal: React.FC<DigitalCertificateModalProps> = (
         <div className="p-4 sm:p-8 bg-slate-100 flex justify-center">
           <div 
             ref={printRef}
+            id="fet-certificate-print-target"
             className={`w-full max-w-3xl bg-white border-8 border-double ${isRevoked ? 'border-rose-900/80 opacity-90' : 'border-emerald-900/80'} rounded-2xl p-6 sm:p-10 shadow-lg relative overflow-hidden text-slate-900 print:shadow-none print:border-8 print:m-0`}
             style={{
               backgroundImage: isRevoked
@@ -333,12 +418,12 @@ export const DigitalCertificateModal: React.FC<DigitalCertificateModalProps> = (
         </div>
 
         {/* Modal Actions */}
-        <div className="p-4 bg-white border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="p-4 bg-white border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 no-print">
           <div className="flex items-center gap-2 text-xs text-slate-600">
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             <span>Authenticated by Fatimyah Educational Trust Central Examination Directorate</span>
           </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             {onOpenVerifyModal && (
               <button
                 type="button"
@@ -346,24 +431,49 @@ export const DigitalCertificateModal: React.FC<DigitalCertificateModalProps> = (
                   onClose();
                   onOpenVerifyModal(certificate.certificateId);
                 }}
-                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl cursor-pointer flex items-center gap-1.5"
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl cursor-pointer flex items-center gap-1.5 transition-colors"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
-                <span>Open in Verification Center</span>
+                <span>Verify Online</span>
               </button>
             )}
+
             <button
               type="button"
               onClick={handlePrint}
-              className="flex-1 sm:flex-initial px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl cursor-pointer flex items-center gap-1.5 transition-colors"
+              id="print-certificate-btn"
+            >
+              <Printer className="w-4 h-4 text-slate-700" />
+              <span>Print</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={isGeneratingPdf}
+              className="flex-1 sm:flex-initial px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+              id="download-certificate-pdf-btn"
             >
               <Download className="w-4 h-4" />
-              <span>Download Official PDF Certificate</span>
+              <span>{isGeneratingPdf ? 'Generating PDF...' : 'Download Official PDF'}</span>
             </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadPng}
+              disabled={isGeneratingPng}
+              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              id="download-certificate-png-btn"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>{isGeneratingPng ? 'Saving...' : 'PNG'}</span>
+            </button>
+
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer"
+              className="px-3.5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs rounded-xl cursor-pointer transition-colors"
             >
               Close
             </button>

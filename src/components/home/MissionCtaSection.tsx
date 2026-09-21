@@ -159,9 +159,21 @@ export const MissionCtaSection: React.FC<MissionCtaSectionProps> = ({
                   </div>
                   <div>
                     <span className="text-[10px] font-bold text-slate-500 uppercase block">Helpline & WhatsApp</span>
-                    <a href={`tel:${config.contactPhone}`} className="text-sm font-bold text-white hover:text-emerald-300">
-                      {config.contactPhone}
-                    </a>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <a href={`tel:${config.contactPhone}`} className="text-sm font-bold text-white hover:text-emerald-300">
+                        {config.contactPhone}
+                      </a>
+                      {(config.socialLinks?.whatsapp || config.socialLinks?.whatsappCommunity) && (
+                        <a 
+                          href={config.socialLinks.whatsapp || config.socialLinks.whatsappCommunity}
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-emerald-950 text-emerald-300 border border-emerald-700/60 hover:bg-emerald-900 transition-colors"
+                        >
+                          Chat on WhatsApp →
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
 

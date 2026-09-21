@@ -75,6 +75,20 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     description: 'Oversee income ledgers, expense requisitions, payment vouchers, approvals, and statutory audit compliance.',
     category: 'Core Operations',
     targetModule: 'Finance & Accounting'
+  },
+  {
+    id: 'exams.manage',
+    name: 'Manage Examination System',
+    description: 'Oversee examination setup, schedules, papers, candidate registrations, results computation, and certification.',
+    category: 'Core Operations',
+    targetModule: 'Examinations'
+  },
+  {
+    id: 'exams.evaluate',
+    name: 'Academic Evaluation & Grading',
+    description: 'Review candidate answer sheets, evaluate assessments, verify marks, and contribute to question banks.',
+    category: 'Core Operations',
+    targetModule: 'Examinations'
   }
 ];
 
@@ -87,7 +101,9 @@ export const ALL_PERMISSIONS: AppPermission[] = [
   'members.manage',
   'modules.manage',
   'settings.manage',
-  'finance.manage'
+  'finance.manage',
+  'exams.manage',
+  'exams.evaluate'
 ];
 
 /**
@@ -112,7 +128,9 @@ export const ROLE_DEFINITIONS: Record<UserRole, RoleMetadata> = {
       'members.manage',
       'modules.manage',
       'settings.manage',
-      'finance.manage'
+      'finance.manage',
+      'exams.manage',
+      'exams.evaluate'
     ],
     badgeColor: 'bg-emerald-950 text-emerald-300 border-emerald-800'
   },
@@ -228,8 +246,26 @@ export const ROLE_DEFINITIONS: Record<UserRole, RoleMetadata> = {
     description: 'Oversees talent search examinations, student hall tickets, and evaluations.',
     hierarchyLevel: 70,
     isAdministrative: true,
-    defaultPermissions: ['users.view', 'modules.manage'],
+    defaultPermissions: ['users.view', 'modules.manage', 'exams.manage', 'exams.evaluate'],
     badgeColor: 'bg-purple-950 text-purple-300 border-purple-800'
+  },
+  exam_controller: {
+    id: 'exam_controller',
+    label: 'Exam Controller',
+    description: 'Comprehensive examination governance authority: schedule, eligibility, fee, question papers, participant reviews, result calculation, publication, ranking, and certificates.',
+    hierarchyLevel: 75,
+    isAdministrative: true,
+    defaultPermissions: ['users.view', 'modules.manage', 'exams.manage', 'exams.evaluate'],
+    badgeColor: 'bg-purple-950 text-purple-200 border-purple-700'
+  },
+  examiner: {
+    id: 'examiner',
+    label: 'Examiner',
+    description: 'Academic examiner: questions management, paper creation, evaluating candidate responses, and grading answer sheets.',
+    hierarchyLevel: 55,
+    isAdministrative: true,
+    defaultPermissions: ['users.view', 'exams.evaluate'],
+    badgeColor: 'bg-indigo-950 text-indigo-300 border-indigo-800'
   },
   school_admin: {
     id: 'school_admin',

@@ -62,7 +62,8 @@ import {
   Radio,
   UploadCloud,
   Loader2,
-  FileVideo
+  FileVideo,
+  Building2
 } from 'lucide-react';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -72,9 +73,11 @@ import { FETLogo } from '../common/FETLogo';
 import { fetchPublicCampaigns } from '../../lib/firebase';
 import { uploadCampaignMedia } from '../../lib/storage';
 import { HomepageLivePreview } from './HomepageLivePreview';
+import { AdminAboutTrustCMSView } from './AdminAboutTrustCMSView';
 
 type CMSTab = 
   | 'branding' 
+  | 'about_trust'
   | 'announcements' 
   | 'navigation' 
   | 'sections' 
@@ -369,7 +372,8 @@ export const AdminCMSView: React.FC = () => {
       imageUrl: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1600&q=80',
       isActive: true,
       status: 'published',
-      mediaType: 'image'
+      mediaType: 'image',
+      showTextOverlay: true
     };
     setSlides([...slides, newSlide]);
   };
@@ -750,6 +754,19 @@ export const AdminCMSView: React.FC = () => {
 
         <button
           type="button"
+          onClick={() => setActiveTab('about_trust')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTab === 'about_trust'
+              ? 'bg-emerald-800 text-white shadow-xs font-extrabold'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <Building2 className="w-4 h-4 text-emerald-400" />
+          <span>About Trust & Leadership</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab('announcements')}
           className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
             activeTab === 'announcements'
@@ -852,6 +869,15 @@ export const AdminCMSView: React.FC = () => {
           <span>9. Live Simulator</span>
         </button>
       </div>
+
+      {/* ------------------------------------------------------------- */}
+      {/* TAB 0: About Trust & Leadership CMS */}
+      {/* ------------------------------------------------------------- */}
+      {activeTab === 'about_trust' && (
+        <div className="animate-in fade-in">
+          <AdminAboutTrustCMSView />
+        </div>
+      )}
 
       {/* ------------------------------------------------------------- */}
       {/* TAB 1: Brand Identity & Colors & Impact Census Metrics */}
@@ -1587,34 +1613,41 @@ export const AdminCMSView: React.FC = () => {
 
                 {/* Simulated Hero Card */}
                 {slides[activeSlidePreviewIdx] && (
-                  <div className="p-4 sm:p-6 bg-slate-900 rounded-xl border border-slate-800 relative overflow-hidden">
+                  <div className="p-4 sm:p-6 bg-slate-900 rounded-xl border border-slate-800 relative overflow-hidden min-h-[160px] flex flex-col justify-end">
                     {slides[activeSlidePreviewIdx].imageUrl && (
                       <div 
-                        className="absolute inset-0 bg-cover bg-center opacity-25 pointer-events-none"
+                        className="absolute inset-0 bg-cover bg-center opacity-30 pointer-events-none"
                         style={{ backgroundImage: `url(${slides[activeSlidePreviewIdx].imageUrl})` }}
                       />
                     )}
-                    <div className="relative space-y-2">
-                      <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950">
-                        {slides[activeSlidePreviewIdx].badgeText || 'Badge'}
-                      </span>
-                      <h4 className="text-base sm:text-lg font-black text-white">
-                        {slides[activeSlidePreviewIdx].title}
-                      </h4>
-                      <p className="text-xs text-slate-300 line-clamp-2">
-                        {slides[activeSlidePreviewIdx].subtitle}
-                      </p>
-                      <div className="pt-2 flex flex-wrap gap-2">
-                        <span className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-700">
-                          {slides[activeSlidePreviewIdx].ctaText || 'Primary CTA'}
+                    {slides[activeSlidePreviewIdx].showTextOverlay !== false ? (
+                      <div className="relative space-y-2">
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950">
+                          {slides[activeSlidePreviewIdx].badgeText || 'Badge'}
                         </span>
-                        {slides[activeSlidePreviewIdx].secondaryCtaText && (
-                          <span className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-300 bg-slate-800 border border-slate-700">
-                            {slides[activeSlidePreviewIdx].secondaryCtaText}
+                        <h4 className="text-base sm:text-lg font-black text-white">
+                          {slides[activeSlidePreviewIdx].title}
+                        </h4>
+                        <p className="text-xs text-slate-300 line-clamp-2">
+                          {slides[activeSlidePreviewIdx].subtitle}
+                        </p>
+                        <div className="pt-2 flex flex-wrap gap-2">
+                          <span className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-700">
+                            {slides[activeSlidePreviewIdx].ctaText || 'Primary CTA'}
                           </span>
-                        )}
+                          {slides[activeSlidePreviewIdx].secondaryCtaText && (
+                            <span className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-300 bg-slate-800 border border-slate-700">
+                              {slides[activeSlidePreviewIdx].secondaryCtaText}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="relative z-10 flex items-center justify-between p-3 rounded-lg bg-slate-950/80 border border-amber-400/30 text-amber-300 text-xs">
+                        <span className="font-bold">Text Overlay: OFF (Pure Media Mode)</span>
+                        <span className="text-[10px] text-slate-400">Media shown full-bleed without text or buttons</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1668,7 +1701,24 @@ export const AdminCMSView: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
+                      {/* Independent Text Overlay Control */}
+                      <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-slate-300 cursor-pointer shadow-2xs hover:border-amber-400 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={slide.showTextOverlay !== false}
+                          onChange={(e) => updateSlide(idx, 'showTextOverlay', e.target.checked)}
+                          className="rounded text-amber-500 focus:ring-amber-400"
+                        />
+                        <span className="text-[11px]">
+                          Text Overlay: {slide.showTextOverlay !== false ? (
+                            <span className="text-emerald-700 font-extrabold">ON</span>
+                          ) : (
+                            <span className="text-slate-400 font-extrabold">OFF (Pure Media)</span>
+                          )}
+                        </span>
+                      </label>
+
                       <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
                         <input
                           type="checkbox"
@@ -1690,6 +1740,15 @@ export const AdminCMSView: React.FC = () => {
                       )}
                     </div>
                   </div>
+
+                  {/* Notice when Text Overlay is OFF */}
+                  {slide.showTextOverlay === false && (
+                    <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-[11px] flex items-center justify-between">
+                      <span className="font-semibold">
+                        Pure Media Mode: Headline, subtitle, and CTA buttons are hidden for this slide. The image or video will be displayed cleanly without empty space or placeholders.
+                      </span>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>

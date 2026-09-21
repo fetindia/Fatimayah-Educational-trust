@@ -63,10 +63,13 @@ import { AdminMembershipApplicationsView } from './AdminMembershipApplicationsVi
 import { AdminCoreMembersView } from './AdminCoreMembersView';
 import { AdminCampaignManagementView } from './AdminCampaignManagementView';
 import { AdminReportsAnalyticsView } from './AdminReportsAnalyticsView';
+import { AssignExamRoleModal } from './exam/AssignExamRoleModal';
 import { AdminDonorsManagementView } from './AdminDonorsManagementView';
 import { AdminFinanceAccountingView } from './AdminFinanceAccountingView';
 import { AdminStaffHRMSView } from './AdminStaffHRMSView';
 import { AdminCMSView } from './AdminCMSView';
+import { AdminManualDonationSettings } from './settings/AdminManualDonationSettings';
+import { AdminQuranicVersesSettings } from './settings/AdminQuranicVersesSettings';
 import { UserProfile, UserRole, AuditLog, AppPermission } from '../../types';
 import { ROLE_DEFINITIONS, getRoleMetadata } from '../../lib/rbac';
 
@@ -97,6 +100,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   const [selectedUserForProfile, setSelectedUserForProfile] = useState<UserProfile | null>(null);
   const [selectedUserForEdit, setSelectedUserForEdit] = useState<UserProfile | null>(null);
   const [selectedUserForStatus, setSelectedUserForStatus] = useState<UserProfile | null>(null);
+  const [selectedUserForExamRole, setSelectedUserForExamRole] = useState<UserProfile | null>(null);
   const [statusActionReason, setStatusActionReason] = useState<string>('');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
   const [isSavingUserEdit, setIsSavingUserEdit] = useState<boolean>(false);
@@ -910,6 +914,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                   <option value="member">Member</option>
                   <option value="volunteer">Volunteer</option>
                   <option value="donor">Donor</option>
+                  <option value="exam_controller">Exam Controller</option>
+                  <option value="examiner">Examiner</option>
                   <option value="core_member">Core Member</option>
                   <option value="administrator">Administrator</option>
                   <option value="super_admin">Super Admin</option>
@@ -1010,6 +1016,27 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                           </td>
                           <td className="py-3 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => setSelectedUserForExamRole(u)}
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 border ${
+                                  u.roles?.includes('exam_controller')
+                                    ? 'text-purple-800 bg-purple-100 hover:bg-purple-200 border-purple-300'
+                                    : u.roles?.includes('examiner')
+                                    ? 'text-indigo-800 bg-indigo-100 hover:bg-indigo-200 border-indigo-300'
+                                    : 'text-purple-700 bg-purple-50 hover:bg-purple-100 border-purple-200'
+                                }`}
+                                title="Assign or Manage Examination Access (Examiner / Exam Controller)"
+                              >
+                                <Award className="w-3.5 h-3.5 text-purple-600" />
+                                <span>
+                                  {u.roles?.includes('exam_controller')
+                                    ? 'Exam Controller'
+                                    : u.roles?.includes('examiner')
+                                    ? 'Examiner'
+                                    : 'Assign Exam Role'}
+                                </span>
+                              </button>
+
                               <button
                                 onClick={() => setSelectedUserForProfile(u)}
                                 className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors cursor-pointer"
@@ -1195,7 +1222,15 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         {/* TAB 5: SYSTEM SETTINGS (FOUNDATION) */}
         {/* ------------------------------------------------------------- */}
         {activeTab === 'settings' && (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 sm:p-8 space-y-6" id="super-admin-settings-section">
+          <div className="space-y-8" id="super-admin-settings-section">
+            {/* Official Qur'anic Verses Registry */}
+            <AdminQuranicVersesSettings />
+
+            {/* Dedicated Manual Donation & Bank Transfer Control Center */}
+            <AdminManualDonationSettings />
+
+            {/* System Infrastructure & Operating Parameters */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 sm:p-8 space-y-6">
             
             <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
               <div>
@@ -1308,6 +1343,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
 
             </div>
 
+          </div>
           </div>
         )}
 
@@ -1771,6 +1807,20 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
           </div>
         </div>
       )}
+
+      {/* Dedicated Examination Role Assignment Modal */}
+      <AssignExamRoleModal
+        isOpen={Boolean(selectedUserForExamRole)}
+        onClose={() => setSelectedUserForExamRole(null)}
+        targetUser={selectedUserForExamRole}
+        onSuccess={(updatedUser) => {
+          setUsers(prev => prev.map(u => u.uid === updatedUser.uid ? updatedUser : u));
+          setStatusMessage({
+            type: 'success',
+            text: `Successfully updated examination clearance for ${updatedUser.email}.`
+          });
+        }}
+      />
 
     </div>
   );

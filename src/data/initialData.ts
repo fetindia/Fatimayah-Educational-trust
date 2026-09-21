@@ -8,7 +8,9 @@
  * Website: FETIndia.com
  */
 
-import { OrgConfig, ModuleChapter, NavigationMenuItem } from '../types';
+import { OrgConfig, ModuleChapter, NavigationMenuItem, AboutTrustContentConfig, TrusteeProfile, OfficialSignatoryConfig } from '../types';
+import { DEFAULT_ROLE_QURANIC_VERSES } from './quranicVerses';
+export { DEFAULT_ROLE_QURANIC_VERSES };
 
 export const DEFAULT_NAV_MENU: NavigationMenuItem[] = [
   {
@@ -32,11 +34,27 @@ export const DEFAULT_NAV_MENU: NavigationMenuItem[] = [
     ]
   },
   {
+    id: 'nav-donate',
+    label: 'Donate Now',
+    target: 'donate',
+    isEnabled: true,
+    order: 3,
+    badge: '80G Exemption',
+    subItems: [
+      { id: 'sub-don-general', label: 'General Donation / Sadaqah', target: 'donate_general', isEnabled: true },
+      { id: 'sub-don-zakat', label: 'Zakat Fund & Calculator', target: 'donate_zakat', isEnabled: true },
+      { id: 'sub-don-fitrah', label: 'Fitrah & Ramadan Aid', target: 'donate_fitrah', isEnabled: true },
+      { id: 'sub-don-property', label: 'Land / Property Donation', target: 'donate_property', isEnabled: true },
+      { id: 'sub-don-material', label: 'Material & In-Kind Contribution', target: 'donate_material', isEnabled: true },
+      { id: 'sub-don-other', label: 'Other Contributions', target: 'donate_other', isEnabled: true }
+    ]
+  },
+  {
     id: 'nav-examination',
     label: 'Examination',
     target: 'examinations',
     isEnabled: true,
-    order: 3,
+    order: 4,
     badge: 'Open',
     subItems: [
       { id: 'sub-exam-portal', label: 'Examination', target: 'examinations', isEnabled: true },
@@ -49,7 +67,7 @@ export const DEFAULT_NAV_MENU: NavigationMenuItem[] = [
     label: 'Programs & Welfare',
     target: 'programs',
     isEnabled: true,
-    order: 4,
+    order: 5,
     subItems: [
       { id: 'sub-prog-support', label: 'Support Education & Scholars', target: 'education_support', isEnabled: true },
       { id: 'sub-prog-flagship', label: 'Flagship Educational Initiatives', target: 'programs', isEnabled: true },
@@ -60,52 +78,286 @@ export const DEFAULT_NAV_MENU: NavigationMenuItem[] = [
   {
     id: 'nav-crowdfunding',
     label: 'Appeals (80G)',
-    target: 'crowdfunding',
+    target: 'appeals',
     isEnabled: true,
-    order: 5,
+    order: 6,
     badge: 'Tax Free',
     subItems: [
-      { id: 'sub-crowd-urgent', label: 'Urgent Appeals (80G)', target: 'crowdfunding', isEnabled: true },
-      { id: 'sub-crowd-featured', label: 'Featured Cases', target: 'featured_cases', isEnabled: true }
+      { id: 'sub-crowd-urgent', label: 'All Active Appeals (80G)', target: 'appeals', isEnabled: true },
+      { id: 'sub-crowd-featured', label: 'Featured Emergency Cases', target: 'appeals', isEnabled: true }
     ]
   },
   {
     id: 'nav-membership',
     label: 'Membership',
-    target: 'volunteer_membership',
+    target: 'membership',
     isEnabled: true,
-    order: 6,
+    order: 7,
     subItems: [
-      { id: 'sub-mem-apply', label: 'Apply for Membership', target: 'volunteer_membership', isEnabled: true },
-      { id: 'sub-mem-core', label: 'Core Member Accreditation', target: 'volunteer_membership', isEnabled: true }
+      { id: 'sub-mem-apply', label: 'Trust Membership Tiers', target: 'membership', isEnabled: true },
+      { id: 'sub-mem-core', label: 'Verify Member ID Card', target: 'membership', isEnabled: true }
     ]
   },
   {
     id: 'nav-volunteer',
-    label: 'Volunteer',
-    target: 'volunteer_membership',
+    label: 'Volunteers',
+    target: 'volunteers',
     isEnabled: true,
-    order: 7
+    order: 8
   },
   {
     id: 'nav-events',
     label: 'Events & News',
-    target: 'events_blog',
+    target: 'events_news',
     isEnabled: true,
-    order: 8,
+    order: 9,
     subItems: [
-      { id: 'sub-events-all', label: 'Upcoming Trust Events', target: 'events_blog', isEnabled: true },
-      { id: 'sub-events-news', label: 'News & Blogs', target: 'news_blogs', isEnabled: true }
+      { id: 'sub-events-all', label: 'Official Events Calendar', target: 'events_news', isEnabled: true },
+      { id: 'sub-events-news', label: 'News Releases & Circulars', target: 'events_news', isEnabled: true }
     ]
   },
   {
     id: 'nav-contact',
     label: 'Contact',
-    target: 'mission_cta',
+    target: 'contact',
     isEnabled: true,
-    order: 9
+    order: 10
   }
 ];
+
+export const DEFAULT_ABOUT_TRUST_CONFIG: AboutTrustContentConfig = {
+  // 1. Institutional Overview
+  overviewIntroduction: 'Fatimyah Educational Trust (FET India) is a distinguished public charitable and educational trust established in 1994 under the Bombay Public Trusts Act, 1950. Driven by our foundational motto "Education • Service • Empowerment", the Trust is committed to eliminating socio-economic barriers for deserving scholars, modernizing grassroots education, and delivering transparent humanitarian welfare.',
+  purpose: 'To advance quality modern and ethical education, establish accessible academic institutions, provide merit-cum-means scholarships, deliver prompt humanitarian relief, and cultivate self-reliant community ecosystems with unyielding statutory transparency.',
+  educationalWorkSummary: 'Comprehensive scholarship disbursement for higher, technical, and medical education; curriculum enrichment and STEM modernization in traditional seminaries; establishment of digital libraries, vocational institutes, and competitive talent examination networks across India.',
+  welfareWorkSummary: 'Targeted healthcare interventions including dialysis support, emergency surgical sponsorships, widow pensions, winter relief packages, and zero-leakage micro-aid delivery directly to verified beneficiaries.',
+  communityServiceSummary: 'Empowering marginalized households through skill acquisition centers, legal literacy clinics, youth mentorship camps, and community-led disaster relief initiatives.',
+  empowermentObjectives: 'Fostering financial independence for women through accredited vocational diplomas, career counseling for first-generation learners, and incubation of community enterprise initiatives.',
+  areasOfWork: [
+    'Higher Education & Research Grants',
+    'Madrasa STEM & Digital Laboratories',
+    'National Talent Search Competitions',
+    'Critical Healthcare & Dialysis Subsidies',
+    'Women\'s Vocational Empowerment',
+    'Zero-Leakage Humanitarian Relief',
+    'Disaster Rehabilitation',
+    'Community Legal & Career Guidance'
+  ],
+
+  // 2. Mission & Objectives
+  missionStatement: 'To illuminate every household through the power of quality education, ethical stewardship, and dignified empowerment, ensuring that no aspiring student is deprived of their academic potential due to financial adversity.',
+  visionStatement: 'An equitable and enlightened society where educational excellence, compassionate welfare, and transparent institutional accountability uplift generations towards enduring self-reliance and civic contribution.',
+  coreObjectives: [
+    'Provide merit-based financial aid and tuition scholarships to economically disadvantaged students across India.',
+    'Modernize educational pedagogy through STEM laboratories, digital smart classes, and skill certifications.',
+    'Deliver direct, zero-leakage humanitarian healthcare subsidies and life-saving medical interventions.',
+    'Empower women and youth through vocational training centers, craft cooperatives, and career mentorship.',
+    'Maintain impeccable fiduciary compliance, external statutory audits, and 100% public donor transparency.'
+  ],
+  educationObjectives: [
+    'Annual higher education fee sponsorship for undergraduate, postgraduate, engineering, and medical candidates.',
+    'Pan-India FET Talent Search Competitions with cash awards, merit citations, and mentorship fellowships.',
+    'Accredited teachers\' pedagogy training and continuous faculty development workshops in partner institutions.'
+  ],
+  welfareObjectives: [
+    'Subsidized dialysis and life-critical treatment funds with direct institutional transfer to accredited hospitals.',
+    'Emergency disaster response and relief drives delivering nutrition, medicine, and temporary shelter.',
+    'Orphan educational guardianship and monthly subsistence stipends for vulnerable single-parent households.'
+  ],
+  communityDevelopment: 'Establishing multi-purpose community resource centers that integrate academic tutoring, health screening camps, legal awareness kiosks, and civic development workshops.',
+  serviceEmpowerment: 'Championing human dignity by transforming aid recipients into self-sufficient contributors through market-linked vocational trades, apprenticeship placements, and micro-grant mentorship.',
+  longTermGoals: [
+    'Establishing state-of-the-art FET University and autonomous research centers by 2030.',
+    'Expanding digital STEM access to over 100,000 students across 27 regional chapter networks.',
+    'Attaining a self-sustaining corpus fund with 100% endowment-backed scholarships.'
+  ],
+
+  // 3. Governance & Structure
+  governanceDescription: 'The Trust operates under a sovereign, 6-tier institutional governance framework designed to uphold fiduciary integrity, operational decentralization, and democratic oversight. Strategic policy decisions are ratified by the Board of Trustees, guided by the Advisory Council, and executed through specialized administrative wings and regional chapter coordinators.',
+  structureTiers: [
+    { tierNumber: 1, title: 'Board of Trustees', bodyName: 'Apex Governing Authority', description: 'Ultimate legal, fiduciary, and policy custodianship; statutory compliance and asset management under the Public Trusts Act.' },
+    { tierNumber: 2, title: 'Advisory Council', bodyName: 'Eminent Scholars & Jurists', description: 'Non-executive advisory body providing visionary counsel, ethical oversight, and strategic roadmap calibration.' },
+    { tierNumber: 3, title: 'Central Secretariat', bodyName: 'Executive Administration', description: 'Day-to-day administrative execution, inter-departmental coordination, statutory filings, and chapter liaison.' },
+    { tierNumber: 4, title: 'Academic Board', bodyName: 'Curriculum & Examination Directorate', description: 'Scholarship evaluation, competitive syllabus drafting, examination conduct, and university accreditation.' },
+    { tierNumber: 5, title: 'Welfare & Healthcare Wing', bodyName: 'Social Assistance Directorate', description: 'Beneficiary ground verification, medical committee evaluations, hospital billing audits, and relief distribution.' },
+    { tierNumber: 6, title: 'Regional Chapter Coordinators', bodyName: 'Field Operations Network', description: 'Grassroots implementation across 27 state and district chapters ensuring last-mile delivery and community engagement.' }
+  ],
+
+  // 4. RBAC, Roles & Responsibilities Public Explanation
+  rbacDescription: 'FET India enforces an advanced 14-role Role-Based Access Control (RBAC) architecture. This operational model balances executive sovereignty with rigorous separation of duties, ensuring every administrative action, disbursement, and curriculum change is compartmentalized, verifiable, and protected.',
+  rolesOverview: [
+    { roleKey: 'super_admin', roleTitle: 'Super Admin', responsibility: 'Apex Platform Custodian', scope: 'Sovereign governance over platform modules, dynamic CMS configuration, role assignment, and institutional audits.' },
+    { roleKey: 'education_admin', roleTitle: 'Education Admin', responsibility: 'Academic & Scholarship Director', scope: 'Manages scholarship pipelines, madrasa modernization, institution registrations, and curriculum audits.' },
+    { roleKey: 'volunteer_admin', roleTitle: 'Volunteer Admin', responsibility: 'Field Force Commander', scope: 'Mobilizes volunteer force, validates onboarding, assigns chapter missions, and issues volunteer credentials.' },
+    { roleKey: 'member_admin', roleTitle: 'Member Admin', responsibility: 'Registrar of Members', scope: 'Verifies membership applications, oversees digital ID card lifecycle, and manages general assembly records.' },
+    { roleKey: 'donor_admin', roleTitle: 'Donor Admin', responsibility: 'Philanthropic Relations & 80G', scope: 'Oversees donor contributions, issues Form 10BE tax receipts, and ensures statutory compliance for donations.' },
+    { roleKey: 'crowdfunding_admin', roleTitle: 'Crowdfunding Admin', responsibility: 'Appeals & Relief Inspector', scope: 'Inspects verified medical and educational appeals, monitors fund targets, and verifies patient documentation.' },
+    { roleKey: 'exam_admin', roleTitle: 'Exam Admin', responsibility: 'National Examination Commissioner', scope: 'Schedules competitions, manages question banks, monitors exam centers, and certifies student scorecards.' },
+    { roleKey: 'examiner', roleTitle: 'Examiner', responsibility: 'Academic Evaluator', scope: 'Evaluates candidate submissions, enters verified marks into the portal, and records evaluation logs.' },
+    { roleKey: 'exam_controller', roleTitle: 'Exam Controller', responsibility: 'Examination Integrity Officer', scope: 'Validates exam room rosters, inspects center security, oversees attendance logs, and countersigns results.' },
+    { roleKey: 'school_admin', roleTitle: 'School ERP Admin', responsibility: 'Institutional Operations Lead', scope: 'Manages school academic calendars, student enrollment, fee structures, and parent-teacher communication.' },
+    { roleKey: 'madrasa_admin', roleTitle: 'Madrasa ERP Admin', responsibility: 'Seminary Modernization Director', scope: 'Oversees traditional madrasa databases, STEM lab integration, computer science syllabus, and faculty records.' },
+    { roleKey: 'finance_admin', roleTitle: 'Finance & Accounts Admin', responsibility: 'Chief Financial Officer', scope: 'Double-entry general ledgers, voucher ratifications, banking reconciliations, and annual statutory audit files.' },
+    { roleKey: 'hr_admin', roleTitle: 'HRMS & Staff Admin', responsibility: 'Human Resources & Payroll', scope: 'Oversees trust staff contracts, attendance, payroll processing, performance appraisals, and service records.' },
+    { roleKey: 'blog_admin', roleTitle: 'Blog & Media Admin', responsibility: 'Public Relations & Press Officer', scope: 'Publishes official trust communiqués, press releases, circulars, research articles, and newsletter dispatches.' }
+  ],
+
+  // 5. History & Milestones
+  historyDescription: 'From a modest community initiative in 1994 to a nationwide institutional network, the journey of Fatimyah Educational Trust reflects over three decades of unwavering perseverance, philanthropic dedication, and statutory excellence.',
+  milestones: [
+    { id: 'm-1994', year: '1994', title: 'Founding & Legal Registration', description: 'Trust formally registered under the Bombay Public Trusts Act, 1950 in Mumbai to provide structured educational assistance to vulnerable youth.', category: 'Foundation', isKeyMilestone: true },
+    { id: 'm-1998', year: '1998', title: 'First Higher Education Scholarship Cohort', description: 'Disbursed full undergraduate engineering and medical scholarships to 150 deserving students across Maharashtra.', category: 'Education', isKeyMilestone: false },
+    { id: 'm-2004', year: '2004', title: 'Income Tax 12A & 80G Recognition', description: 'Accorded perpetual tax-exempt charitable status under Section 12A and 50% donor tax exemption under Section 80G.', category: 'Legal', isKeyMilestone: true },
+    { id: 'm-2011', year: '2011', title: 'Madrasa STEM Modernization Pilot', description: 'Launched comprehensive pilot to equip traditional madrasas with computer laboratories, English language software, and certified science teachers.', category: 'Education', isKeyMilestone: false },
+    { id: 'm-2017', year: '2017', title: 'FET National Talent Search Launch', description: 'Inauguration of nationwide merit examinations providing cash awards, scholastic citations, and direct mentorship.', category: 'Education', isKeyMilestone: true },
+    { id: 'm-2021', year: '2021', title: 'NITI Aayog NGO Darpan Registration', description: 'Accredited with NITI Aayog NGO Darpan Portal (MH/2021/028914) enabling structured developmental and welfare collaborations.', category: 'Legal', isKeyMilestone: false },
+    { id: 'm-2024', year: '2024', title: '30-Year Jubilee & Milestone of 40,000+ Scholars', description: 'Celebrated three decades of uninterrupted community service, having directly supported over 42,000 scholars and 14 academic institutions.', category: 'Foundation', isKeyMilestone: true },
+    { id: 'm-2026', year: '2026', title: 'Sovereign Digital Trust Platform & 27-Module Cloud Engine', description: 'Deployment of the unified digital governance portal featuring Form 10BE instant issuance, biometric volunteer cards, and real-time ledger transparency.', category: 'Digital', isKeyMilestone: true }
+  ],
+
+  // 6. Legal & Tax Status
+  registrationAuthority: 'Office of the Charity Commissioner, Greater Mumbai Region',
+  registrationDate: '12th April 1994',
+  panNumberPublic: 'AAATF1234A',
+  darpanNgoId: 'MH/2021/028914',
+  section12ADetails: 'Registration under Section 12A of the Income Tax Act, 1961 (Order No: AAATF1234AE20214) granting perpetual charitable status.',
+  section80GDetails: 'Certified under Section 80G(5)(vi) of the Income Tax Act, 1961 (Order No: AAATF1234AF20216). All contributions are entitled to 50% statutory tax deduction.',
+  fcraStatus: 'Registered under Foreign Contribution (Regulation) Act, 2010 (FCRA-083780912) for compliant cross-border philanthropic development.',
+  taxDeductionNote: 'Tax exemption certificates in official Form 10BE format are generated dynamically with unique verification QR codes and certified digital signatures.',
+  complianceStatement: 'Fully compliant with all reporting mandates under the Bombay Public Trusts Act 1950, Ministry of Corporate Affairs, Income Tax Department, and NITI Aayog guidelines.',
+
+  // 7. Leadership, Chairman & Trustees
+  chairmanProfile: {
+    id: 'tr-chair',
+    name: 'Janab Syed Ali Raza Zaidi',
+    designation: 'Chairman & Managing Trustee',
+    isChairman: true,
+    photoUrl: '',
+    overview: 'Senior philanthropist, educationist, and founding trustee with over 35 years of devoted public leadership in educational reform.',
+    biography: 'Dedicated his life to fostering modern educational equity across rural and semi-urban India. Under his visionary stewardship, the Trust expanded from an educational relief society into an accredited nationwide network serving over 42,000 scholars.',
+    vision: 'To build an enlightened, self-sustaining generation grounded in modern scientific acumen and timeless ethical responsibility.',
+    message: 'Education is not merely an individual accomplishment; it is the collective lifeline of community dignity. At Fatimyah Educational Trust, every scholarship awarded and every classroom equipped represents a sacred pledge towards justice, empowerment, and statutory transparency. I urge our youth to embrace knowledge as their greatest virtue and our patrons to champion this noble journey.',
+    responsibilities: [
+      'Apex Institutional Governance & Policy Direction',
+      'Statutory Fiduciary Custodianship & Trust Assets',
+      'Strategic Guidance for Higher Education Initiatives',
+      'National Chapter Relations & Advisory Liaison'
+    ],
+    contactEmail: 'chairman@fetindia.com',
+    contactPhone: '+91 22 2876 5432',
+    displayOrder: 1,
+    isEnabled: true
+  },
+  trustees: [
+    {
+      id: 'tr-2',
+      name: 'Dr. Asadullah Merchant',
+      designation: 'Trustee — Academic Affairs & Research',
+      isChairman: false,
+      photoUrl: '',
+      overview: 'Distinguished academician, former university dean, and researcher with 28 years of pedagogical curriculum design experience.',
+      biography: 'Leads the Academic Board overseeing the scholarship appraisal committee, university accreditation linkages, and madrasa STEM syllabus integration.',
+      vision: 'Transforming classroom learning into practical analytical competence and ethical inquiry.',
+      message: 'Quality education is the great equalizer. Our focus remains steadfast on ensuring deserving scholars reach premier technical and medical institutions.',
+      responsibilities: [
+        'Curriculum Standards & STEM Laboratory Modernization',
+        'Academic Scholarship Selection Committee',
+        'Faculty Development & Pedagogy Workshops'
+      ],
+      contactEmail: 'academic@fetindia.com',
+      displayOrder: 2,
+      isEnabled: true
+    },
+    {
+      id: 'tr-3',
+      name: 'Adv. Fatima Zehra Mirza',
+      designation: 'Trustee — Legal Affairs & Statutory Compliance',
+      isChairman: false,
+      photoUrl: '',
+      overview: 'Senior advocate of the High Court specializing in public trust governance, statutory taxation, and civil jurisprudence.',
+      biography: 'Ensures absolute compliance across all statutory filings, Charity Commissioner mandates, Section 12A/80G renewals, and trust deed covenants.',
+      vision: 'Uncompromising legal transparency and institutional probity as the bedrock of public charity.',
+      message: 'Trusteeship is a sacred fiduciary responsibility. Every donor rupee and every institutional transaction must withstand the highest level of legal scrutiny.',
+      responsibilities: [
+        'Statutory Filings with Charity Commissioner',
+        'Income Tax 12A & 80G Statutory Adherence',
+        'Legal Documentation & Board Resolutions'
+      ],
+      contactEmail: 'legal@fetindia.com',
+      displayOrder: 3,
+      isEnabled: true
+    },
+    {
+      id: 'tr-4',
+      name: 'Janab Haider Abbas Merchant',
+      designation: 'Trustee — Finance, Audit & Accounts',
+      isChairman: false,
+      photoUrl: '',
+      overview: 'Fellow Chartered Accountant with 30 years of corporate finance, internal controls, and forensic audit expertise.',
+      biography: 'Directs the financial ledger system, oversees external statutory audits, ensures zero-leakage beneficiary transfers, and supervises endowment funds.',
+      vision: 'Precision in financial accounting and zero administrative waste.',
+      message: 'Fiduciary discipline is non-negotiable. Our double-entry ledgers and statutory audits guarantee total accountability to donors and society.',
+      responsibilities: [
+        'Annual Statutory Audits & Form 10B Filing',
+        'Internal Financial Controls & Ledger Oversight',
+        'Direct Beneficiary Bank Transfer Verification'
+      ],
+      contactEmail: 'finance@fetindia.com',
+      displayOrder: 4,
+      isEnabled: true
+    },
+    {
+      id: 'tr-5',
+      name: 'Begum Noor Zehra Bilgrami',
+      designation: 'Trustee — Healthcare & Social Welfare',
+      isChairman: false,
+      photoUrl: '',
+      overview: 'Social worker and healthcare advocate heading grassroots welfare, dialysis subsidies, and women’s vocational programs.',
+      biography: 'Pioneered the Trust’s subsidized dialysis scheme and women’s craft cooperatives across Maharashtra and Madhya Pradesh.',
+      vision: 'Restoring dignity to the vulnerable through accessible healthcare and economic self-reliance.',
+      message: 'Compassion must be accompanied by swift, dignified action. We ensure urgent medical relief reaches families in their darkest hour without bureaucracy.',
+      responsibilities: [
+        'Emergency Medical Relief & Dialysis Assistance',
+        'Women’s Vocational Training & Craft Centers',
+        'Disaster Rehabilitation & Field Relief'
+      ],
+      contactEmail: 'welfare@fetindia.com',
+      displayOrder: 5,
+      isEnabled: true
+    }
+  ],
+
+  // 8. Authorized Signatory & Official Institutional Seal
+  signatory: {
+    name: 'Janab Syed Ali Raza Zaidi',
+    designation: 'Chairman & Authorized Signatory',
+    photoUrl: '',
+    signatureUrl: '',
+    signatureEnabled: true,
+    authorizationStatement: 'Duly authorized by Board Resolution No. 04/1994 to sign, execute, and seal all official certificates, statutory tax exemption receipts, and legal communications on behalf of Fatimyah Educational Trust.',
+    termValidUntil: 'Perpetual Board Ratification',
+    officialSealUrl: '',
+    officialSealEnabled: true,
+    sealResolution: 'Board of Trustees Resolution dated 12/04/1994',
+    useOn80GReceipts: true,
+    useOnMembershipCards: true,
+    useOnCertificates: true,
+    useOnOfficialLetters: true
+  },
+
+  // 9. Audit & Transparency
+  auditStatement: 'The financial accounts and institutional balance sheets of Fatimyah Educational Trust are comprehensively audited annually by independent certified Chartered Accountants in accordance with statutory guidelines.',
+  financialTransparency: '100% of public contributions are allocated directly to verified charitable programs and beneficiary grants. Comprehensive annual returns and Form 10B audit reports are submitted punctually to the Charity Commissioner and the Income Tax Department.',
+  auditorFirmName: 'M/s S. K. Merchant & Associates, Chartered Accountants (Firm Reg: 104822W)',
+  annualReturnStatus: 'Statutory returns ratified and filed for FY 2024-25',
+  publicAccountabilityStatement: 'We enforce a strict zero-tolerance policy towards leakage, opaque intermediaries, or unauthorized administrative overhead. Donors are entitled to receive transparent utilization updates for every sponsored initiative.',
+  fundDeploymentRatios: [
+    { category: 'Higher Education & Madrasa Modernization', percentage: 65, description: 'Scholarships, tuition aid, STEM equipment, and curriculum tools' },
+    { category: 'Critical Healthcare & Dialysis Subsidies', percentage: 20, description: 'Direct hospital settlements for dialysis, surgery, and medicines' },
+    { category: 'Community Welfare & Women\'s Vocational Centers', percentage: 10, description: 'Vocational training, micro-grants, and winter relief drives' },
+    { category: 'Administration, Compliance & Digital Governance', percentage: 5, description: 'Statutory audit fees, portal operations, and legal filings' }
+  ]
+};
 
 export const DEFAULT_ORG_CONFIG: OrgConfig = {
   legalName: 'Fatimyah Educational Trust',
@@ -248,8 +500,25 @@ export const DEFAULT_ORG_CONFIG: OrgConfig = {
     branch: 'Mumbai Main Branch',
     accountNumber: '389402019482',
     ifscCode: 'SBIN0000300',
-    upiId: 'fetindia@sbi'
+    accountType: 'Current Account',
+    upiId: 'fetindia@sbi',
+    instructions: 'Donors may transfer contributions directly via NEFT, RTGS, IMPS, or UPI. All direct contributions are eligible for 50% tax exemption under Section 80G.',
+    referenceInstructions: 'After initiating the transfer, please email your transaction reference (UTR) and PAN details to contact@fetindia.com to receive your official Form 10BE tax exemption receipt.',
+    isEnabled: true
   },
+
+  aboutTrust: DEFAULT_ABOUT_TRUST_CONFIG,
+
+  chairmanMessage: {
+    name: DEFAULT_ABOUT_TRUST_CONFIG.chairmanProfile.name,
+    designation: DEFAULT_ABOUT_TRUST_CONFIG.chairmanProfile.designation,
+    photoUrl: DEFAULT_ABOUT_TRUST_CONFIG.chairmanProfile.photoUrl,
+    message: DEFAULT_ABOUT_TRUST_CONFIG.chairmanProfile.message || '',
+    vision: DEFAULT_ABOUT_TRUST_CONFIG.chairmanProfile.vision,
+    leadershipStatement: 'Guiding Fatimyah Educational Trust through three decades of ethical stewardship, educational equity, and transparent public service.'
+  },
+
+  roleQuranicVerses: DEFAULT_ROLE_QURANIC_VERSES,
 
   updatedAt: new Date().toISOString(),
   updatedBy: 'System Bootstrap'
@@ -831,6 +1100,16 @@ export const ADMIN_ROLE_DEFINITIONS: Record<string, { label: string; description
     label: 'Examination Administrator',
     description: 'Conducts talent search examinations, oversees hall ticket dispatch, results evaluation, and digital certifications.',
     badgeColor: 'bg-purple-900 text-purple-100 border-purple-700'
+  },
+  exam_controller: {
+    label: 'Exam Controller',
+    description: 'Lead authority for competition & examination governance, schedule, paper approval, results calculation, publication, and certificates.',
+    badgeColor: 'bg-purple-900 text-purple-100 border-purple-700'
+  },
+  examiner: {
+    label: 'Examiner',
+    description: 'Academic examiner for question banks, paper drafts, candidate evaluations, and answer sheet grading.',
+    badgeColor: 'bg-indigo-900 text-indigo-100 border-indigo-700'
   },
   school_admin: {
     label: 'School Administrator',

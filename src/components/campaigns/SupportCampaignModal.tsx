@@ -39,6 +39,7 @@ import {
   RazorpayPublicConfig,
   PaymentVerificationResult
 } from '../../lib/razorpay';
+import { PrintableDonationReceiptModal } from '../donor/PrintableDonationReceiptModal';
 
 interface SupportCampaignModalProps {
   campaign: CrowdfundingCampaign | null;
@@ -83,6 +84,7 @@ export const SupportCampaignModal: React.FC<SupportCampaignModalProps> = ({
   const [recordedTxnId, setRecordedTxnId] = useState<string>('');
   const [verifiedPayment, setVerifiedPayment] = useState<PaymentVerificationResult | null>(null);
   const [gatewayConfig, setGatewayConfig] = useState<RazorpayPublicConfig | null>(null);
+  const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
 
   React.useEffect(() => {
     fetchRazorpayConfig().then(setGatewayConfig).catch(console.warn);
@@ -110,17 +112,21 @@ export const SupportCampaignModal: React.FC<SupportCampaignModalProps> = ({
     setTimeout(() => setCopiedBank(false), 2000);
   };
 
+  const isBankTransferEnabled = config.bankDetails?.isEnabled !== false;
   const bank = {
-    accountName: config.bankDetails?.accountBeneficiary || 'Fatimyah Educational Trust',
+    accountName: config.bankDetails?.accountBeneficiary || config.legalName || 'Fatimyah Educational Trust',
     accountNumber: config.bankDetails?.accountNumber || '389402019482',
     ifscCode: config.bankDetails?.ifscCode || 'SBIN0000300',
     bankName: config.bankDetails?.bankName || 'State Bank of India',
-    branch: config.bankDetails?.branch || 'Main Branch, Hyderabad',
-    upiId: config.bankDetails?.upiId || 'fetindia@sbi'
+    branch: config.bankDetails?.branch || 'Mumbai Main Branch',
+    accountType: config.bankDetails?.accountType || 'Current Account',
+    upiId: config.bankDetails?.upiId || 'fetindia@sbi',
+    instructions: config.bankDetails?.instructions,
+    referenceInstructions: config.bankDetails?.referenceInstructions
   };
 
   // UPI URL payload for instant payments
-  const upiPayUri = `upi://pay?pa=${encodeURIComponent(bank.upiId)}&pn=${encodeURIComponent(config.legalName || 'Fatimyah Educational Trust')}&am=${amount}&cu=INR&tn=${encodeURIComponent(`Donation for ${campaign.campaignNumber || campaign.title.slice(0, 20)}`)}`;
+  const upiPayUri = `upi://pay?pa=${encodeURIComponent(bank.upiId || 'fetindia@sbi')}&pn=${encodeURIComponent(config.legalName || 'Fatimyah Educational Trust')}&am=${amount}&cu=INR&tn=${encodeURIComponent(`Donation for ${campaign.campaignNumber || campaign.title.slice(0, 20)}`)}`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiPayUri)}`;
 
   const handlePayWithRazorpay = async (preferredMethod: 'all' | 'upi' | 'qr' = 'all') => {
@@ -316,16 +322,15 @@ export const SupportCampaignModal: React.FC<SupportCampaignModalProps> = ({
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-3">
-              {verifiedPayment && (
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="px-6 py-2.5 rounded-2xl bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs transition-all shadow-sm cursor-pointer flex items-center gap-2"
-                >
-                  <Printer className="w-4 h-4 text-amber-300" />
-                  <span>Print 80G Receipt</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setShowReceiptModal(true)}
+                className="px-6 py-2.5 rounded-2xl bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs transition-all shadow-sm cursor-pointer flex items-center gap-2"
+                id="view-campaign-donation-receipt-btn"
+              >
+                <Printer className="w-4 h-4 text-amber-300" />
+                <span>View / Print / Download 80G Receipt</span>
+              </button>
               <button
                 type="button"
                 onClick={handleModalClose}
@@ -383,80 +388,99 @@ export const SupportCampaignModal: React.FC<SupportCampaignModalProps> = ({
             </div>
 
             {/* Institutional Trust Account / Direct Bank Transfer Instructions */}
-            <div className="p-5 rounded-3xl bg-slate-900 text-white space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Building className="w-4 h-4 text-emerald-400" />
-                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-200">
-                    FET India Direct Bank Transfer / UPI
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowQrCode(!showQrCode)}
-                  className="text-[10px] bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/40 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition-colors"
-                >
-                  <QrCode className="w-3.5 h-3.5" />
-                  <span>{showQrCode ? 'Hide QR Code' : 'Scan UPI QR'}</span>
-                </button>
-              </div>
-
-              {/* QR Code Section */}
-              {showQrCode && (
-                <div className="bg-white p-4 rounded-2xl flex flex-col items-center justify-center text-slate-900 space-y-2">
-                  <img 
-                    src={qrCodeUrl} 
-                    alt="UPI Payment QR Code" 
-                    className="w-40 h-40 border border-slate-200 rounded-xl"
-                  />
-                  <p className="text-[11px] font-bold text-slate-700">Scan using GPay, PhonePe, Paytm, or BHIM</p>
-                  <p className="text-[10px] text-slate-500 font-mono">Amount preset to ₹{amount.toLocaleString('en-IN')}</p>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div className="bg-slate-800/80 p-3 rounded-2xl space-y-1">
-                  <span className="text-[10px] text-slate-400 block font-medium">Account Name</span>
-                  <p className="font-bold text-white truncate">{bank.accountName}</p>
-                  <span className="text-[10px] text-slate-400 block font-medium mt-2">Account Number</span>
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono font-bold text-amber-300">{bank.accountNumber}</span>
+            {isBankTransferEnabled ? (
+              <div className="p-5 rounded-3xl bg-slate-900 text-white space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Building className="w-4 h-4 text-emerald-400" />
+                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-200">
+                      FET India Direct Bank Transfer / UPI
+                    </h3>
+                  </div>
+                  {bank.upiId ? (
                     <button
                       type="button"
-                      onClick={() => handleCopyAccount(bank.accountNumber)}
-                      className="p-1 text-slate-400 hover:text-white"
-                      title="Copy Account Number"
+                      onClick={() => setShowQrCode(!showQrCode)}
+                      className="text-[10px] bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/40 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition-colors"
                     >
-                      <Copy className="w-3 h-3" />
+                      <QrCode className="w-3.5 h-3.5" />
+                      <span>{showQrCode ? 'Hide QR Code' : 'Scan UPI QR'}</span>
                     </button>
+                  ) : null}
+                </div>
+
+                {/* QR Code Section */}
+                {showQrCode && bank.upiId && (
+                  <div className="bg-white p-4 rounded-2xl flex flex-col items-center justify-center text-slate-900 space-y-2">
+                    <img 
+                      src={qrCodeUrl} 
+                      alt="UPI Payment QR Code" 
+                      className="w-40 h-40 border border-slate-200 rounded-xl"
+                    />
+                    <p className="text-[11px] font-bold text-slate-700">Scan using GPay, PhonePe, Paytm, or BHIM</p>
+                    <p className="text-[10px] text-slate-500 font-mono">Amount preset to ₹{amount.toLocaleString('en-IN')}</p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="bg-slate-800/80 p-3 rounded-2xl space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400 block font-medium">Beneficiary</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">
+                        {bank.accountType}
+                      </span>
+                    </div>
+                    <p className="font-bold text-white truncate">{bank.accountName}</p>
+                    <span className="text-[10px] text-slate-400 block font-medium mt-2">Account Number</span>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-bold text-amber-300">{bank.accountNumber}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyAccount(bank.accountNumber)}
+                        className="p-1 text-slate-400 hover:text-white"
+                        title="Copy Account Number"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-800/80 p-3 rounded-2xl space-y-1">
+                    <span className="text-[10px] text-slate-400 block font-medium">IFSC / Branch</span>
+                    <p className="font-mono font-bold text-white">{bank.ifscCode}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{bank.bankName} • {bank.branch}</p>
+                    {bank.upiId && (
+                      <>
+                        <span className="text-[10px] text-slate-400 block font-medium mt-2">UPI ID / VPA</span>
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono font-bold text-emerald-300">{bank.upiId}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyAccount(bank.upiId || '')}
+                            className="p-1 text-slate-400 hover:text-white"
+                            title="Copy UPI ID"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
-                <div className="bg-slate-800/80 p-3 rounded-2xl space-y-1">
-                  <span className="text-[10px] text-slate-400 block font-medium">IFSC / Branch</span>
-                  <p className="font-mono font-bold text-white">{bank.ifscCode}</p>
-                  <p className="text-[10px] text-slate-400 truncate">{bank.bankName} • {bank.branch}</p>
-                  <span className="text-[10px] text-slate-400 block font-medium mt-2">UPI ID / VPA</span>
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono font-bold text-emerald-300">{bank.upiId}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleCopyAccount(bank.upiId)}
-                      className="p-1 text-slate-400 hover:text-white"
-                      title="Copy UPI ID"
-                    >
-                      <Copy className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-              </div>
+                {bank.referenceInstructions && (
+                  <p className="text-[10px] text-slate-300 bg-slate-800/60 p-2 rounded-xl">
+                    {bank.referenceInstructions}
+                  </p>
+                )}
 
-              {copiedBank && (
-                <p className="text-[11px] text-emerald-400 text-center font-bold">
-                  ✓ Details copied to clipboard!
-                </p>
-              )}
-            </div>
+                {copiedBank && (
+                  <p className="text-[11px] text-emerald-400 text-center font-bold">
+                    ✓ Details copied to clipboard!
+                  </p>
+                )}
+              </div>
+            ) : null}
 
             {/* Donor Identification & 80G Receipt Fields */}
             <div className="space-y-4">
@@ -645,6 +669,29 @@ export const SupportCampaignModal: React.FC<SupportCampaignModalProps> = ({
         )}
 
       </div>
+
+      {showReceiptModal && (
+        <PrintableDonationReceiptModal
+          isOpen={showReceiptModal}
+          onClose={() => setShowReceiptModal(false)}
+          receipt={{
+            receiptNumber: verifiedPayment?.receiptNumber || `REC/80G/${Date.now().toString().slice(-6)}`,
+            donationDate: new Date().toISOString(),
+            donorName: isAnonymous ? 'Anonymous Well-Wisher' : (donorName || 'Generous Benefactor'),
+            donorEmail: donorEmail || undefined,
+            donorPhone: donorPhone || undefined,
+            donorPan: donorPan || undefined,
+            amount: amount,
+            paymentMode: verifiedPayment?.paymentId ? 'Razorpay Online Gateway' : (paymentMethod || 'Direct Contribution'),
+            transactionReference: verifiedPayment?.paymentId || recordedTxnId || `TRX-${Date.now()}`,
+            paymentGateway: verifiedPayment?.paymentId ? 'Razorpay Verified' : undefined,
+            causeTitle: campaign.title,
+            paymentStatus: verifiedPayment ? 'verified' : 'pending_verification',
+            is80GClaimed: !!donorPan || true
+          }}
+        />
+      )}
+
     </div>
   );
 };

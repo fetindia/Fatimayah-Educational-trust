@@ -21,10 +21,12 @@ import {
   X,
   Sliders,
   Eye,
-  UserCog
+  UserCog,
+  Award,
+  GraduationCap
 } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
-import { db, updateUserRoles, SYSTEM_SUPER_ADMIN_EMAIL } from '../../lib/firebase';
+import { db, updateUserRoles, adminUpdateUserProfile, updateUserAccountStatus, SYSTEM_SUPER_ADMIN_EMAIL } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
   ROLE_DEFINITIONS, 
@@ -34,9 +36,11 @@ import {
   getRoleMetadata 
 } from '../../lib/rbac';
 import { UserProfile, UserRole, AppPermission, CoreRole } from '../../types';
+import { AssignExamRoleModal } from './exam/AssignExamRoleModal';
 
 export const AdminRolesView: React.FC = () => {
   const { currentUser, activeRole, isSuperAdmin, canManageRoles } = useAuth();
+  const [selectedUserForExamRole, setSelectedUserForExamRole] = useState<UserProfile | null>(null);
   const [users, setUsers] = useState<UserProfile[]>([
     {
       uid: 'sys-super-admin-01',
@@ -57,16 +61,24 @@ export const AdminRolesView: React.FC = () => {
   const [editedRoles, setEditedRoles] = useState<UserRole[]>([]);
   const [editedPrimaryRole, setEditedPrimaryRole] = useState<UserRole>('member');
   const [editedCustomPermissions, setEditedCustomPermissions] = useState<AppPermission[]>([]);
+  const [modalTab, setModalTab] = useState<'profile' | 'roles'>('profile');
+  const [editName, setEditName] = useState('');
+  const [editMobile, setEditMobile] = useState('');
+  const [editCity, setEditCity] = useState('');
+  const [editState, setEditState] = useState('');
+  const [editCountry, setEditCountry] = useState('India');
+  const [editStatus, setEditStatus] = useState<'active' | 'suspended'>('active');
   const [activeTab, setActiveTab] = useState<'users' | 'matrix'>('users');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Core 6 initial foundation roles
-  const CORE_ROLES_LIST: CoreRole[] = [
+  // Core foundation roles + examiner role
+  const CORE_ROLES_LIST: UserRole[] = [
     'member',
     'volunteer',
     'donor',
+    'examiner',
     'core_member',
     'administrator',
     'super_admin'
@@ -128,6 +140,13 @@ export const AdminRolesView: React.FC = () => {
     setEditedRoles(userRoles);
     setEditedPrimaryRole(userPrimary);
     setEditedCustomPermissions(u.customPermissions || []);
+    setEditName(u.fullLegalName || u.fullName || u.displayName || '');
+    setEditMobile(u.mobileNumber || u.phoneNumber || '');
+    setEditCity(u.city || u.district || '');
+    setEditState(u.state || '');
+    setEditCountry(u.country || 'India');
+    setEditStatus((u.accountStatus || u.status || 'active') === 'suspended' ? 'suspended' : 'active');
+    setModalTab('profile');
   };
 
   const toggleRole = (role: UserRole) => {
@@ -163,6 +182,7 @@ export const AdminRolesView: React.FC = () => {
     const finalPrimary = finalRoles.includes(editedPrimaryRole) ? editedPrimaryRole : finalRoles[0];
 
     try {
+      // 1. Update roles and permissions in Firestore
       await updateUserRoles(
         selectedUser.uid,
         selectedUser.email,
@@ -176,28 +196,73 @@ export const AdminRolesView: React.FC = () => {
         editedCustomPermissions
       );
 
+      // 2. Update demographic profile details safely (secrets and passwords are never touched)
+      const updatedProfile = await adminUpdateUserProfile(
+        selectedUser.uid,
+        {
+          fullLegalName: editName.trim(),
+          fullName: editName.trim(),
+          displayName: editName.trim(),
+          mobileNumber: editMobile.trim(),
+          phoneNumber: editMobile.trim(),
+          city: editCity.trim(),
+          state: editState.trim(),
+          country: editCountry.trim()
+        },
+        {
+          uid: currentUser.uid,
+          email: currentUser.email || 'superadmin@fetindia.com',
+          primaryRole: activeRole
+        }
+      );
+
+      // 3. Update account status if changed
+      const currentStatus = (selectedUser.accountStatus || selectedUser.status || 'active') === 'suspended' ? 'suspended' : 'active';
+      if (editStatus !== currentStatus) {
+        await updateUserAccountStatus(
+          selectedUser.uid,
+          selectedUser.email,
+          editStatus,
+          {
+            uid: currentUser.uid,
+            email: currentUser.email || 'superadmin@fetindia.com',
+            role: activeRole
+          },
+          `Status modified to ${editStatus} by Super Admin via User Profile & Roles editor`
+        );
+      }
+
       const effectivePerms = getEffectivePermissions(finalRoles, editedCustomPermissions);
 
       // Local optimistic update
       setUsers(prev => prev.map(u => u.uid === selectedUser.uid ? {
         ...u,
+        ...updatedProfile,
+        fullLegalName: editName.trim(),
+        displayName: editName.trim(),
+        mobileNumber: editMobile.trim(),
+        city: editCity.trim(),
+        state: editState.trim(),
+        country: editCountry.trim(),
         roles: finalRoles,
         primaryRole: finalPrimary,
         role: finalPrimary,
         permissions: effectivePerms,
-        customPermissions: editedCustomPermissions
+        customPermissions: editedCustomPermissions,
+        status: editStatus,
+        accountStatus: editStatus
       } : u));
 
       setStatusMsg({
         type: 'success',
-        text: `Successfully updated RBAC roles and permissions for ${selectedUser.email}. Immutable audit record logged.`
+        text: `Successfully updated profile and RBAC permissions for ${selectedUser.email}. Immutable audit record logged.`
       });
       setSelectedUser(null);
     } catch (err: any) {
       console.error(err);
       setStatusMsg({
         type: 'error',
-        text: `Failed to update roles: ${err.message || 'Permission denied by security rules'}`
+        text: `Failed to update user: ${err.message || 'Permission denied by security rules'}`
       });
     } finally {
       setIsSaving(false);
@@ -403,13 +468,37 @@ export const AdminRolesView: React.FC = () => {
                         </span>
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={() => handleSelectUser(u)}
-                          disabled={!canManageRoles}
-                          className="px-3 py-1.5 rounded-lg text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors cursor-pointer disabled:opacity-40"
-                        >
-                          Manage Roles
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => setSelectedUserForExamRole(u)}
+                            disabled={!canManageRoles}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 border disabled:opacity-40 ${
+                              u.roles?.includes('exam_controller')
+                                ? 'text-purple-800 bg-purple-100 hover:bg-purple-200 border-purple-300'
+                                : u.roles?.includes('examiner')
+                                ? 'text-indigo-800 bg-indigo-100 hover:bg-indigo-200 border-indigo-300'
+                                : 'text-purple-700 bg-purple-50 hover:bg-purple-100 border-purple-200'
+                            }`}
+                            title="Assign or Manage Examination Role (Examiner / Exam Controller)"
+                          >
+                            <Award className="w-3.5 h-3.5 text-purple-600" />
+                            <span>
+                              {u.roles?.includes('exam_controller')
+                                ? 'Exam Controller'
+                                : u.roles?.includes('examiner')
+                                ? 'Examiner'
+                                : 'Assign Exam Role'}
+                            </span>
+                          </button>
+
+                          <button
+                            onClick={() => handleSelectUser(u)}
+                            disabled={!canManageRoles}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors cursor-pointer disabled:opacity-40"
+                          >
+                            Manage Roles
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -484,7 +573,7 @@ export const AdminRolesView: React.FC = () => {
           <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between border-b border-slate-100 pb-4">
               <div>
-                <h3 className="text-lg font-bold text-slate-900">Manage User Roles & Permissions</h3>
+                <h3 className="text-lg font-bold text-slate-900">Manage User Account & Permissions</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Target: <strong className="text-slate-800">{selectedUser.fullLegalName || selectedUser.displayName}</strong> ({selectedUser.email})
                 </p>
@@ -497,6 +586,116 @@ export const AdminRolesView: React.FC = () => {
               </button>
             </div>
 
+            {/* Modal Tabs */}
+            <div className="flex border-b border-slate-200 gap-6">
+              <button
+                type="button"
+                onClick={() => setModalTab('profile')}
+                className={`pb-3 text-xs font-bold transition-all border-b-2 cursor-pointer ${
+                  modalTab === 'profile'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Profile & Demographic Info
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalTab('roles')}
+                className={`pb-3 text-xs font-bold transition-all border-b-2 cursor-pointer ${
+                  modalTab === 'roles'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Roles & Clearance Permissions
+              </button>
+            </div>
+
+            {/* TAB 1: Profile & Demographic Details */}
+            {modalTab === 'profile' && (
+              <div className="space-y-4">
+                <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-xl text-[11px] text-indigo-900 flex items-start gap-2">
+                  <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Security Isolation Enforced:</strong> Super Admin can update safe contact and profile demographics. Passwords, auth credentials, and secrets remain securely isolated and never exposed.
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1 sm:col-span-2">
+                    <label className="block text-xs font-bold text-slate-700">Full Legal Name</label>
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      placeholder="e.g. Syed Ali Raza"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-slate-700">Mobile / WhatsApp Number</label>
+                    <input
+                      type="tel"
+                      value={editMobile}
+                      onChange={(e) => setEditMobile(e.target.value)}
+                      placeholder="+91 9876543210"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-slate-700">City / District</label>
+                    <input
+                      type="text"
+                      value={editCity}
+                      onChange={(e) => setEditCity(e.target.value)}
+                      placeholder="e.g. Hyderabad / Lucknow"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-slate-700">State / Region</label>
+                    <input
+                      type="text"
+                      value={editState}
+                      onChange={(e) => setEditState(e.target.value)}
+                      placeholder="e.g. Telangana / Uttar Pradesh"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-slate-700">Country</label>
+                    <input
+                      type="text"
+                      value={editCountry}
+                      onChange={(e) => setEditCountry(e.target.value)}
+                      placeholder="India"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    />
+                  </div>
+
+                  <div className="space-y-1 sm:col-span-2">
+                    <label className="block text-xs font-bold text-slate-700">Account Governance Status</label>
+                    <select
+                      value={editStatus}
+                      onChange={(e) => setEditStatus(e.target.value as 'active' | 'suspended')}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    >
+                      <option value="active">Active (Full system clearance according to role)</option>
+                      <option value="suspended">Suspended (Access locked by Super Administrator)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: Roles & Permissions */}
+            {modalTab === 'roles' && (
+              <>
             {/* Primary Role Selector */}
             <div className="space-y-2">
               <label className="block text-xs font-bold text-slate-800">Primary Role (Default Clearance Level)</label>
@@ -611,6 +810,8 @@ export const AdminRolesView: React.FC = () => {
                 })}
               </div>
             </div>
+            </>
+            )}
 
             {/* Modal Actions */}
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
@@ -637,6 +838,16 @@ export const AdminRolesView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Dedicated Examination Role Assignment Modal */}
+      <AssignExamRoleModal
+        isOpen={Boolean(selectedUserForExamRole)}
+        onClose={() => setSelectedUserForExamRole(null)}
+        targetUser={selectedUserForExamRole}
+        onSuccess={(updatedUser) => {
+          setUsers(prev => prev.map(u => u.uid === updatedUser.uid ? updatedUser : u));
+        }}
+      />
 
     </div>
   );

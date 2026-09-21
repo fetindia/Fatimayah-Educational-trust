@@ -7,19 +7,31 @@
     --color-accent-amber: #D97706;
   }
 
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
   html {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     scroll-behavior: smooth;
     overflow-x: hidden;
+    width: 100%;
     max-width: 100vw;
   }
 
   body {
     overflow-x: hidden;
-    max-width: 100vw;
     width: 100%;
+    max-width: 100vw;
     margin: 0;
     padding: 0;
+    position: relative;
+  }
+
+  #root {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
 }
 
@@ -36,23 +48,40 @@
     display: none !important;
   }
 
-  /* Make print-target visible */
+  /* Make print-targets visible */
   #fet-idcard-print-target, 
-  #fet-idcard-print-target * {
+  #fet-idcard-print-target *,
+  #fet-receipt-print-target,
+  #fet-receipt-print-target *,
+  #fet-certificate-print-target,
+  #fet-certificate-print-target * {
     visibility: visible !important;
   }
 
-  #fet-idcard-print-target {
+  #fet-idcard-print-target,
+  #fet-receipt-print-target,
+  #fet-certificate-print-target {
     display: block !important;
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
-    margin: 0;
-    padding: 20px;
+    margin: 0 auto !important;
+    padding: 15px !important;
     background: #ffffff !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  #fet-receipt-print-target {
+    max-width: 680px !important;
+    margin: 0 auto !important;
+    border: 1.5px solid #064e3b !important;
+  }
+
+  #fet-certificate-print-target {
+    max-width: 900px !important;
+    margin: 0 auto !important;
   }
 
   .print-page-layout {

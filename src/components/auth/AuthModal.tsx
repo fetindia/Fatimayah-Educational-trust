@@ -96,10 +96,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onAuthSuc
     if (errorCode === 'auth/user-disabled') {
       return 'This account has been disabled. Please contact Trust administration.';
     }
-    if (errorCode === 'auth/operation-not-allowed' || rawMsg.includes('operation-not-allowed')) {
-      return 'Email & Password authentication is not enabled in the Firebase Console. You can sign in using "Continue with Google" below.';
+    if (errorCode === 'auth/account-exists-with-different-credential') {
+      return 'An account already exists with this email address using a different sign-in method. Please sign in with your email & password, or use password recovery.';
     }
-    if (errorCode === 'auth/popup-closed-by-user') {
+    if (errorCode === 'auth/unauthorized-domain') {
+      return 'This web domain is not authorized for Firebase Authentication OAuth. Please add this domain under Firebase Console -> Authentication -> Settings -> Authorized domains.';
+    }
+    if (errorCode === 'auth/operation-not-allowed' || rawMsg.includes('operation-not-allowed')) {
+      return 'The requested sign-in provider is not enabled in the Firebase Console. Please verify that Email/Password and Google sign-in are enabled under Firebase Console -> Authentication -> Sign-in method.';
+    }
+    if (errorCode === 'auth/popup-closed-by-user' || errorCode === 'auth/cancelled-popup-request') {
       return '';
     }
     if (errorCode === 'auth/popup-blocked') {

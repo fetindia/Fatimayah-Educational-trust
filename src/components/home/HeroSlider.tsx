@@ -86,9 +86,17 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ onExplorePrograms, onOpe
     }
   ];
 
-  const slides = (config.heroSliders && config.heroSliders.length > 0)
+  const activeSlides = (config.heroSliders && config.heroSliders.length > 0)
     ? config.heroSliders.filter(s => s.isActive && (s.status === undefined || s.status === 'published'))
-    : defaultSlides;
+    : [];
+
+  const slides = activeSlides.length > 0 ? activeSlides : defaultSlides;
+
+  useEffect(() => {
+    if (currentSlideIndex >= slides.length) {
+      setCurrentSlideIndex(0);
+    }
+  }, [slides.length, currentSlideIndex]);
 
   useEffect(() => {
     if (slides.length <= 1 || !isPlaying) return;
@@ -100,7 +108,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ onExplorePrograms, onOpe
 
   if (slides.length === 0) return null;
 
-  const currentSlide = slides[currentSlideIndex] || slides[0];
+  const currentSlide = slides[currentSlideIndex] || slides[0] || defaultSlides[0];
 
   const primaryGreen = config.primaryGreen || '#0D6E42';
   const primaryBlue = config.primaryBlue || '#0B2545';
@@ -160,8 +168,14 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ onExplorePrograms, onOpe
             src={currentSlide.videoUrl}
           />
           {/* Subtle Transparent Directional Gradient for Text Readability without Obscuring Media */}
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/75 via-slate-950/35 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/65 via-transparent to-slate-950/20" />
+          {currentSlide.showTextOverlay !== false ? (
+            <>
+              <div className="absolute inset-0 bg-gradient-to-r from-slate-950/75 via-slate-950/35 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/65 via-transparent to-slate-950/20" />
+            </>
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/30 via-transparent to-slate-950/15 pointer-events-none" />
+          )}
         </div>
       ) : slideBgImage ? (
         <div 
@@ -171,8 +185,14 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ onExplorePrograms, onOpe
           }}
         >
           {/* Subtle Transparent Directional Gradient - Preserves Photographic Brilliance while Framing Text */}
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/75 via-slate-950/35 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/65 via-transparent to-slate-950/20" />
+          {currentSlide.showTextOverlay !== false ? (
+            <>
+              <div className="absolute inset-0 bg-gradient-to-r from-slate-950/75 via-slate-950/35 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/65 via-transparent to-slate-950/20" />
+            </>
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/30 via-transparent to-slate-950/15 pointer-events-none" />
+          )}
         </div>
       ) : (
         <div 
@@ -193,190 +213,236 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ onExplorePrograms, onOpe
         }}
       />
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 pt-8 pb-10 sm:pt-10 sm:pb-12 lg:pt-14 lg:pb-16 space-y-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-center">
-          
-          {/* Main Slide Content (Left 7 Cols) */}
-          <div className="lg:col-span-7 space-y-6">
+      {currentSlide.showTextOverlay !== false ? (
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 pt-8 pb-10 sm:pt-10 sm:pb-12 lg:pt-14 lg:pb-16 space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-center">
             
-            {/* Top Tag & Badge */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-amber-400/30 text-xs font-bold text-amber-300 shadow-sm">
-              <span className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: accentAmber }} />
-              <span>{currentSlide.badgeText || config.tagline}</span>
-            </div>
-
-            {/* Main Headline with Smooth Fade Key */}
-            <h1 
-              key={`slide-title-${currentSlideIndex}`}
-              className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-tight animate-in fade-in duration-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]"
-            >
-              {currentSlide.title}
-            </h1>
-
-            {/* Subtitle */}
-            <p 
-              key={`slide-sub-${currentSlideIndex}`}
-              className="text-xs sm:text-base lg:text-lg text-slate-200 max-w-2xl leading-relaxed animate-in fade-in duration-300 drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
-            >
-              {currentSlide.subtitle}
-            </p>
-
-            {/* Call to Actions */}
-            <div className="pt-2 flex flex-wrap items-center gap-2.5 sm:gap-4">
-              <button
-                onClick={() => handleSlideCta(currentSlide.ctaLink)}
-                className="px-5 sm:px-6 py-3 sm:py-3.5 rounded-2xl text-xs sm:text-sm font-extrabold text-white shadow-xl transition-all hover:scale-105 active:scale-95 flex items-center gap-2 cursor-pointer border border-emerald-400/40"
-                style={{ backgroundColor: primaryGreen }}
-                id="hero-primary-cta"
-              >
-                <GraduationCap className="w-4 h-4 text-amber-300" />
-                <span>{currentSlide.ctaText || 'Explore Educational Programs'}</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-
-              <button
-                onClick={() => handleSlideCta(currentSlide.secondaryCtaLink || '#donate')}
-                className="px-4 sm:px-5 py-3 sm:py-3.5 rounded-2xl text-xs sm:text-sm font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-400 border border-amber-400 transition-all flex items-center gap-2 cursor-pointer shadow-md"
-                id="hero-donate-cta"
-              >
-                <HeartHandshake className="w-4 h-4 text-emerald-950" />
-                <span>{currentSlide.secondaryCtaText || 'Donate (80G)'}</span>
-              </button>
-
-              <button
-                onClick={() => setIsVideoModalOpen(true)}
-                className="px-3.5 sm:px-4 py-3 sm:py-3.5 rounded-2xl text-xs sm:text-sm font-bold text-slate-200 bg-slate-900/90 hover:bg-slate-800 border border-slate-700 transition-all flex items-center gap-2 cursor-pointer shadow-md"
-                id="hero-video-cta"
-              >
-                <Play className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                <span className="whitespace-nowrap">Watch Tour</span>
-              </button>
-            </div>
-
-            {/* Slide Navigation Controls & Counter */}
-            {slides.length > 1 && (
-              <div className="pt-2 flex items-center gap-4 text-xs text-slate-400">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setCurrentSlideIndex(prev => (prev - 1 + slides.length) % slides.length)}
-                    className="p-2 rounded-xl bg-slate-900/90 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-                    aria-label="Previous Slide"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-
-                  <div className="flex items-center gap-1.5">
-                    {slides.map((_, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setCurrentSlideIndex(idx)}
-                        className={`h-2 transition-all rounded-full cursor-pointer ${
-                          idx === currentSlideIndex 
-                            ? 'w-8 bg-amber-400 shadow-sm' 
-                            : 'w-2 bg-slate-700 hover:bg-slate-500'
-                        }`}
-                        aria-label={`Go to slide ${idx + 1}`}
-                      />
-                    ))}
-                  </div>
-
-                  <button
-                    onClick={() => setCurrentSlideIndex(prev => (prev + 1) % slides.length)}
-                    className="p-2 rounded-xl bg-slate-900/90 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-                    aria-label="Next Slide"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="font-mono text-xs font-bold text-slate-400">
-                  <span className="text-amber-300">{String(currentSlideIndex + 1).padStart(2, '0')}</span>
-                  <span className="mx-1 text-slate-600">/</span>
-                  <span>{String(slides.length).padStart(2, '0')}</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Institutional Trust Bento Card (Right 5 Cols) */}
-          <div className="lg:col-span-5">
-            <div className="p-6 sm:p-8 rounded-3xl bg-slate-950/65 backdrop-blur-md border border-white/15 shadow-2xl space-y-6 relative overflow-hidden">
+            {/* Main Slide Content (Left 7 Cols) */}
+            <div className="lg:col-span-7 space-y-6">
               
-              {/* Card Header */}
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-amber-400">
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Statutory Trust Seal</span>
-                </div>
-                <span className="text-[10px] font-extrabold text-emerald-300 bg-emerald-950 px-2.5 py-1 rounded-full border border-emerald-700">
-                  Registered Public Trust
-                </span>
+              {/* Top Tag & Badge */}
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-amber-400/30 text-xs font-bold text-amber-300 shadow-sm">
+                <span className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: accentAmber }} />
+                <span>{currentSlide.badgeText || config.tagline}</span>
               </div>
 
-              {/* Trust Details */}
-              <div className="space-y-2">
-                <h3 className="text-lg font-extrabold text-white tracking-tight">{config.legalName}</h3>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Headquartered in Mumbai, Maharashtra with verified NITI Aayog NGO Darpan credentials, Section 12A full exemption, and Section 80G tax benefit orders.
-                </p>
-              </div>
+              {/* Main Headline with Smooth Fade Key */}
+              <h1 
+                key={`slide-title-${currentSlideIndex}`}
+                className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-tight animate-in fade-in duration-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]"
+              >
+                {currentSlide.title}
+              </h1>
 
-              {/* Compliance & Quick Numbers */}
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-1">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Registration No.</span>
-                  <span className="text-xs font-mono font-extrabold text-amber-300">{config.registrationNumber}</span>
-                </div>
-                <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-1">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">NITI Aayog Darpan</span>
-                  <span className="text-xs font-mono font-extrabold text-emerald-400">{config.nitiAayogId}</span>
-                </div>
-              </div>
+              {/* Subtitle */}
+              <p 
+                key={`slide-sub-${currentSlideIndex}`}
+                className="text-xs sm:text-base lg:text-lg text-slate-200 max-w-2xl leading-relaxed animate-in fade-in duration-300 drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
+              >
+                {currentSlide.subtitle}
+              </p>
 
-              {/* 3 Primary Brand Colors Affirmation */}
-              <div className="pt-2">
-                <div className="text-[10px] font-bold uppercase text-slate-400 mb-2 flex items-center justify-between">
-                  <span>Official Brand Palette</span>
-                  <span className="text-amber-400 font-mono text-[10px]">Triad Harmony</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
-                    <div className="w-full h-3 rounded-md mb-1.5 shadow-xs" style={{ backgroundColor: primaryGreen }} />
-                    <span className="text-[10px] font-extrabold text-emerald-300 block">Emerald</span>
-                    <span className="text-[9px] text-slate-400">Education</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
-                    <div className="w-full h-3 rounded-md mb-1.5 shadow-xs" style={{ backgroundColor: primaryBlue }} />
-                    <span className="text-[10px] font-extrabold text-blue-300 block">Sapphire</span>
-                    <span className="text-[9px] text-slate-400">Governance</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
-                    <div className="w-full h-3 rounded-md mb-1.5 shadow-xs" style={{ backgroundColor: accentAmber }} />
-                    <span className="text-[10px] font-extrabold text-amber-300 block">Sun Amber</span>
-                    <span className="text-[9px] text-slate-400">Empowerment</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-300">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Series 1 Cloud Core</span>
-                </span>
-                <button 
-                  onClick={onOpenAuth}
-                  className="text-amber-300 hover:text-amber-200 text-xs font-bold underline cursor-pointer"
+              {/* Call to Actions */}
+              <div className="pt-2 flex flex-wrap items-center gap-2.5 sm:gap-4">
+                <button
+                  onClick={() => handleSlideCta(currentSlide.ctaLink)}
+                  className="px-5 sm:px-6 py-3 sm:py-3.5 rounded-2xl text-xs sm:text-sm font-extrabold text-white shadow-xl transition-all hover:scale-105 active:scale-95 flex items-center gap-2 cursor-pointer border border-emerald-400/40"
+                  style={{ backgroundColor: primaryGreen }}
+                  id="hero-primary-cta"
                 >
-                  Member Sign In →
+                  <GraduationCap className="w-4 h-4 text-amber-300" />
+                  <span>{currentSlide.ctaText || 'Explore Educational Programs'}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={() => handleSlideCta(currentSlide.secondaryCtaLink || '#donate')}
+                  className="px-4 sm:px-5 py-3 sm:py-3.5 rounded-2xl text-xs sm:text-sm font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-400 border border-amber-400 transition-all flex items-center gap-2 cursor-pointer shadow-md"
+                  id="hero-donate-cta"
+                >
+                  <HeartHandshake className="w-4 h-4 text-emerald-950" />
+                  <span>{currentSlide.secondaryCtaText || 'Donate (80G)'}</span>
+                </button>
+
+                <button
+                  onClick={() => setIsVideoModalOpen(true)}
+                  className="px-3.5 sm:px-4 py-3 sm:py-3.5 rounded-2xl text-xs sm:text-sm font-bold text-slate-200 bg-slate-900/90 hover:bg-slate-800 border border-slate-700 transition-all flex items-center gap-2 cursor-pointer shadow-md"
+                  id="hero-video-cta"
+                >
+                  <Play className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                  <span className="whitespace-nowrap">Watch Tour</span>
                 </button>
               </div>
 
+              {/* Slide Navigation Controls & Counter */}
+              {slides.length > 1 && (
+                <div className="pt-2 flex items-center gap-4 text-xs text-slate-400">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentSlideIndex(prev => (prev - 1 + slides.length) % slides.length)}
+                      className="p-2 rounded-xl bg-slate-900/90 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                      aria-label="Previous Slide"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+
+                    <div className="flex items-center gap-1.5">
+                      {slides.map((_, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setCurrentSlideIndex(idx)}
+                          className={`h-2 transition-all rounded-full cursor-pointer ${
+                            idx === currentSlideIndex 
+                              ? 'w-8 bg-amber-400 shadow-sm' 
+                              : 'w-2 bg-slate-700 hover:bg-slate-500'
+                          }`}
+                          aria-label={`Go to slide ${idx + 1}`}
+                        />
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={() => setCurrentSlideIndex(prev => (prev + 1) % slides.length)}
+                      className="p-2 rounded-xl bg-slate-900/90 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                      aria-label="Next Slide"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="font-mono text-xs font-bold text-slate-400">
+                    <span className="text-amber-300">{String(currentSlideIndex + 1).padStart(2, '0')}</span>
+                    <span className="mx-1 text-slate-600">/</span>
+                    <span>{String(slides.length).padStart(2, '0')}</span>
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* Institutional Trust Bento Card (Right 5 Cols) */}
+            <div className="lg:col-span-5">
+              <div className="p-6 sm:p-8 rounded-3xl bg-slate-950/65 backdrop-blur-md border border-white/15 shadow-2xl space-y-6 relative overflow-hidden">
+                
+                {/* Card Header */}
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-amber-400">
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Statutory Trust Seal</span>
+                  </div>
+                  <span className="text-[10px] font-extrabold text-emerald-300 bg-emerald-950 px-2.5 py-1 rounded-full border border-emerald-700">
+                    Registered Public Trust
+                  </span>
+                </div>
+
+                {/* Trust Details */}
+                <div className="space-y-2">
+                  <h3 className="text-lg font-extrabold text-white tracking-tight">{config.legalName}</h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Headquartered in Mumbai, Maharashtra with verified NITI Aayog NGO Darpan credentials, Section 12A full exemption, and Section 80G tax benefit orders.
+                  </p>
+                </div>
+
+                {/* Compliance & Quick Numbers */}
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Registration No.</span>
+                    <span className="text-xs font-mono font-extrabold text-amber-300">{config.registrationNumber}</span>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">NITI Aayog Darpan</span>
+                    <span className="text-xs font-mono font-extrabold text-emerald-400">{config.nitiAayogId}</span>
+                  </div>
+                </div>
+
+                {/* 3 Primary Brand Colors Affirmation */}
+                <div className="pt-2">
+                  <div className="text-[10px] font-bold uppercase text-slate-400 mb-2 flex items-center justify-between">
+                    <span>Official Brand Palette</span>
+                    <span className="text-amber-400 font-mono text-[10px]">Triad Harmony</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                      <div className="w-full h-3 rounded-md mb-1.5 shadow-xs" style={{ backgroundColor: primaryGreen }} />
+                      <span className="text-[10px] font-extrabold text-emerald-300 block">Emerald</span>
+                      <span className="text-[9px] text-slate-400">Education</span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                      <div className="w-full h-3 rounded-md mb-1.5 shadow-xs" style={{ backgroundColor: primaryBlue }} />
+                      <span className="text-[10px] font-extrabold text-blue-300 block">Sapphire</span>
+                      <span className="text-[9px] text-slate-400">Governance</span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                      <div className="w-full h-3 rounded-md mb-1.5 shadow-xs" style={{ backgroundColor: accentAmber }} />
+                      <span className="text-[10px] font-extrabold text-amber-300 block">Sun Amber</span>
+                      <span className="text-[9px] text-slate-400">Empowerment</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Series 1 Cloud Core</span>
+                  </span>
+                  <button 
+                    onClick={onOpenAuth}
+                    className="text-amber-300 hover:text-amber-200 text-xs font-bold underline cursor-pointer"
+                  >
+                    Member Sign In →
+                  </button>
+                </div>
+
+              </div>
+            </div>
+
           </div>
-
         </div>
+      ) : (
+        /* Pure Media View: When Text Overlay is OFF, show image or video cleanly with no text box, title, description, or empty space */
+        <div className="relative min-h-[380px] sm:min-h-[460px] md:min-h-[520px] lg:min-h-[600px] flex flex-col justify-end p-4 sm:p-6 lg:p-8">
+          {/* Subtle Floating Navigation Bar on Bottom Right for Media-Only Slides */}
+          {slides.length > 1 && (
+            <div className="self-end inline-flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-slate-950/75 backdrop-blur-md border border-white/15 text-xs text-slate-300 shadow-2xl">
+              <button
+                onClick={() => setCurrentSlideIndex(prev => (prev - 1 + slides.length) % slides.length)}
+                className="p-1.5 rounded-xl bg-slate-900/90 border border-slate-700 text-slate-200 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                aria-label="Previous Slide"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
 
-      </div>
+              <div className="flex items-center gap-1.5">
+                {slides.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setCurrentSlideIndex(idx)}
+                    className={`h-2 transition-all rounded-full cursor-pointer ${
+                      idx === currentSlideIndex 
+                        ? 'w-7 bg-amber-400 shadow-sm' 
+                        : 'w-2 bg-white/40 hover:bg-white/70'
+                    }`}
+                    aria-label={`Go to slide ${idx + 1}`}
+                  />
+                ))}
+              </div>
+
+              <button
+                onClick={() => setCurrentSlideIndex(prev => (prev + 1) % slides.length)}
+                className="p-1.5 rounded-xl bg-slate-900/90 border border-slate-700 text-slate-200 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                aria-label="Next Slide"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+
+              <div className="font-mono text-[11px] font-bold text-slate-400 ml-1">
+                <span className="text-amber-300">{String(currentSlideIndex + 1).padStart(2, '0')}</span>
+                <span className="mx-1 text-slate-600">/</span>
+                <span>{String(slides.length).padStart(2, '0')}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Video Documentary Tour Modal */}
       {isVideoModalOpen && (

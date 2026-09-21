@@ -29,7 +29,8 @@ import {
   AlertCircle,
   Lock,
   CreditCard,
-  Printer
+  Printer,
+  Landmark
 } from 'lucide-react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db, fetchPublicActiveCampaigns, CAMPAIGN_CATEGORY_CONFIG } from '../../lib/firebase';
@@ -738,72 +739,118 @@ export const CrowdfundingDonationSection: React.FC<CrowdfundingDonationSectionPr
             </div>
 
             {/* Official Trust Banking Details */}
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 space-y-4 shadow-xs">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <Building className="w-4 h-4 text-slate-700" />
-                  Official Trust Bank Account (RTGS / NEFT / UPI)
-                </h4>
+            {config.bankDetails?.isEnabled !== false ? (
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 space-y-4 shadow-xs" id="crowdfunding-bank-transfer-details-section">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <Landmark className="w-4 h-4 text-emerald-800" />
+                    <span>Direct Bank Transfer / Manual Donation</span>
+                  </h4>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    80G Tax Exemption
+                  </span>
+                </div>
+
+                {config.bankDetails?.instructions && (
+                  <p className="text-[11px] text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    {config.bankDetails.instructions}
+                  </p>
+                )}
+
+                <div className="space-y-2.5 text-xs text-slate-700">
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <div>
+                      <span className="text-[10px] uppercase text-slate-400 block font-bold">Account Beneficiary</span>
+                      <span className="font-extrabold text-slate-900">
+                        {config.bankDetails?.accountBeneficiary || config.legalName}
+                      </span>
+                    </div>
+                    {config.bankDetails?.accountType && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-700">
+                        {config.bankDetails.accountType}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <div>
+                      <span className="text-[10px] uppercase text-slate-400 block font-bold">Bank & Branch</span>
+                      <span className="font-bold text-slate-900">
+                        {config.bankDetails?.bankName || 'State Bank of India'} ({config.bankDetails?.branch || 'Mumbai Main Branch'})
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <div>
+                      <span className="text-[10px] uppercase text-slate-400 block font-bold">Account Number</span>
+                      <span className="font-mono font-extrabold text-slate-900">
+                        {config.bankDetails?.accountNumber || '389402019482'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(config.bankDetails?.accountNumber || '389402019482', 'acc')}
+                      className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200 cursor-pointer transition-colors"
+                      title="Copy Account Number"
+                    >
+                      {copiedField === 'acc' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <div>
+                      <span className="text-[10px] uppercase text-slate-400 block font-bold">IFSC Code (RTGS / NEFT / IMPS)</span>
+                      <span className="font-mono font-extrabold text-slate-900">
+                        {config.bankDetails?.ifscCode || 'SBIN0000300'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(config.bankDetails?.ifscCode || 'SBIN0000300', 'ifsc')}
+                      className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200 cursor-pointer transition-colors"
+                      title="Copy IFSC Code"
+                    >
+                      {copiedField === 'ifsc' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {config.bankDetails?.upiId && (
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                      <div>
+                        <span className="text-[10px] uppercase text-slate-400 block font-bold">Trust UPI ID</span>
+                        <span className="font-mono font-extrabold text-emerald-800">
+                          {config.bankDetails.upiId}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(config.bankDetails?.upiId || 'fetindia@sbi', 'upi')}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200 cursor-pointer transition-colors"
+                        title="Copy UPI ID"
+                      >
+                        {copiedField === 'upi' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  )}
+
+                  {config.bankDetails?.referenceInstructions && (
+                    <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-[11px] text-emerald-950 leading-relaxed flex items-start gap-2">
+                      <Info className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                      <span>{config.bankDetails.referenceInstructions}</span>
+                    </div>
+                  )}
+                </div>
               </div>
-
-              <div className="space-y-2.5 text-xs text-slate-700">
-                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                  <div>
-                    <span className="text-[10px] uppercase text-slate-400 block font-bold">Account Beneficiary</span>
-                    <span className="font-extrabold text-slate-900">{config.legalName}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                  <div>
-                    <span className="text-[10px] uppercase text-slate-400 block font-bold">Bank & Branch</span>
-                    <span className="font-bold text-slate-900">{config.bankDetails?.bankName || 'State Bank of India'} ({config.bankDetails?.branch || 'Main Branch'})</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                  <div>
-                    <span className="text-[10px] uppercase text-slate-400 block font-bold">Account Number</span>
-                    <span className="font-mono font-extrabold text-slate-900">{config.bankDetails?.accountNumber || '389402019482'}</span>
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard(config.bankDetails?.accountNumber || '389402019482', 'acc')}
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200 cursor-pointer"
-                    title="Copy Account Number"
-                  >
-                    {copiedField === 'acc' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                  <div>
-                    <span className="text-[10px] uppercase text-slate-400 block font-bold">IFSC Code (RTGS / NEFT)</span>
-                    <span className="font-mono font-extrabold text-slate-900">{config.bankDetails?.ifscCode || 'SBIN0000300'}</span>
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard(config.bankDetails?.ifscCode || 'SBIN0000300', 'ifsc')}
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200 cursor-pointer"
-                    title="Copy IFSC Code"
-                  >
-                    {copiedField === 'ifsc' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                  <div>
-                    <span className="text-[10px] uppercase text-slate-400 block font-bold">Trust UPI ID</span>
-                    <span className="font-mono font-extrabold text-emerald-800">{config.bankDetails?.upiId || 'fetindia@sbi'}</span>
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard(config.bankDetails?.upiId || 'fetindia@sbi', 'upi')}
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200 cursor-pointer"
-                    title="Copy UPI ID"
-                  >
-                    {copiedField === 'upi' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-                  </button>
-                </div>
+            ) : (
+              <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center space-y-2 shadow-xs" id="crowdfunding-bank-transfer-paused-section">
+                <Building className="w-6 h-6 text-slate-400 mx-auto" />
+                <h4 className="text-xs font-bold text-slate-700">Direct Bank Transfer Channel Paused</h4>
+                <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                  Direct bank transfers are temporarily undergoing institutional reconciliation. Please choose an appeal above to support instantly with Razorpay / UPI.
+                </p>
               </div>
-            </div>
+            )}
 
           </div>
 
