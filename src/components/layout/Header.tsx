@@ -289,18 +289,54 @@ export const Header: React.FC<HeaderProps> = ({
     });
   }
 
-  // Priority-based navigation splitting for responsive desktop:
-  // On 2xl: show top 5 items, rest in More
-  // On xl: show top 4 items, rest in More
-  // On lg: show top 3 items, rest in More
-  const primaryNavItems2xl = navMenuItems.slice(0, 5);
-  const moreNavItems2xl = navMenuItems.slice(5);
+  // Dedicated nav splitting for clean 100% desktop zoom:
+  // Keep primary high-priority items directly visible (Home, About Trust),
+  // and move secondary items (Examination, Programs & Welfare, Appeals / 80G, etc.) into More.
+  const primaryNavItems: NavigationMenuItem[] = [
+    navMenuItems.find(m => m.target === 'home' || m.id === 'nav-home') || { 
+      id: 'nav-home', 
+      label: 'Home', 
+      target: 'home', 
+      isEnabled: true,
+      order: 1 
+    },
+    navMenuItems.find(m => m.target === 'about' || m.id === 'nav-about') || {
+      id: 'nav-about',
+      label: 'About Trust',
+      target: 'about',
+      isEnabled: true,
+      order: 2,
+      subItems: [
+        { id: 'sub-about-trust', label: 'Trust History & Vision', target: 'history', isEnabled: true },
+        { id: 'sub-about-gov', label: 'Leadership & Governance', target: 'governance', isEnabled: true },
+        { id: 'sub-about-chairman', label: "Chairman's Message", target: 'chairman_message', isEnabled: true },
+        { id: 'sub-about-stats', label: 'Statutory Transparency', target: 'transparency', isEnabled: true }
+      ]
+    }
+  ];
 
-  const primaryNavItemsXl = navMenuItems.slice(0, 4);
-  const moreNavItemsXl = navMenuItems.slice(4);
+  const moreNavItems: NavigationMenuItem[] = navMenuItems.filter(m => 
+    m.target !== 'home' && 
+    m.id !== 'nav-home' && 
+    m.target !== 'about' && 
+    m.id !== 'nav-about'
+  );
 
-  const primaryNavItemsLg = navMenuItems.slice(0, 3);
-  const moreNavItemsLg = navMenuItems.slice(3);
+  const getNavIcon = (target: string, id: string) => {
+    const t = (target || '').toLowerCase();
+    const i = (id || '').toLowerCase();
+    if (t.includes('exam') || i.includes('exam')) return <GraduationCap className="w-4 h-4 text-emerald-600 shrink-0" />;
+    if (t.includes('program') || i.includes('program')) return <BookOpen className="w-4 h-4 text-emerald-600 shrink-0" />;
+    if (t.includes('appeal') || t.includes('crowd') || i.includes('crowd')) return <HeartHandshake className="w-4 h-4 text-amber-600 shrink-0" />;
+    if (t.includes('donate') || i.includes('donate')) return <BadgeDollarSign className="w-4 h-4 text-amber-600 shrink-0" />;
+    if (t.includes('member') || i.includes('member')) return <Users className="w-4 h-4 text-emerald-600 shrink-0" />;
+    if (t.includes('volunteer') || i.includes('volunteer')) return <Users className="w-4 h-4 text-blue-600 shrink-0" />;
+    if (t.includes('event') || i.includes('event')) return <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />;
+    if (t.includes('store') || i.includes('store')) return <ShoppingBag className="w-4 h-4 text-indigo-600 shrink-0" />;
+    if (t.includes('travel') || i.includes('travel')) return <Compass className="w-4 h-4 text-cyan-600 shrink-0" />;
+    if (t.includes('contact') || i.includes('contact')) return <Phone className="w-4 h-4 text-emerald-600 shrink-0" />;
+    return <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />;
+  };
 
   const handleNavClick = (target: string, isExternal?: boolean) => {
     setActiveDropdownId(null);
@@ -755,11 +791,12 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </button>
 
-        {/* 1. Large Screen Navigation (2xl - >= 1536px) */}
-        <nav className="hidden 2xl:flex items-center gap-1 text-xs font-bold text-slate-700" aria-label="Primary Navigation">
-          {primaryNavItems2xl.map((item) => {
+        {/* Unified Responsive Desktop Navigation (lg - 1024px and above) */}
+        <nav className="hidden lg:flex items-center gap-1 sm:gap-1.5 text-xs font-bold text-slate-700" aria-label="Primary Navigation">
+          {primaryNavItems.map((item) => {
             const hasSub = item.subItems && item.subItems.length > 0;
             const isDropdownOpen = activeDropdownId === item.id;
+            const isActive = activeSection === item.target.replace(/^#/, '');
 
             return (
               <div 
@@ -777,11 +814,13 @@ export const Header: React.FC<HeaderProps> = ({
                     }
                   }}
                   className={`px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
-                    activeSection === item.target.replace(/^#/, '')
+                    isActive
                       ? 'text-emerald-900 bg-emerald-50 font-extrabold shadow-2xs border border-emerald-200/60'
                       : 'hover:text-emerald-800 hover:bg-slate-50'
                   }`}
                   id={`fet-nav-${item.id}`}
+                  aria-expanded={hasSub ? isDropdownOpen : undefined}
+                  aria-haspopup={hasSub ? 'menu' : undefined}
                 >
                   <span>{item.label}</span>
                   {item.badge && (
@@ -790,12 +829,12 @@ export const Header: React.FC<HeaderProps> = ({
                     </span>
                   )}
                   {hasSub && (
-                    <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
                   )}
                 </button>
 
                 {hasSub && isDropdownOpen && (
-                  <div className="absolute left-0 top-full mt-1 w-60 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95">
+                  <div className="absolute left-0 top-full mt-1 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95">
                     {item.subItems?.filter(s => s.isEnabled).map((sub) => (
                       <button
                         key={sub.id}
@@ -815,268 +854,112 @@ export const Header: React.FC<HeaderProps> = ({
             );
           })}
 
-          {/* More Menu Dropdown for 2xl */}
-          {moreNavItems2xl.length > 0 && (
+          {/* More Menu Dropdown for Overflow Navigation */}
+          {moreNavItems.length > 0 && (
             <div className="relative" ref={moreMenuRef}>
               <button
                 onClick={() => setMoreMenuOpen(!moreMenuOpen)}
-                className={`px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 text-slate-700 hover:text-emerald-800 hover:bg-slate-50 cursor-pointer ${
-                  moreMenuOpen ? 'bg-slate-100 text-slate-900' : ''
+                className={`px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer font-bold ${
+                  moreMenuOpen 
+                    ? 'bg-slate-100 text-slate-900 ring-2 ring-slate-900/10' 
+                    : 'text-slate-700 hover:text-emerald-800 hover:bg-slate-50'
                 }`}
-                id="header-nav-more-2xl-btn"
+                id="header-nav-more-btn"
                 aria-expanded={moreMenuOpen}
                 aria-haspopup="menu"
+                title="More Sections: Examination, Programs, Appeals (80G), etc."
               >
                 <span>More</span>
-                <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${moreMenuOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${moreMenuOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {moreMenuOpen && (
-                <div className="absolute left-0 top-full mt-1 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95">
-                  {moreNavItems2xl.map((item) => (
-                    <div key={item.id}>
-                      <button
-                        onClick={() => handleNavClick(item.target, item.isExternal)}
-                        className={`w-full text-left px-4 py-2.5 text-xs font-semibold flex items-center justify-between hover:bg-emerald-50 hover:text-emerald-900 cursor-pointer transition-colors ${
-                          activeSection === item.target.replace(/^#/, '') ? 'text-emerald-900 font-bold bg-emerald-50/60' : 'text-slate-700'
-                        }`}
-                      >
-                        <span>{item.label}</span>
-                        {item.badge && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-amber-100 text-amber-900">
-                            {item.badge}
-                          </span>
-                        )}
-                      </button>
-                      {item.subItems && item.subItems.length > 0 && (
-                        <div className="pl-6 pr-3 py-1 space-y-1 bg-slate-50/60 border-y border-slate-100">
-                          {item.subItems.filter(s => s.isEnabled).map((sub) => (
-                            <button
-                              key={sub.id}
-                              onClick={() => handleNavClick(sub.target, sub.isExternal)}
-                              className="w-full text-left px-2 py-1.5 text-[11px] font-medium text-slate-600 hover:text-emerald-800 flex items-center gap-1.5 cursor-pointer"
-                            >
-                              <ChevronRight className="w-2.5 h-2.5 text-emerald-600" />
-                              <span>{sub.label}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {onOpenVerification && (
-                    <div className="border-t border-slate-100 pt-1 mt-1">
-                      <button
-                        onClick={() => {
-                          setMoreMenuOpen(false);
-                          onOpenVerification();
-                        }}
-                        className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
-                      >
-                        <CreditCard className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Verify Member Credential</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </nav>
-
-        {/* 2. Standard Desktop Navigation (xl - 1280px to 1535px) */}
-        <nav className="hidden xl:flex 2xl:hidden items-center gap-1 text-xs font-bold text-slate-700" aria-label="Primary Navigation">
-          {primaryNavItemsXl.map((item) => {
-            const hasSub = item.subItems && item.subItems.length > 0;
-            const isDropdownOpen = activeDropdownId === item.id;
-
-            return (
-              <div 
-                key={item.id} 
-                className="relative"
-                onMouseEnter={() => hasSub && setActiveDropdownId(item.id)}
-                onMouseLeave={() => hasSub && setActiveDropdownId(null)}
-              >
-                <button
-                  onClick={() => {
-                    if (hasSub) {
-                      setActiveDropdownId(isDropdownOpen ? null : item.id);
-                    } else {
-                      handleNavClick(item.target, item.isExternal);
-                    }
-                  }}
-                  className={`px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
-                    activeSection === item.target.replace(/^#/, '')
-                      ? 'text-emerald-900 bg-emerald-50 font-extrabold shadow-2xs border border-emerald-200/60'
-                      : 'hover:text-emerald-800 hover:bg-slate-50'
-                  }`}
-                  id={`fet-nav-xl-${item.id}`}
+                <div 
+                  className="absolute left-0 top-full mt-1.5 w-72 sm:w-80 bg-white rounded-2xl shadow-2xl border border-slate-200/90 py-2 z-50 animate-in fade-in zoom-in-95 max-h-[calc(100vh-85px)] overflow-y-auto"
+                  id="header-nav-more-dropdown"
                 >
-                  <span>{item.label}</span>
-                  {item.badge && (
-                    <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300/60">
-                      {item.badge}
-                    </span>
-                  )}
-                  {hasSub && (
-                    <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                  )}
-                </button>
-
-                {hasSub && isDropdownOpen && (
-                  <div className="absolute left-0 top-full mt-1 w-60 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95">
-                    {item.subItems?.filter(s => s.isEnabled).map((sub) => (
-                      <button
-                        key={sub.id}
-                        onClick={() => handleNavClick(sub.target, sub.isExternal)}
-                        className="w-full text-left px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-900 flex items-center justify-between cursor-pointer transition-colors"
-                      >
-                        <span className="flex items-center gap-2">
-                          <ChevronRight className="w-3 h-3 text-emerald-600 shrink-0" />
-                          <span>{sub.label}</span>
-                        </span>
-                        {sub.isExternal && <ExternalLink className="w-3 h-3 text-slate-400" />}
-                      </button>
-                    ))}
+                  <div className="px-3.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 flex items-center justify-between">
+                    <span>Navigation & Services</span>
+                    <span className="text-[9px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">FET Portal</span>
                   </div>
-                )}
-              </div>
-            );
-          })}
 
-          {/* More Menu Dropdown for XL */}
-          {moreNavItemsXl.length > 0 && (
-            <div className="relative" ref={moreMenuRef}>
-              <button
-                onClick={() => setMoreMenuOpen(!moreMenuOpen)}
-                className={`px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 text-slate-700 hover:text-emerald-800 hover:bg-slate-50 cursor-pointer ${
-                  moreMenuOpen ? 'bg-slate-100 text-slate-900' : ''
-                }`}
-                id="header-nav-more-xl-btn"
-                aria-expanded={moreMenuOpen}
-                aria-haspopup="menu"
-              >
-                <span>More</span>
-                <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${moreMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
+                  {moreNavItems.map((item) => {
+                    const isActive = activeSection === item.target.replace(/^#/, '');
+                    const hasSub = item.subItems && item.subItems.length > 0;
 
-              {moreMenuOpen && (
-                <div className="absolute left-0 top-full mt-1 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95">
-                  {moreNavItemsXl.map((item) => (
-                    <div key={item.id}>
-                      <button
-                        onClick={() => handleNavClick(item.target, item.isExternal)}
-                        className={`w-full text-left px-4 py-2.5 text-xs font-semibold flex items-center justify-between hover:bg-emerald-50 hover:text-emerald-900 cursor-pointer transition-colors ${
-                          activeSection === item.target.replace(/^#/, '') ? 'text-emerald-900 font-bold bg-emerald-50/60' : 'text-slate-700'
-                        }`}
-                      >
-                        <span>{item.label}</span>
-                        {item.badge && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-amber-100 text-amber-900">
-                            {item.badge}
-                          </span>
+                    return (
+                      <div key={item.id} className="border-b border-slate-50 last:border-b-0">
+                        <button
+                          onClick={() => handleNavClick(item.target, item.isExternal)}
+                          className={`w-full text-left px-3.5 py-2.5 text-xs font-semibold flex items-center justify-between hover:bg-emerald-50/80 hover:text-emerald-950 cursor-pointer transition-colors ${
+                            isActive ? 'text-emerald-900 font-extrabold bg-emerald-50/60' : 'text-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {getNavIcon(item.target, item.id)}
+                            <span className="truncate">{item.label}</span>
+                          </div>
+                          {item.badge && (
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase shrink-0 ${
+                              item.badge === 'Open'
+                                ? 'bg-amber-100 text-amber-900 border border-amber-300/60'
+                                : 'bg-emerald-100 text-emerald-900 border border-emerald-300/60'
+                            }`}>
+                              {item.badge}
+                            </span>
+                          )}
+                        </button>
+
+                        {/* Indented sub-items if present */}
+                        {hasSub && (
+                          <div className="pl-9 pr-3 py-1 space-y-0.5 bg-slate-50/60 border-t border-slate-100/80">
+                            {item.subItems!.filter(s => s.isEnabled).map((sub) => (
+                              <button
+                                key={sub.id}
+                                onClick={() => handleNavClick(sub.target, sub.isExternal)}
+                                className="w-full text-left px-2 py-1.5 text-[11px] font-medium text-slate-600 hover:text-emerald-900 hover:bg-emerald-50/70 rounded-md flex items-center justify-between cursor-pointer transition-colors"
+                              >
+                                <span className="flex items-center gap-1.5 truncate">
+                                  <ChevronRight className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                                  <span className="truncate">{sub.label}</span>
+                                </span>
+                                {sub.isExternal && <ExternalLink className="w-2.5 h-2.5 text-slate-400 shrink-0" />}
+                              </button>
+                            ))}
+                          </div>
                         )}
-                      </button>
-                      {item.subItems && item.subItems.length > 0 && (
-                        <div className="pl-6 pr-3 py-1 space-y-1 bg-slate-50/60 border-y border-slate-100">
-                          {item.subItems.filter(s => s.isEnabled).map((sub) => (
-                            <button
-                              key={sub.id}
-                              onClick={() => handleNavClick(sub.target, sub.isExternal)}
-                              className="w-full text-left px-2 py-1.5 text-[11px] font-medium text-slate-600 hover:text-emerald-800 flex items-center gap-1.5 cursor-pointer"
-                            >
-                              <ChevronRight className="w-2.5 h-2.5 text-emerald-600" />
-                              <span>{sub.label}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {onOpenVerification && (
-                    <div className="border-t border-slate-100 pt-1 mt-1">
+                      </div>
+                    );
+                  })}
+
+                  {/* Additional Actions in More Menu */}
+                  <div className="border-t border-slate-100 pt-1.5 mt-1 px-1.5 space-y-1">
+                    {onOpenVerification && (
                       <button
                         onClick={() => {
                           setMoreMenuOpen(false);
                           onOpenVerification();
                         }}
-                        className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                        className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-emerald-900 rounded-xl flex items-center gap-2 cursor-pointer transition-colors"
                       >
-                        <CreditCard className="w-3.5 h-3.5 text-emerald-600" />
+                        <CreditCard className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                         <span>Verify Member Credential</span>
                       </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </nav>
+                    )}
 
-        {/* 3. Compact Desktop Navigation (lg - 1024px to 1279px) */}
-        <nav className="hidden lg:flex xl:hidden items-center gap-1 text-xs font-bold text-slate-700" aria-label="Primary Navigation">
-          {primaryNavItemsLg.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => handleNavClick(item.target, item.isExternal)}
-              className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
-                activeSection === item.target.replace(/^#/, '')
-                  ? 'text-emerald-900 bg-emerald-50 font-extrabold'
-                  : 'hover:text-emerald-800 hover:bg-slate-50'
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
-
-          {/* More Menu Dropdown for LG */}
-          {moreNavItemsLg.length > 0 && (
-            <div className="relative" ref={moreMenuRef}>
-              <button
-                onClick={() => setMoreMenuOpen(!moreMenuOpen)}
-                className={`px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 text-slate-700 hover:text-emerald-800 hover:bg-slate-50 cursor-pointer ${
-                  moreMenuOpen ? 'bg-slate-100 text-slate-900' : ''
-                }`}
-                id="header-nav-more-lg-btn"
-                aria-expanded={moreMenuOpen}
-                aria-haspopup="menu"
-              >
-                <span>More</span>
-                <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${moreMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {moreMenuOpen && (
-                <div className="absolute left-0 top-full mt-1 w-60 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95">
-                  {moreNavItemsLg.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => handleNavClick(item.target, item.isExternal)}
-                      className={`w-full text-left px-4 py-2 text-xs font-semibold flex items-center justify-between hover:bg-emerald-50 hover:text-emerald-900 cursor-pointer transition-colors ${
-                        activeSection === item.target.replace(/^#/, '') ? 'text-emerald-900 font-bold bg-emerald-50/60' : 'text-slate-700'
-                      }`}
-                    >
-                      <span>{item.label}</span>
-                      {item.badge && (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-amber-100 text-amber-900">
-                          {item.badge}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                  {onOpenVerification && (
-                    <div className="border-t border-slate-100 pt-1 mt-1">
+                    {onOpenStudentResults && (
                       <button
                         onClick={() => {
                           setMoreMenuOpen(false);
-                          onOpenVerification();
+                          onOpenStudentResults();
                         }}
-                        className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                        className="w-full text-left px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50 rounded-xl flex items-center gap-2 cursor-pointer transition-colors"
                       >
-                        <CreditCard className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Verify Member Credential</span>
+                        <GraduationCap className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>Examination Results Portal</span>
                       </button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -1117,7 +1000,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Quick Donate CTA with 80G Gold Highlight */}
           <button
             onClick={() => handleNavClick('donate')}
-            className="hidden lg:inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-400 transition-all shadow-xs border border-amber-400 hover:shadow-md active:scale-95 cursor-pointer"
+            className="hidden sm:inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-400 transition-all shadow-xs border border-amber-400 hover:shadow-md active:scale-95 cursor-pointer"
             id="header-quick-donate-btn"
             title="Donate to FET India with 50% 80G Tax Exemption"
           >

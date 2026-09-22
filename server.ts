@@ -101,14 +101,14 @@ app.get('/api/health', (_req: Request, res: Response) => {
 // 2. GET RAZORPAY CONFIGURATION (Client-safe metadata only)
 // -------------------------------------------------------------
 app.get('/api/razorpay/config', (_req: Request, res: Response) => {
-  const keyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || '';
-  const keySecret = process.env.RAZORPAY_KEY_SECRET || '';
+  const keyId = (process.env.RAZORPAY_KEY_ID || '').trim();
+  const keySecret = (process.env.RAZORPAY_KEY_SECRET || '').trim();
   const isConfigured = Boolean(keyId && keySecret);
   const isLive = keyId.startsWith('rzp_live');
 
   res.json({
-    // Return keyId if configured, or a fallback test identifier for preview
-    keyId: keyId || (isLive ? '' : 'rzp_test_FET_INDIA_TESTMODE'),
+    // Only return the public keyId when configured; never expose any secret or fallback credentials
+    keyId: isConfigured ? keyId : '',
     isConfigured,
     mode: isLive ? 'live' : 'test',
     currency: 'INR',
@@ -166,43 +166,35 @@ app.post('/api/razorpay/create-order', async (req: Request, res: Response) => {
     const internalReference = `FET-DON-${currentYear}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 
     const rzp = getRazorpayClient();
-    const rawKeyId = process.env.RAZORPAY_KEY_ID || '';
-    const isLive = rawKeyId.startsWith('rzp_live');
-    let orderId: string;
-    let mode: 'test' | 'live' = isLive ? 'live' : 'test';
-    const keyId = rawKeyId || 'rzp_test_FET_INDIA_TESTMODE';
+    const keyId = (process.env.RAZORPAY_KEY_ID || '').trim();
+    const keySecret = (process.env.RAZORPAY_KEY_SECRET || '').trim();
 
-    if (isLive && (!rzp || !process.env.RAZORPAY_KEY_SECRET)) {
+    if (!rzp || !keyId || !keySecret) {
       res.status(500).json({
-        error: 'Razorpay Live key ID is set, but server Secret is missing or client failed to initialize. Please configure RAZORPAY_KEY_SECRET in server environment.'
+        error: 'Razorpay payment gateway is not configured on the server. Please ensure RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are set in the server environment.'
       });
       return;
     }
 
-    if (rzp && process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
-      // Official Razorpay API order creation
-      mode = isLive ? 'live' : 'test';
-      const orderOptions = {
-        amount: amountInPaise,
-        currency: 'INR',
-        receipt: internalReference,
-        notes: {
-          internalReference,
-          campaignId: String(campaignId),
-          campaignTitle: String(campaignTitle).substring(0, 40),
-          donorName: donorName.trim(),
-          donorEmail: donorEmail.trim(),
-          donorPan: donorPan ? String(donorPan).trim().toUpperCase() : 'NOT_PROVIDED'
-        }
-      };
+    const isLive = keyId.startsWith('rzp_live');
+    const mode: 'test' | 'live' = isLive ? 'live' : 'test';
 
-      const razorpayOrder = await rzp.orders.create(orderOptions);
-      orderId = razorpayOrder.id;
-    } else {
-      // Test simulation mode (allows full development and preview before keys injected)
-      orderId = `order_test_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
-      mode = 'test';
-    }
+    const orderOptions = {
+      amount: amountInPaise,
+      currency: 'INR',
+      receipt: internalReference,
+      notes: {
+        internalReference,
+        campaignId: String(campaignId),
+        campaignTitle: String(campaignTitle).substring(0, 40),
+        donorName: donorName.trim(),
+        donorEmail: donorEmail.trim(),
+        donorPan: donorPan ? String(donorPan).trim().toUpperCase() : 'NOT_PROVIDED'
+      }
+    };
+
+    const razorpayOrder = await rzp.orders.create(orderOptions);
+    const orderId = razorpayOrder.id;
 
     // Save pending contribution record in Firestore
     const now = new Date().toISOString();
@@ -260,7 +252,7 @@ app.post('/api/razorpay/create-order', async (req: Request, res: Response) => {
       docId: docRef.id,
       keyId,
       mode,
-      isConfigured: Boolean(rzp)
+      isConfigured: true
     });
   } catch (error: any) {
     console.error('Error creating Razorpay order:', error);
@@ -283,7 +275,7 @@ app.post('/api/razorpay/verify-payment', async (req: Request, res: Response) => 
       campaignId
     } = req.body;
 
-    if (!razorpay_order_id || !razorpay_payment_id || !internalReference) {
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !internalReference) {
       res.status(400).json({
         success: false,
         error: 'Missing mandatory payment verification fields.'
@@ -291,31 +283,29 @@ app.post('/api/razorpay/verify-payment', async (req: Request, res: Response) => 
       return;
     }
 
-    const keySecret = process.env.RAZORPAY_KEY_SECRET;
-    const rawKeyId = process.env.RAZORPAY_KEY_ID || '';
-    const isLive = rawKeyId.startsWith('rzp_live');
+    const keySecret = (process.env.RAZORPAY_KEY_SECRET || '').trim();
+    if (!keySecret) {
+      res.status(500).json({
+        success: false,
+        error: 'Razorpay server secret (RAZORPAY_KEY_SECRET) is not configured in server environment.'
+      });
+      return;
+    }
+
+    // Cryptographic HMAC SHA256 verification
+    const expectedSignature = crypto
+      .createHmac('sha256', keySecret)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest('hex');
 
     let isSignatureValid = false;
-
-    if (keySecret && razorpay_signature) {
-      // Production HMAC SHA256 verification
-      const expectedSignature = crypto
-        .createHmac('sha256', keySecret.trim())
-        .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-        .digest('hex');
-
-      try {
-        isSignatureValid = crypto.timingSafeEqual(
-          Buffer.from(expectedSignature, 'utf8'),
-          Buffer.from(razorpay_signature, 'utf8')
-        );
-      } catch {
-        isSignatureValid = false;
-      }
-    } else if (!isLive && !keySecret) {
-      // In development/test mode before secret is injected:
-      // Allow simulation only when live keys are NOT active
-      isSignatureValid = razorpay_payment_id.startsWith('pay_');
+    try {
+      isSignatureValid = crypto.timingSafeEqual(
+        Buffer.from(expectedSignature, 'utf8'),
+        Buffer.from(razorpay_signature, 'utf8')
+      );
+    } catch {
+      isSignatureValid = false;
     }
 
     // Locate the matching donation record in Firestore by internalReference or orderId
@@ -351,7 +341,7 @@ app.post('/api/razorpay/verify-payment', async (req: Request, res: Response) => 
     }
 
     // Check if this payment ID was already used on another contribution (replay attack prevention)
-    if (razorpay_payment_id && !razorpay_payment_id.startsWith('pay_test_sim_')) {
+    if (razorpay_payment_id) {
       const existingPaymentSnap = await getDocs(query(
         donationsCollection,
         where('razorpayPaymentId', '==', razorpay_payment_id),
@@ -393,7 +383,7 @@ app.post('/api/razorpay/verify-payment', async (req: Request, res: Response) => 
       paymentStatus: 'verified',
       razorpayOrderId: razorpay_order_id,
       razorpayPaymentId: razorpay_payment_id,
-      razorpaySignature: razorpay_signature || 'TEST_VERIFIED',
+      razorpaySignature: razorpay_signature,
       verifiedAt: now,
       receiptNumber,
       financialYear,

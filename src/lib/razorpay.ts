@@ -83,11 +83,11 @@ export async function fetchRazorpayConfig(): Promise<RazorpayPublicConfig> {
     }
     return await res.json();
   } catch (err) {
-    console.warn('Falling back to default Razorpay config:', err);
+    console.warn('Unable to load Razorpay config from server:', err);
     return {
-      keyId: 'rzp_test_FET_INDIA_TESTMODE',
+      keyId: '',
       isConfigured: false,
-      mode: 'test',
+      mode: 'live',
       currency: 'INR',
       merchantName: 'Fatimyah Educational Trust',
       supportEmail: 'fetkofficial@gmail.com',
@@ -207,9 +207,15 @@ export async function initiateRazorpayContribution(options: {
       onOrderCreated(order);
     }
 
+    const effectiveKeyId = order.keyId || config.keyId;
+    if (!effectiveKeyId) {
+      onError('Payment gateway is not currently configured. Please contact the Trust desk or try again later.');
+      return;
+    }
+
     // 4. Configure Razorpay Standard Checkout
     const checkoutOptions: any = {
-      key: order.keyId || config.keyId,
+      key: effectiveKeyId,
       amount: order.amount,
       currency: order.currency,
       name: config.merchantName,
