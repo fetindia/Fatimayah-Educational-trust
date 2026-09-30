@@ -48,7 +48,8 @@ import {
   Home,
   Info,
   Search,
-  GraduationCap
+  GraduationCap,
+  Newspaper
 } from 'lucide-react';
 import { FETLogo } from '../common/FETLogo';
 import { usePWAInstall } from '../common/PWAInstallBanner';
@@ -56,6 +57,7 @@ import { useConfig } from '../../contexts/ConfigContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useModules } from '../../contexts/ModuleContext';
+import { isPublisherOnly } from '../../lib/rbac';
 import { NavigationMenuItem, NavigationSubItem } from '../../types';
 import { DEFAULT_NAV_MENU } from '../../data/initialData';
 
@@ -114,6 +116,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { config } = useConfig();
   const { currentUser, userProfile, hasAdminAccess, isSuperAdmin, signOut } = useAuth();
+  const isPublisherUser = isPublisherOnly(userProfile, isSuperAdmin);
   const { unreadCount } = useNotifications();
   const { getModuleByCode } = useModules();
   const { canInstall, installApp } = usePWAInstall();
@@ -712,7 +715,9 @@ export const Header: React.FC<HeaderProps> = ({
             {headerSettings.showRegNumber !== false && config.registrationNumber && (
               <>
                 <span className="hidden sm:inline text-slate-400">|</span>
-                <span className="hidden sm:inline text-slate-300">Reg No: {config.registrationNumber}</span>
+                <span className="hidden sm:inline text-slate-300">
+                  Registration No. {config.registrationNumber} ({config.registrationJurisdiction || 'Jammu & Kashmir'})
+                </span>
               </>
             )}
             {headerSettings.showTaxExemptionTag !== false && (
@@ -1042,14 +1047,14 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               ) : hasAdminAccess ? (
                 <button
-                  onClick={() => onOpenAdminConsole('dashboard')}
+                  onClick={() => onOpenAdminConsole(isPublisherUser ? 'publishing' : 'dashboard')}
                   className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white shadow-xs transition-all hover:brightness-110 active:scale-95 cursor-pointer"
-                  style={{ backgroundColor: primaryBlue }}
+                  style={{ backgroundColor: isPublisherUser ? '#be123c' : primaryBlue }}
                   id="header-admin-console-btn"
-                  title="Open Administrative Console"
+                  title={isPublisherUser ? "Open Dedicated Publishing Dashboard" : "Open Administrative Console"}
                 >
-                  <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Admin Console</span>
+                  {isPublisherUser ? <Newspaper className="w-3.5 h-3.5 text-amber-300" /> : <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />}
+                  <span>{isPublisherUser ? "Publishing" : "Admin Console"}</span>
                 </button>
               ) : (
                 <button
@@ -1160,23 +1165,35 @@ export const Header: React.FC<HeaderProps> = ({
                         </button>
                       )}
 
-                      {/* 2. Admin Console (if Role Admin and not Super Admin) */}
+                      {/* 2. Admin Console or Publishing Dashboard (if not Super Admin) */}
                       {hasAdminAccess && !isSuperAdmin && (
                         <button
                           onClick={() => {
                             setUserMenuOpen(false);
-                            onOpenAdminConsole('dashboard');
+                            onOpenAdminConsole(isPublisherUser ? 'publishing' : 'dashboard');
                           }}
-                          className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-blue-900 bg-blue-50 hover:bg-blue-100/80 flex items-center justify-between cursor-pointer border border-blue-200 transition-colors"
+                          className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between cursor-pointer border transition-colors ${
+                            isPublisherUser
+                              ? 'text-rose-950 bg-rose-50 hover:bg-rose-100/80 border-rose-200'
+                              : 'text-blue-900 bg-blue-50 hover:bg-blue-100/80 border-blue-200'
+                          }`}
                           id="account-menu-admin-console-btn"
                           role="menuitem"
                         >
                           <div className="flex items-center gap-2">
-                            <SlidersHorizontal className="w-4 h-4 text-blue-700 shrink-0" />
-                            <span>Administrative Console</span>
+                            {isPublisherUser ? (
+                              <Newspaper className="w-4 h-4 text-rose-700 shrink-0" />
+                            ) : (
+                              <SlidersHorizontal className="w-4 h-4 text-blue-700 shrink-0" />
+                            )}
+                            <span>{isPublisherUser ? 'Publishing Control Center' : 'Administrative Console'}</span>
                           </div>
-                          <span className="text-[10px] font-black uppercase text-blue-700 bg-blue-200/60 px-1.5 py-0.5 rounded">
-                            Admin
+                          <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded ${
+                            isPublisherUser
+                              ? 'text-rose-800 bg-rose-200/60'
+                              : 'text-blue-700 bg-blue-200/60'
+                          }`}>
+                            {isPublisherUser ? 'Publisher' : 'Admin'}
                           </span>
                         </button>
                       )}
@@ -1737,13 +1754,13 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     onClick={() => {
                       handleCloseMobileMenu();
-                      onOpenAdminConsole('dashboard');
+                      onOpenAdminConsole(isPublisherUser ? 'publishing' : 'dashboard');
                     }}
                     className="col-span-2 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold text-white shadow-2xs cursor-pointer"
-                    style={{ backgroundColor: primaryBlue }}
+                    style={{ backgroundColor: isPublisherUser ? '#be123c' : primaryBlue }}
                   >
-                    <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Administrative Console</span>
+                    {isPublisherUser ? <Newspaper className="w-3.5 h-3.5 text-amber-300" /> : <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />}
+                    <span>{isPublisherUser ? 'Publishing Dashboard' : 'Administrative Console'}</span>
                   </button>
                 )}
               </div>
@@ -2031,10 +2048,10 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Drawer Compliance & Registration Footer */}
           <div className="pt-2 pb-6 text-center text-[10px] text-slate-400 space-y-1">
             <p className="font-semibold text-slate-500">
-              {config.legalName || 'Fatimyah Educational Trust India'}
+              {config.legalName || 'FATIMYAH EDUCATIONAL TRUST'}
             </p>
-            <p>Reg. No: 153/2014 • 80G & 12A Certified • NITI Aayog</p>
-            <p className="text-emerald-700 font-bold">Helpline: +91 97793 42786</p>
+            <p>Registration No. {config.registrationNumber || 'E 9822'} • Registered in {config.registrationJurisdiction || 'Jammu & Kashmir'}{config.registrationAuthority ? ` (${config.registrationAuthority})` : ''}{config.registrationAct ? ` • ${config.registrationAct}` : ''} • 80G & 12A Certified</p>
+            <p className="text-emerald-700 font-bold">Helpline: {config.contactPhone || '+91 91494 14549'}</p>
           </div>
         </div>
       </div>

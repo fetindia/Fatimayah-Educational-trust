@@ -40,7 +40,7 @@ import {
 import { getStorage } from 'firebase/storage';
 import firebaseConfigData from '../../firebase-applet-config.json';
 import { DEFAULT_ORG_CONFIG, MASTER_27_MODULES } from '../data/initialData';
-import { getEffectivePermissions } from './rbac';
+import { getEffectivePermissions, filterCampaignsByScope, filterRegistrationsByScope } from './rbac';
 import { 
   OrgConfig, 
   ModuleChapter, 
@@ -48,6 +48,10 @@ import {
   UserProfile, 
   UserRole, 
   AppPermission,
+  DelegatedAdminScope,
+  AdminScopeLevel,
+  AdminModuleScope,
+  CaseWorkflowStage,
   MembershipStatus,
   VolunteerStatus,
   DonorStatus,
@@ -967,6 +971,165 @@ export async function updateUserRoles(
       effectivePermissions,
       customPermissions: customPermissions || [],
       membershipStatus: membershipStatus || 'unchanged'
+    }
+  });
+}
+
+/**
+ * Assigns or updates a Delegated Jurisdictional Administrative Scope (District / State / National)
+ * Controlled and audited by Super Admin.
+ */
+export async function assignDelegatedScope(
+  targetUid: string,
+  targetEmail: string,
+  scope: DelegatedAdminScope,
+  adminUser: { uid: string; email: string; role: UserRole }
+): Promise<void> {
+  const userRef = doc(db, 'users', targetUid);
+  const snap = await getDoc(userRef);
+  if (!snap.exists()) {
+    throw new Error('Target user account not found');
+  }
+
+  const existingProfile = snap.data() as UserProfile;
+  const existingScopes = existingProfile.delegatedScopes || [];
+  
+  const scopeId = scope.id || `scope-${Date.now()}`;
+  const now = new Date().toISOString();
+  const finalizedScope: DelegatedAdminScope = {
+    ...scope,
+    id: scopeId,
+    status: 'active',
+    assignedByUid: adminUser.uid,
+    assignedByEmail: adminUser.email,
+    assignedAt: now
+  };
+
+  const updatedScopes = [
+    finalizedScope,
+    ...existingScopes.filter(s => s.id !== scopeId && !(s.module === scope.module && s.level === scope.level))
+  ];
+
+  // Derive role identifier based on level and module
+  let roleToAdd: UserRole = 'district_admin';
+  if (scope.level === 'district') {
+    if (scope.module === 'crowdfunding') roleToAdd = 'district_crowdfunding_admin';
+    else if (scope.module === 'examinations') roleToAdd = 'district_exam_admin';
+    else roleToAdd = 'district_admin';
+  } else if (scope.level === 'state') {
+    if (scope.module === 'crowdfunding') roleToAdd = 'state_crowdfunding_admin';
+    else if (scope.module === 'examinations') roleToAdd = 'state_exam_admin';
+    else roleToAdd = 'state_admin';
+  } else if (scope.level === 'national') {
+    if (scope.module === 'crowdfunding') roleToAdd = 'national_crowdfunding_admin';
+    else if (scope.module === 'examinations') roleToAdd = 'national_exam_admin';
+    else roleToAdd = 'national_admin';
+  }
+
+  const currentRoles = existingProfile.roles || [existingProfile.primaryRole || 'member'];
+  const newRoles: UserRole[] = currentRoles.includes(roleToAdd) ? currentRoles : [...currentRoles, roleToAdd];
+  const effectivePermissions = getEffectivePermissions(newRoles, existingProfile.customPermissions || []);
+
+  const updatePayload: Partial<UserProfile> = {
+    delegatedScopes: updatedScopes,
+    activeScopeLevel: scope.level,
+    assignedState: scope.assignedState || existingProfile.assignedState || existingProfile.state,
+    assignedDistricts: scope.assignedDistricts || existingProfile.assignedDistricts,
+    roles: newRoles,
+    permissions: effectivePermissions,
+    updatedAt: now
+  };
+
+  await updateDoc(userRef, updatePayload);
+
+  await logAuditEvent({
+    actorUid: adminUser.uid,
+    actorEmail: adminUser.email,
+    actorRole: adminUser.role,
+    action: 'ASSIGN_DELEGATED_ADMIN_SCOPE',
+    targetEntity: 'users',
+    targetId: targetUid,
+    details: {
+      targetEmail,
+      level: scope.level,
+      module: scope.module,
+      assignedState: scope.assignedState,
+      assignedDistricts: scope.assignedDistricts,
+      roleAssigned: roleToAdd,
+      expiresAt: scope.expiresAt
+    }
+  });
+}
+
+/**
+ * Revokes an assigned Delegated Administrative Scope
+ */
+export async function revokeDelegatedScope(
+  targetUid: string,
+  targetEmail: string,
+  scopeId: string,
+  adminUser: { uid: string; email: string; role: UserRole }
+): Promise<void> {
+  const userRef = doc(db, 'users', targetUid);
+  const snap = await getDoc(userRef);
+  if (!snap.exists()) {
+    throw new Error('Target user account not found');
+  }
+
+  const existingProfile = snap.data() as UserProfile;
+  const existingScopes = existingProfile.delegatedScopes || [];
+  const now = new Date().toISOString();
+
+  const updatedScopes = existingScopes.map(s => {
+    if (s.id === scopeId) {
+      return {
+        ...s,
+        status: 'suspended' as const,
+        revokedAt: now,
+        revokedByUid: adminUser.uid
+      };
+    }
+    return s;
+  });
+
+  const remainingActiveScopes = updatedScopes.filter(s => s.status === 'active');
+  const delegatedRolesList: UserRole[] = [
+    'district_admin',
+    'district_crowdfunding_admin',
+    'district_exam_admin',
+    'state_admin',
+    'state_crowdfunding_admin',
+    'state_exam_admin',
+    'national_admin',
+    'national_crowdfunding_admin',
+    'national_exam_admin'
+  ];
+
+  let newRoles = [...(existingProfile.roles || [existingProfile.primaryRole || 'member'])];
+  if (remainingActiveScopes.length === 0) {
+    newRoles = newRoles.filter(r => !delegatedRolesList.includes(r));
+    if (newRoles.length === 0) newRoles = ['member'];
+  }
+
+  const effectivePermissions = getEffectivePermissions(newRoles, existingProfile.customPermissions || []);
+
+  await updateDoc(userRef, {
+    delegatedScopes: updatedScopes,
+    roles: newRoles,
+    permissions: effectivePermissions,
+    updatedAt: now
+  });
+
+  await logAuditEvent({
+    actorUid: adminUser.uid,
+    actorEmail: adminUser.email,
+    actorRole: adminUser.role,
+    action: 'REVOKE_DELEGATED_ADMIN_SCOPE',
+    targetEntity: 'users',
+    targetId: targetUid,
+    details: {
+      targetEmail,
+      scopeId
     }
   });
 }
@@ -2723,6 +2886,7 @@ export async function adminReviewMembershipApplication(
   const updatePayload: Partial<MembershipApplication> = {
     status: newStatus,
     reviewNotes: reviewNotes || '',
+    rejectionReason: newStatus === 'rejected' ? (reviewNotes || 'Application not approved at this time') : undefined,
     reviewedByUid: adminUser.uid,
     reviewedByEmail: adminUser.email,
     approvedBy: newStatus === 'approved' ? adminUser.uid : undefined,
@@ -2731,8 +2895,19 @@ export async function adminReviewMembershipApplication(
     updatedAt: now
   };
 
-  // Perform document update in Firestore
-  await updateDoc(docRef, updatePayload);
+  // Perform document update in Firestore (use setDoc with merge for maximum resilience)
+  await setDoc(docRef, updatePayload, { merge: true });
+
+  // Also sync to legacy member_applications collection if it exists
+  try {
+    await updateDoc(doc(db, 'member_applications', applicationId), {
+      status: newStatus.toUpperCase(),
+      reviewNotes: reviewNotes || '',
+      updatedAt: now
+    });
+  } catch {
+    // Non-blocking if document does not exist in legacy collection
+  }
 
   // Sync applicant's membershipStatus and roles in Firestore
   if (applicantUid) {
@@ -4345,8 +4520,9 @@ export async function fetchUserCampaigns(userId: string): Promise<CrowdfundingCa
 
 /**
  * Fetch All Campaigns for Super Admin / Campaign Management
+ * Automatically applies jurisdictional isolation when caller profile has delegated scope.
  */
-export async function fetchAllCampaignsAdmin(): Promise<CrowdfundingCampaign[]> {
+export async function fetchAllCampaignsAdmin(callerProfile?: UserProfile | null): Promise<CrowdfundingCampaign[]> {
   try {
     const campaignsRef = collection(db, 'crowdfunding_campaigns');
     const snapshot = await getDocs(campaignsRef);
@@ -4367,6 +4543,12 @@ export async function fetchAllCampaignsAdmin(): Promise<CrowdfundingCampaign[]> 
     });
 
     list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    // Apply strict scope-based data isolation
+    if (callerProfile) {
+      return filterCampaignsByScope(list, callerProfile);
+    }
+
     return list;
   } catch (err) {
     console.error('Error fetching all admin campaigns:', err);
@@ -4403,17 +4585,38 @@ export async function fetchCampaignById(campaignId: string): Promise<Crowdfundin
 }
 
 /**
- * Administrator Campaign Review & Lifecycle Action
- * Allows: 'approve' | 'activate' | 'pause' | 'resume' | 'complete' | 'reject' | 'close'
- * Records Admin UID, Email, Notes, Timestamp
- * Triggers targeted In-App Notification using existing notification engine
+ * Administrator Campaign Review & Multi-Tier Workflow Action
+ * Supports:
+ * - Super Admin full approval / publication / pause / complete
+ * - Delegated District / State / National recommendations, document verifications, clarification requests
+ * Records reviewer level, jurisdiction, and audit trail.
  */
 export async function adminReviewCampaign(
   campaignId: string,
-  action: 'approve' | 'activate' | 'pause' | 'resume' | 'complete' | 'reject' | 'request_correction' | 'start_review' | 'under_review' | 'close',
+  action: 
+    | 'approve' 
+    | 'activate' 
+    | 'pause' 
+    | 'resume' 
+    | 'complete' 
+    | 'reject' 
+    | 'request_correction' 
+    | 'request_clarification'
+    | 'start_review' 
+    | 'under_review' 
+    | 'close'
+    | 'recommend_approve'
+    | 'recommend_reject'
+    | 'verify_docs'
+    | 'forward_to_state'
+    | 'forward_to_super_admin',
   options: {
     adminUid: string;
     adminEmail: string;
+    reviewerName?: string;
+    reviewerLevel?: AdminScopeLevel | 'super_admin';
+    assignedScope?: string;
+    recommendation?: 'recommend_approve' | 'recommend_reject' | 'request_clarification' | 'verified';
     reviewNotes?: string;
     internalNotes?: string;
     reason?: string;
@@ -4451,19 +4654,103 @@ export async function adminReviewCampaign(
   let notifMessage = '';
   let notifSeverity: NotificationSeverity = 'info';
 
+  const reviewerLevel = options.reviewerLevel || 'super_admin';
+
   switch (action) {
     case 'start_review':
     case 'under_review':
       nextStatus = 'under_review';
       updatePayload.status = 'under_review';
+      updatePayload.workflowStage = reviewerLevel === 'district' ? 'district_review' : reviewerLevel === 'state' ? 'state_review' : 'super_admin_approval';
       notifTitle = `Appeal Under Review: ${campaign.title}`;
-      notifMessage = `Your fundraising appeal "${campaign.title}" is currently undergoing official verification by the FET India Administrative Secretariat.`;
+      notifMessage = `Your fundraising appeal "${campaign.title}" is undergoing review.`;
       notifSeverity = 'info';
+      break;
+
+    case 'verify_docs':
+      updatePayload.status = campaign.status === 'pending_review' ? 'under_review' : campaign.status;
+      break;
+
+    case 'recommend_approve':
+      nextStatus = 'under_review';
+      updatePayload.status = 'under_review';
+      if (reviewerLevel === 'district') {
+        updatePayload.workflowStage = 'state_review';
+        updatePayload.districtReview = {
+          reviewedByUid: options.adminUid,
+          reviewedByEmail: options.adminEmail,
+          reviewerName: options.reviewerName,
+          district: campaign.district || 'Assigned District',
+          recommendation: 'recommend_approve',
+          notes: internalNotes,
+          reviewedAt: now
+        };
+      } else if (reviewerLevel === 'state') {
+        updatePayload.workflowStage = 'super_admin_approval';
+        updatePayload.stateReview = {
+          reviewedByUid: options.adminUid,
+          reviewedByEmail: options.adminEmail,
+          reviewerName: options.reviewerName,
+          state: campaign.state || 'Assigned State',
+          recommendation: 'recommend_approve',
+          notes: internalNotes,
+          reviewedAt: now
+        };
+      } else if (reviewerLevel === 'national') {
+        updatePayload.workflowStage = 'super_admin_approval';
+        updatePayload.nationalReview = {
+          reviewedByUid: options.adminUid,
+          reviewedByEmail: options.adminEmail,
+          reviewerName: options.reviewerName,
+          recommendation: 'recommend_approve',
+          notes: internalNotes,
+          reviewedAt: now
+        };
+      }
+      notifTitle = `Appeal Verification Update: ${campaign.title}`;
+      notifMessage = `Your appeal has received recommendation for approval by ${options.assignedScope || reviewerLevel} review.`;
+      notifSeverity = 'info';
+      break;
+
+    case 'recommend_reject':
+      nextStatus = 'under_review';
+      updatePayload.status = 'under_review';
+      updatePayload.workflowStage = 'super_admin_approval';
+      if (reviewerLevel === 'district') {
+        updatePayload.districtReview = {
+          reviewedByUid: options.adminUid,
+          reviewedByEmail: options.adminEmail,
+          reviewerName: options.reviewerName,
+          district: campaign.district || 'Assigned District',
+          recommendation: 'recommend_reject',
+          notes: internalNotes || feedback,
+          reviewedAt: now
+        };
+      } else if (reviewerLevel === 'state') {
+        updatePayload.stateReview = {
+          reviewedByUid: options.adminUid,
+          reviewedByEmail: options.adminEmail,
+          reviewerName: options.reviewerName,
+          state: campaign.state || 'Assigned State',
+          recommendation: 'recommend_reject',
+          notes: internalNotes || feedback,
+          reviewedAt: now
+        };
+      }
+      break;
+
+    case 'forward_to_state':
+      updatePayload.workflowStage = 'state_review';
+      break;
+
+    case 'forward_to_super_admin':
+      updatePayload.workflowStage = 'super_admin_approval';
       break;
 
     case 'approve':
       nextStatus = 'active'; // Approved becomes active for immediate public support
       updatePayload.status = 'active';
+      updatePayload.workflowStage = 'approved';
       updatePayload.isVerifiedByFET = true;
       updatePayload.approvedAt = now;
       updatePayload.approvedByUid = options.adminUid;
@@ -4504,6 +4791,7 @@ export async function adminReviewCampaign(
     case 'reject':
       nextStatus = 'rejected';
       updatePayload.status = 'rejected';
+      updatePayload.workflowStage = 'rejected';
       updatePayload.rejectionReason = feedback || 'Documents could not be verified.';
       notifTitle = `Appeal Review Notice: ${campaign.title}`;
       notifMessage = `Your appeal "${campaign.title}" could not be approved at this time. Feedback: ${feedback || 'Documentation did not meet verification criteria.'}`;
@@ -4511,8 +4799,10 @@ export async function adminReviewCampaign(
       break;
 
     case 'request_correction':
+    case 'request_clarification':
       nextStatus = 'draft';
       updatePayload.status = 'draft';
+      updatePayload.workflowStage = 'clarification_requested';
       updatePayload.correctionReason = feedback || 'Additional verification details or updated documents requested.';
       updatePayload.rejectionReason = feedback || 'Additional verification details or updated documents requested.';
       notifTitle = `Appeal Revision Requested: ${campaign.title}`;
@@ -4541,7 +4831,10 @@ export async function adminReviewCampaign(
     reviewerEmail: options.adminEmail,
     timestamp: now,
     internalNotes: internalNotes || '',
-    applicantFeedback: feedback || ''
+    applicantFeedback: feedback || '',
+    reviewerLevel: options.reviewerLevel,
+    assignedScope: options.assignedScope,
+    recommendation: options.recommendation || (action.startsWith('recommend_') ? action as any : undefined)
   };
 
   const existingHistory = campaign.reviewHistory || [];

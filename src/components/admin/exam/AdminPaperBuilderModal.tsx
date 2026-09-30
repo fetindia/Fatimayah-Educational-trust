@@ -26,7 +26,11 @@ import {
   MoveDown,
   AlertCircle,
   HelpCircle,
-  CheckCircle2
+  CheckCircle2,
+  Calendar,
+  Shuffle,
+  Lock,
+  ShieldCheck
 } from 'lucide-react';
 import { 
   Competition, 
@@ -34,9 +38,15 @@ import {
   ExamQuestion, 
   ExamIntegrityConfig, 
   ExamLanguage, 
-  QuestionBank 
+  QuestionBank,
+  ExamSeries,
+  QuestionType,
+  QuestionDifficulty
 } from '../../../types';
 import { INITIAL_QUESTION_BANKS } from '../../../data/initialQuestionBanks';
+import { SUPPORTED_EXAM_LANGUAGES } from '../../../lib/examTranslation';
+import { db } from '../../../lib/firebase';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 interface AdminPaperBuilderModalProps {
   competition: Competition;
@@ -78,6 +88,72 @@ export const AdminPaperBuilderModal: React.FC<AdminPaperBuilderModalProps> = ({
     }
   );
 
+  // Scheduled Examination State
+  const [examScheduleDate, setExamScheduleDate] = useState<string>(
+    existingExam?.examScheduleDate || competition.examScheduleDate || competition.competitionDate || new Date().toISOString().split('T')[0]
+  );
+  const [openingTime, setOpeningTime] = useState<string>(
+    existingExam?.openingTime || competition.openingTime || '09:00'
+  );
+  const [closingTime, setClosingTime] = useState<string>(
+    existingExam?.closingTime || competition.closingTime || '10:00'
+  );
+  const [timeZone, setTimeZone] = useState<string>(
+    existingExam?.timeZone || competition.timeZone || 'Asia/Kolkata'
+  );
+  const [allowMultipleAttempts, setAllowMultipleAttempts] = useState<boolean>(
+    existingExam?.allowMultipleAttempts ?? competition.allowMultipleAttempts ?? false
+  );
+
+  // Series 1 to 5 Management State
+  const [seriesCount, setSeriesCount] = useState<number>(
+    existingExam?.seriesCount || competition.seriesCount || 1
+  );
+  const [seriesList, setSeriesList] = useState<ExamSeries[]>(() => {
+    if (existingExam?.seriesList && existingExam.seriesList.length > 0) {
+      return existingExam.seriesList;
+    }
+    const initialList: ExamSeries[] = [];
+    const count = existingExam?.seriesCount || competition.seriesCount || 1;
+    for (let i = 1; i <= Math.max(1, Math.min(5, count)); i++) {
+      initialList.push({
+        id: `series-${i}`,
+        seriesCode: `Series ${i}`,
+        seriesTitle: `Paper Series ${i}`,
+        orderMode: i === 1 ? 'custom_questions' : 'shuffled_questions'
+      });
+    }
+    return initialList;
+  });
+  const [activeSeriesTab, setActiveSeriesTab] = useState<string>('series-1');
+
+  const handleSetSeriesCount = (count: number) => {
+    const validCount = Math.max(1, Math.min(5, count));
+    setSeriesCount(validCount);
+    setSeriesList(prev => {
+      const nextList: ExamSeries[] = [];
+      for (let i = 1; i <= validCount; i++) {
+        const existing = prev.find(s => s.seriesCode === `Series ${i}` || s.id === `series-${i}`);
+        if (existing) {
+          nextList.push(existing);
+        } else {
+          nextList.push({
+            id: `series-${i}`,
+            seriesCode: `Series ${i}`,
+            seriesTitle: `Paper Series ${i}`,
+            orderMode: 'shuffled_questions'
+          });
+        }
+      }
+      return nextList;
+    });
+    setActiveSeriesTab('series-1');
+  };
+
+  const handleUpdateSeries = (seriesId: string, updates: Partial<ExamSeries>) => {
+    setSeriesList(prev => prev.map(s => s.id === seriesId ? { ...s, ...updates } : s));
+  };
+
   // Sections
   const [sections, setSections] = useState<ExamSection[]>(
     existingExam?.sections || [
@@ -103,9 +179,50 @@ export const AdminPaperBuilderModal: React.FC<AdminPaperBuilderModalProps> = ({
   );
 
   const [activeSectionId, setActiveSectionId] = useState<string>(sections[0]?.id || 'sec-1');
-  const [activeBuilderTab, setActiveBuilderTab] = useState<'sections' | 'integrity' | 'preview'>('sections');
+  const [activeBuilderTab, setActiveBuilderTab] = useState<'sections' | 'series' | 'schedule' | 'integrity' | 'preview'>('sections');
   const [showQuestionPickerModal, setShowQuestionPickerModal] = useState<boolean>(false);
+  const [showCreateQuestionModal, setShowCreateQuestionModal] = useState<boolean>(false);
   const [selectedBankForPick, setSelectedBankForPick] = useState<string>(INITIAL_QUESTION_BANKS[0]?.id || '');
+  const [shuffleQuestions, setShuffleQuestions] = useState<boolean>(existingExam?.shuffleQuestions ?? true);
+  const [shuffleOptions, setShuffleOptions] = useState<boolean>(existingExam?.shuffleOptions ?? true);
+
+  // Super Admin controlled pre-exam instruction duration and answer policies
+  const [instructionDurationMinutes, setInstructionDurationMinutes] = useState<number>(
+    existingExam?.instructionDurationMinutes !== undefined ? existingExam.instructionDurationMinutes : 2
+  );
+  const [allowAnswerChanges, setAllowAnswerChanges] = useState<boolean>(
+    existingExam?.allowAnswerChanges !== undefined ? existingExam.allowAnswerChanges : true
+  );
+  const [allowReviewQuestions, setAllowReviewQuestions] = useState<boolean>(
+    existingExam?.allowReviewQuestions !== undefined ? existingExam.allowReviewQuestions : true
+  );
+
+  // Directly created question handler (Method B: Write a Question Directly)
+  const handleDirectCreateQuestion = async (newQ: ExamQuestion, alsoSaveToBankId?: string) => {
+    if (!currentSection) return;
+    const updated = [...currentSection.questions, newQ];
+    handleUpdateSection(currentSection.id, { questions: updated });
+    setShowCreateQuestionModal(false);
+
+    // Optional reuse: save to selected question bank repository without duplicating bank
+    if (alsoSaveToBankId) {
+      try {
+        const bankRef = doc(db, 'question_banks', alsoSaveToBankId);
+        const bankSnap = await getDoc(bankRef);
+        if (bankSnap.exists()) {
+          const bdata = bankSnap.data();
+          const existingQs = bdata.questions || [];
+          await updateDoc(bankRef, {
+            questions: [...existingQs, newQ],
+            questionsCount: existingQs.length + 1,
+            updatedAt: new Date().toISOString()
+          });
+        }
+      } catch (saveErr) {
+        console.warn('Optional save to question bank note:', saveErr);
+      }
+    }
+  };
 
   // Calculate total marks across sections
   const totalCalculatedMarks = sections.reduce((sum, sec) => sum + (sec.totalMarks || 0), 0);
@@ -183,6 +300,14 @@ export const AdminPaperBuilderModal: React.FC<AdminPaperBuilderModalProps> = ({
 
     const updatedComp: Competition = {
       ...competition,
+      competitionDate: examScheduleDate,
+      examScheduleDate,
+      openingTime,
+      closingTime,
+      timeZone,
+      allowMultipleAttempts,
+      seriesCount,
+      seriesList,
       maxMarks: totalCalculatedMarks > 0 ? totalCalculatedMarks : competition.maxMarks,
       passingMarks: passingMarks,
       examDetails: {
@@ -198,7 +323,19 @@ export const AdminPaperBuilderModal: React.FC<AdminPaperBuilderModalProps> = ({
         sections,
         questions: flatQuestions,
         integrityConfig,
+        instructionDurationMinutes: Number(instructionDurationMinutes),
+        allowAnswerChanges: Boolean(allowAnswerChanges),
+        allowReviewQuestions: Boolean(allowReviewQuestions),
         allowReviewBeforeSubmit: true,
+        shuffleQuestions: Boolean(shuffleQuestions),
+        shuffleOptions: Boolean(shuffleOptions),
+        seriesCount,
+        seriesList,
+        examScheduleDate,
+        openingTime,
+        closingTime,
+        timeZone,
+        allowMultipleAttempts,
         instructions: [
           `You have ${durationMinutes} minutes to complete all sections of this paper.`,
           `This examination is monitored by the FET Exam Integrity System.`,
@@ -249,7 +386,7 @@ export const AdminPaperBuilderModal: React.FC<AdminPaperBuilderModalProps> = ({
         </div>
 
         {/* Paper Overview Cards */}
-        <div className="bg-white p-4 border-b border-gray-100 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+        <div className="bg-white p-4 border-b border-gray-100 grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
           <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3">
             <span className="text-gray-500 block">Total Sections</span>
             <span className="text-lg font-bold text-indigo-900">{sections.length} Sections</span>
@@ -266,42 +403,70 @@ export const AdminPaperBuilderModal: React.FC<AdminPaperBuilderModalProps> = ({
             <span className="text-gray-500 block">Time Duration</span>
             <span className="text-lg font-bold text-amber-900">{durationMinutes} Minutes</span>
           </div>
+          <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 col-span-2 sm:col-span-1">
+            <span className="text-gray-500 block">Series & Schedule</span>
+            <span className="text-xs font-bold text-blue-900 block truncate mt-1">
+              {seriesCount} Series • {openingTime || '09:00'}–{closingTime || '10:00'} IST
+            </span>
+          </div>
         </div>
 
         {/* Tab Switcher */}
-        <div className="px-6 border-b border-gray-200 flex items-center space-x-4 bg-white">
+        <div className="px-6 border-b border-gray-200 flex items-center space-x-2 sm:space-x-4 bg-white overflow-x-auto">
           <button
             onClick={() => setActiveBuilderTab('sections')}
-            className={`py-3 text-sm font-bold border-b-2 flex items-center space-x-2 transition ${
+            className={`py-3 text-xs sm:text-sm font-bold border-b-2 flex items-center space-x-1.5 transition whitespace-nowrap ${
               activeBuilderTab === 'sections'
                 ? 'border-indigo-600 text-indigo-600'
                 : 'border-transparent text-gray-500 hover:text-gray-800'
             }`}
           >
             <Layers className="w-4 h-4" />
-            <span>Sections & Questions Builder</span>
+            <span>Sections & Questions</span>
+          </button>
+          <button
+            onClick={() => setActiveBuilderTab('series')}
+            className={`py-3 text-xs sm:text-sm font-bold border-b-2 flex items-center space-x-1.5 transition whitespace-nowrap ${
+              activeBuilderTab === 'series'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            <Shuffle className="w-4 h-4" />
+            <span>Series 1–5 ({seriesCount})</span>
+          </button>
+          <button
+            onClick={() => setActiveBuilderTab('schedule')}
+            className={`py-3 text-xs sm:text-sm font-bold border-b-2 flex items-center space-x-1.5 transition whitespace-nowrap ${
+              activeBuilderTab === 'schedule'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            <Calendar className="w-4 h-4" />
+            <span>Schedule & Windows</span>
           </button>
           <button
             onClick={() => setActiveBuilderTab('integrity')}
-            className={`py-3 text-sm font-bold border-b-2 flex items-center space-x-2 transition ${
+            className={`py-3 text-xs sm:text-sm font-bold border-b-2 flex items-center space-x-1.5 transition whitespace-nowrap ${
               activeBuilderTab === 'integrity'
                 ? 'border-indigo-600 text-indigo-600'
                 : 'border-transparent text-gray-500 hover:text-gray-800'
             }`}
           >
             <ShieldAlert className="w-4 h-4" />
-            <span>Anti-Cheating & Integrity Rules</span>
+            <span>Integrity & Anti-Cheat</span>
           </button>
           <button
             onClick={() => setActiveBuilderTab('preview')}
-            className={`py-3 text-sm font-bold border-b-2 flex items-center space-x-2 transition ${
+            className={`py-3 text-xs sm:text-sm font-bold border-b-2 flex items-center space-x-1.5 transition whitespace-nowrap ${
               activeBuilderTab === 'preview'
                 ? 'border-indigo-600 text-indigo-600'
                 : 'border-transparent text-gray-500 hover:text-gray-800'
             }`}
           >
             <Eye className="w-4 h-4" />
-            <span>Live Paper Preview & Print</span>
+            <span>Live Paper Preview</span>
           </button>
         </div>
 
@@ -393,18 +558,75 @@ export const AdminPaperBuilderModal: React.FC<AdminPaperBuilderModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1">Duration (Minutes)</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-gray-700">Exam Duration Limit</label>
+                      <span className="text-xs font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                        {durationMinutes} Minutes
+                      </span>
+                    </div>
+                    {/* Practical Duration Presets */}
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {[10, 15, 30, 45, 60, 90].map((mins) => (
+                        <button
+                          key={mins}
+                          type="button"
+                          onClick={() => setDurationMinutes(mins)}
+                          className={`px-2 py-1 rounded text-[11px] font-semibold transition cursor-pointer ${
+                            durationMinutes === mins
+                              ? 'bg-amber-600 text-white font-bold'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
+                          }`}
+                        >
+                          {mins}m
+                        </button>
+                      ))}
+                    </div>
                     <input
                       type="number"
                       value={durationMinutes}
-                      onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                      min={10}
-                      className="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 text-xs text-gray-900"
+                      onChange={(e) => setDurationMinutes(Math.max(5, Number(e.target.value)))}
+                      min={5}
+                      placeholder="Custom minutes..."
+                      className="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 text-xs font-semibold text-gray-900"
+                    />
+                  </div>
+
+                  {/* Super Admin Instruction Reading Period */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-gray-700">Pre-Exam Instruction Time</label>
+                      <span className="text-xs font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                        {instructionDurationMinutes > 0 ? `${instructionDurationMinutes} Minutes` : 'None / Immediate'}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {[0, 1, 2, 3, 5].map((mins) => (
+                        <button
+                          key={mins}
+                          type="button"
+                          onClick={() => setInstructionDurationMinutes(mins)}
+                          className={`px-2 py-1 rounded text-[11px] font-semibold transition cursor-pointer ${
+                            instructionDurationMinutes === mins
+                              ? 'bg-indigo-600 text-white font-bold'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
+                          }`}
+                        >
+                          {mins === 0 ? '0m' : `${mins}m`}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="number"
+                      value={instructionDurationMinutes}
+                      onChange={(e) => setInstructionDurationMinutes(Math.max(0, Number(e.target.value)))}
+                      min={0}
+                      placeholder="Instruction minutes (e.g. 2)..."
+                      className="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 text-xs font-semibold text-gray-900"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1">Passing Cutoff Marks</label>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Passing Cutoff Marks</label>
                     <input
                       type="number"
                       value={passingMarks}
@@ -418,27 +640,21 @@ export const AdminPaperBuilderModal: React.FC<AdminPaperBuilderModalProps> = ({
                   <div className="pt-2 border-t border-gray-100">
                     <label className="block text-xs font-semibold text-gray-700 mb-1.5 flex items-center space-x-1">
                       <Languages className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>Supported Languages</span>
+                      <span>Supported Languages ({supportedLanguages.length})</span>
                     </label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {[
-                        { id: 'en', label: 'English' },
-                        { id: 'ur', label: 'اردو (Urdu)' },
-                        { id: 'hi', label: 'हिंदी (Hindi)' },
-                        { id: 'ar', label: 'العربية (Arabic)' },
-                        { id: 'fa', label: 'فارسی (Persian)' }
-                      ].map(lang => (
+                    <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+                      {SUPPORTED_EXAM_LANGUAGES.map(lang => (
                         <button
-                          key={lang.id}
+                          key={lang.code}
                           type="button"
-                          onClick={() => toggleLanguage(lang.id as ExamLanguage)}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
-                            supportedLanguages.includes(lang.id as ExamLanguage)
+                          onClick={() => toggleLanguage(lang.code)}
+                          className={`px-2 py-1 rounded-lg text-[11px] font-medium transition cursor-pointer ${
+                            supportedLanguages.includes(lang.code)
                               ? 'bg-indigo-600 text-white font-bold'
                               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                           }`}
                         >
-                          {lang.label}
+                          {lang.nativeLabel} ({lang.label})
                         </button>
                       ))}
                     </div>
@@ -493,17 +709,30 @@ export const AdminPaperBuilderModal: React.FC<AdminPaperBuilderModalProps> = ({
 
                     {/* Questions in this Section */}
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <h4 className="text-sm font-bold text-gray-900 flex items-center space-x-2">
                           <span>Questions Assigned ({currentSection.questions.length})</span>
                         </h4>
-                        <button
-                          onClick={() => setShowQuestionPickerModal(true)}
-                          className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Pick from Question Banks</span>
-                        </button>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowCreateQuestionModal(true)}
+                            className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition cursor-pointer"
+                            title="Write a new question directly into this paper section (Method B)"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Create Question</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowQuestionPickerModal(true)}
+                            className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition cursor-pointer"
+                            title="Select existing questions from Question Bank repository (Method A)"
+                          >
+                            <BookOpen className="w-3.5 h-3.5" />
+                            <span>Pick from Question Banks</span>
+                          </button>
+                        </div>
                       </div>
 
                       {currentSection.questions.length === 0 ? (
@@ -511,8 +740,26 @@ export const AdminPaperBuilderModal: React.FC<AdminPaperBuilderModalProps> = ({
                           <BookOpen className="w-8 h-8 text-gray-300 mx-auto mb-2" />
                           <p className="text-xs font-bold text-gray-700">No questions added to this section yet</p>
                           <p className="text-xs text-gray-500 mt-0.5">
-                            Click "Pick from Question Banks" above to import curated questions.
+                            Add questions directly to this paper or import curated questions from the Question Bank repository:
                           </p>
+                          <div className="flex flex-wrap items-center justify-center gap-3 mt-4">
+                            <button
+                              type="button"
+                              onClick={() => setShowCreateQuestionModal(true)}
+                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition flex items-center space-x-1.5 cursor-pointer"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Create Question Directly</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowQuestionPickerModal(true)}
+                              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition flex items-center space-x-1.5 cursor-pointer"
+                            >
+                              <BookOpen className="w-3.5 h-3.5" />
+                              <span>Pick from Question Banks</span>
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <div className="space-y-3">
@@ -562,6 +809,303 @@ export const AdminPaperBuilderModal: React.FC<AdminPaperBuilderModalProps> = ({
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: SERIES 1 TO 5 ARCHITECTURE */}
+          {activeBuilderTab === 'series' && (
+            <div className="max-w-4xl mx-auto space-y-6">
+              <div className="p-5 bg-blue-50/70 border border-blue-200 rounded-2xl flex items-start space-x-3">
+                <Shuffle className="w-6 h-6 text-blue-700 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="text-base font-bold text-blue-950">
+                    Question Paper Series Management (Series 1 to 5)
+                  </h3>
+                  <p className="text-xs text-blue-900 mt-1 leading-relaxed">
+                    Prevent collusive malpractice by configuring up to 5 concurrent question paper series. The system allocates series across test-takers so adjacent participants receive alternating question sequences.
+                  </p>
+                </div>
+              </div>
+
+              {/* Series Count Selector */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-900">Active Question Paper Series Count</h4>
+                    <p className="text-xs text-gray-500">Select how many distinct series to generate (1 to 5 series supported).</p>
+                  </div>
+                  <div className="flex items-center space-x-1.5 bg-gray-100 p-1 rounded-xl">
+                    {[1, 2, 3, 4, 5].map((cnt) => (
+                      <button
+                        key={cnt}
+                        type="button"
+                        onClick={() => handleSetSeriesCount(cnt)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                          seriesCount === cnt
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                        }`}
+                      >
+                        {cnt} {cnt === 1 ? 'Series' : 'Series'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Series Subtabs */}
+              <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                <div className="flex border-b border-gray-200 bg-gray-50 px-4 pt-2 gap-2 overflow-x-auto">
+                  {seriesList.map((series) => (
+                    <button
+                      key={series.id}
+                      type="button"
+                      onClick={() => setActiveSeriesTab(series.id)}
+                      className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition cursor-pointer border-t border-x ${
+                        activeSeriesTab === series.id
+                          ? 'bg-white border-gray-200 text-blue-700 shadow-sm'
+                          : 'border-transparent text-gray-500 hover:text-gray-900'
+                      }`}
+                    >
+                      {series.seriesCode}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Active Series Config */}
+                {(() => {
+                  const currSeries = seriesList.find(s => s.id === activeSeriesTab) || seriesList[0];
+                  if (!currSeries) return null;
+
+                  return (
+                    <div className="p-6 space-y-5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 mb-1">Series Designation</label>
+                          <input
+                            type="text"
+                            value={currSeries.seriesCode}
+                            onChange={(e) => handleUpdateSeries(currSeries.id, { seriesCode: e.target.value })}
+                            className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 mb-1">Series Description</label>
+                          <input
+                            type="text"
+                            value={currSeries.seriesTitle || ''}
+                            onChange={(e) => handleUpdateSeries(currSeries.id, { seriesTitle: e.target.value })}
+                            placeholder="e.g. Standard Shuffled Set"
+                            className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-2">Sequence & Randomization Strategy</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          {[
+                            {
+                              id: 'shuffled_questions',
+                              label: 'Shuffled Questions',
+                              desc: 'Questions permuted pseudorandomly; preserves section breakdown'
+                            },
+                            {
+                              id: 'shuffled_options',
+                              label: 'Shuffled MCQ Options',
+                              desc: 'Options order scrambled differently per question'
+                            },
+                            {
+                              id: 'custom_questions',
+                              label: 'Direct Sequence',
+                              desc: 'Original paper order as configured in the Section builder'
+                            }
+                          ].map(mode => (
+                            <button
+                              key={mode.id}
+                              type="button"
+                              onClick={() => handleUpdateSeries(currSeries.id, { orderMode: mode.id as any })}
+                              className={`p-3 rounded-xl border text-left transition cursor-pointer ${
+                                (currSeries.orderMode || 'shuffled_questions') === mode.id
+                                  ? 'border-blue-600 bg-blue-50/70 text-blue-900 ring-2 ring-blue-500/20'
+                                  : 'border-gray-200 bg-gray-50 hover:bg-white text-gray-700'
+                              }`}
+                            >
+                              <div className="font-bold text-xs">{mode.label}</div>
+                              <div className="text-[11px] text-gray-500 mt-1 leading-snug">{mode.desc}</div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Paper-Wide Shuffling Controls */}
+                      <div className="pt-4 border-t border-gray-200 space-y-2">
+                        <div className="text-xs font-bold text-gray-800">Series Shuffling & Anti-Malpractice Controls</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <label className="flex items-start space-x-2.5 p-3 rounded-xl border border-gray-200 bg-gray-50/70 hover:bg-gray-100/70 transition cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={shuffleQuestions}
+                              onChange={(e) => setShuffleQuestions(e.target.checked)}
+                              className="w-4 h-4 text-blue-600 rounded mt-0.5"
+                            />
+                            <div>
+                              <span className="text-xs font-bold text-gray-900 block">Shuffle Questions Across Series</span>
+                              <span className="text-[11px] text-gray-500 leading-tight block mt-0.5">
+                                Permute question order per series while preserving mark weightage and section boundaries.
+                              </span>
+                            </div>
+                          </label>
+                          <label className="flex items-start space-x-2.5 p-3 rounded-xl border border-gray-200 bg-gray-50/70 hover:bg-gray-100/70 transition cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={shuffleOptions}
+                              onChange={(e) => setShuffleOptions(e.target.checked)}
+                              className="w-4 h-4 text-blue-600 rounded mt-0.5"
+                            />
+                            <div>
+                              <span className="text-xs font-bold text-gray-900 block">Shuffle Options for MCQ Questions</span>
+                              <span className="text-[11px] text-gray-500 leading-tight block mt-0.5">
+                                Scramble answer choices (A, B, C, D) per participant while preserving correct answer mapping.
+                              </span>
+                            </div>
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-600 space-y-1">
+                        <div className="font-bold text-gray-800">Series Overview for Candidates:</div>
+                        <div>• Contains all {totalQuestionsCount} questions across {sections.length} sections ({totalCalculatedMarks} total marks).</div>
+                        <div>• Supports questions added from Question Bank and questions written directly in the builder.</div>
+                        <div>• Assigned automatically on exam start. Answer keys are strictly preserved and never exposed.</div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: SCHEDULE & STRICT EXAM WINDOW */}
+          {activeBuilderTab === 'schedule' && (
+            <div className="max-w-4xl mx-auto space-y-6">
+              <div className="p-5 bg-emerald-50/70 border border-emerald-200 rounded-2xl flex items-start space-x-3">
+                <Calendar className="w-6 h-6 text-emerald-700 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="text-base font-bold text-emerald-950">
+                    Scheduled Examination & Strict Time Window
+                  </h3>
+                  <p className="text-xs text-emerald-900 mt-1 leading-relaxed">
+                    Set explicit opening and closing times. The system enforces strict server-synchronized boundaries: no candidate can begin before opening time, and late starts are blocked after closing time.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                  {/* Exam Date */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center space-x-1">
+                      <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Exam Date</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={examScheduleDate}
+                      onChange={(e) => setExamScheduleDate(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold"
+                    />
+                  </div>
+
+                  {/* Opening Time */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center space-x-1">
+                      <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Opening Time (IST)</span>
+                    </label>
+                    <input
+                      type="time"
+                      value={openingTime}
+                      onChange={(e) => setOpeningTime(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-emerald-800"
+                    />
+                  </div>
+
+                  {/* Closing Time */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center space-x-1">
+                      <Clock className="w-3.5 h-3.5 text-red-600" />
+                      <span>Closing Time (IST)</span>
+                    </label>
+                    <input
+                      type="time"
+                      value={closingTime}
+                      onChange={(e) => setClosingTime(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-red-800"
+                    />
+                  </div>
+
+                  {/* Time Zone */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Time Zone</label>
+                    <select
+                      value={timeZone}
+                      onChange={(e) => setTimeZone(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold"
+                    >
+                      <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+                      <option value="UTC">UTC (Universal)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* One Attempt Rule */}
+                <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-900 flex items-center space-x-2">
+                      <Lock className="w-4 h-4 text-indigo-600" />
+                      <span>Strict Single Attempt Enforcement</span>
+                    </h4>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      1 Registered Candidate = 1 Valid Exam Attempt. Re-registration or restarting an in-progress/submitted test is blocked.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!allowMultipleAttempts}
+                      onChange={(e) => setAllowMultipleAttempts(!e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+
+                {/* Schedule Lifecycle Timeline Explanation */}
+                <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-3 text-xs">
+                  <div className="font-bold text-gray-900 uppercase tracking-wide">Automated Schedule Stages:</div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <div className="font-bold text-amber-900">1. Before Opening</div>
+                      <div className="text-amber-800 text-[11px] mt-1">
+                        Opens on {examScheduleDate} at {openingTime} IST. Candidate can view study material & rules, but cannot start.
+                      </div>
+                    </div>
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                      <div className="font-bold text-emerald-900">2. Active Window ({openingTime}–{closingTime})</div>
+                      <div className="text-emerald-800 text-[11px] mt-1">
+                        "Start Examination" unlocks for registered candidates. Timer counts down for {durationMinutes} minutes.
+                      </div>
+                    </div>
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="font-bold text-red-900">3. Strict Closing (After {closingTime})</div>
+                      <div className="text-red-800 text-[11px] mt-1">
+                        Window closes strictly. Unattempted or late candidates cannot start.
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -685,6 +1229,112 @@ export const AdminPaperBuilderModal: React.FC<AdminPaperBuilderModalProps> = ({
                   />
                 </div>
               </div>
+
+              {/* SUPER ADMIN EXAMINATION POLICIES CARD */}
+              <div className="bg-white border-2 border-indigo-200 rounded-2xl p-6 shadow-sm space-y-6">
+                <div className="flex items-center space-x-2 border-b border-indigo-100 pb-3">
+                  <ShieldCheck className="w-5 h-5 text-indigo-700" />
+                  <div>
+                    <h3 className="text-sm font-extrabold text-indigo-950 uppercase tracking-wider">
+                      Pre-Exam Instructions & Answer Review Policy (Super Admin Controlled)
+                    </h3>
+                    <p className="text-xs text-indigo-800 mt-0.5">
+                      Configure authoritative candidate answering constraints and pre-exam instruction screen timing.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 1. Instruction Screen Duration */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-gray-900">Instruction Screen Display Duration</h4>
+                      <p className="text-[11px] text-gray-500 leading-snug">
+                        Mandatory reading time presented to candidate before the examination answering period begins.
+                      </p>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-bold font-mono border border-indigo-200">
+                      {instructionDurationMinutes > 0 ? `${instructionDurationMinutes} Minutes` : 'Immediate Start'}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {[
+                      { val: 0, label: '0m (Immediate)' },
+                      { val: 1, label: '1 Minute' },
+                      { val: 2, label: '2 Minutes' },
+                      { val: 3, label: '3 Minutes' },
+                      { val: 5, label: '5 Minutes' }
+                    ].map(preset => (
+                      <button
+                        key={preset.val}
+                        type="button"
+                        onClick={() => setInstructionDurationMinutes(preset.val)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                          instructionDurationMinutes === preset.val
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2. Allow Answer Changes During Examination (Answer Locking) */}
+                <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
+                  <div className="pr-4">
+                    <div className="flex items-center space-x-2">
+                      <h4 className="text-xs font-bold text-gray-900">Allow Answer Changes During Examination</h4>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        allowAnswerChanges ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {allowAnswerChanges ? 'ON (Editable)' : 'OFF (Answer Locked)'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-1 leading-snug">
+                      <strong>ON:</strong> Candidate can review and modify already answered questions during the active test.<br />
+                      <strong>OFF:</strong> Once an answer is selected and saved, that answer becomes locked and cannot be changed.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={allowAnswerChanges}
+                      onChange={(e) => setAllowAnswerChanges(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+
+                {/* 3. Allow Review of Answered Questions During Examination */}
+                <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
+                  <div className="pr-4">
+                    <div className="flex items-center space-x-2">
+                      <h4 className="text-xs font-bold text-gray-900">Allow Review of Answered Questions During Examination</h4>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        allowReviewQuestions ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {allowReviewQuestions ? 'ON (Reopen Allowed)' : 'OFF (Reopen Disabled)'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-1 leading-snug">
+                      <strong>ON:</strong> Candidate may navigate back to previously answered questions.<br />
+                      <strong>OFF:</strong> Once candidate proceeds past/locks an answer, that question cannot be reopened for viewing.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={allowReviewQuestions}
+                      onChange={(e) => setAllowReviewQuestions(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+              </div>
             </div>
           )}
 
@@ -763,11 +1413,23 @@ export const AdminPaperBuilderModal: React.FC<AdminPaperBuilderModalProps> = ({
         </div>
       </div>
 
-      {/* QUESTION PICKER MODAL */}
+      {/* QUESTION PICKER MODAL (METHOD A) */}
       {showQuestionPickerModal && (
         <QuestionPickerSubModal
           onClose={() => setShowQuestionPickerModal(false)}
           onAdd={handleAddQuestionsFromBank}
+        />
+      )}
+
+      {/* CREATE QUESTION DIRECTLY MODAL (METHOD B) */}
+      {showCreateQuestionModal && (
+        <CreateQuestionDirectSubModal
+          onClose={() => setShowCreateQuestionModal(false)}
+          onAdd={handleDirectCreateQuestion}
+          supportedLanguages={supportedLanguages}
+          defaultLanguage={defaultLanguage}
+          availableBanks={INITIAL_QUESTION_BANKS}
+          defaultBookTitle={competition.bookDetails?.bookTitle || competition.title}
         />
       )}
     </div>
@@ -888,6 +1550,398 @@ const QuestionPickerSubModal: React.FC<QuestionPickerSubModalProps> = ({
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
+// Sub-Modal: Write Question Directly (Method B)
+// ==========================================
+interface CreateQuestionDirectSubModalProps {
+  onClose: () => void;
+  onAdd: (newQuestion: ExamQuestion, alsoSaveToBankId?: string) => void;
+  supportedLanguages: ExamLanguage[];
+  defaultLanguage: ExamLanguage;
+  availableBanks: QuestionBank[];
+  defaultBookTitle?: string;
+}
+
+const CreateQuestionDirectSubModal: React.FC<CreateQuestionDirectSubModalProps> = ({
+  onClose,
+  onAdd,
+  defaultLanguage,
+  availableBanks,
+  defaultBookTitle
+}) => {
+  const [questionType, setQuestionType] = useState<QuestionType>('mcq');
+  const [questionText, setQuestionText] = useState('');
+  const [options, setOptions] = useState<string[]>(['', '', '', '']);
+  const [correctOptionIndex, setCorrectOptionIndex] = useState<number>(0);
+  const [marks, setMarks] = useState<number>(4);
+  const [negativeMarks, setNegativeMarks] = useState<number>(0);
+  const [difficulty] = useState<QuestionDifficulty>('medium');
+  const [explanation, setExplanation] = useState('');
+  const [urduTranslationText, setUrduTranslationText] = useState('');
+  const [hindiTranslationText, setHindiTranslationText] = useState('');
+  const [chapterNumber, setChapterNumber] = useState<string>('');
+  const [topicTag, setTopicTag] = useState<string>('');
+  const [alsoSaveToBank, setAlsoSaveToBank] = useState<boolean>(false);
+  const [selectedBankId, setSelectedBankId] = useState<string>(availableBanks[0]?.id || '');
+  const [errorNotice, setErrorNotice] = useState<string | null>(null);
+
+  const handleOptionChange = (idx: number, val: string) => {
+    const updated = [...options];
+    updated[idx] = val;
+    setOptions(updated);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!questionText.trim()) {
+      setErrorNotice('Question text is required.');
+      return;
+    }
+
+    let finalOptions: string[] | undefined = undefined;
+    let finalCorrectIndex: number | undefined = undefined;
+
+    if (questionType === 'mcq') {
+      const validOptions = options.map(o => o.trim());
+      if (validOptions.filter(o => o.length > 0).length < 2) {
+        setErrorNotice('Multiple choice questions require at least 2 non-empty options.');
+        return;
+      }
+      finalOptions = validOptions;
+      finalCorrectIndex = correctOptionIndex;
+    } else if (questionType === 'true_false') {
+      finalOptions = ['True', 'False'];
+      finalCorrectIndex = correctOptionIndex === 1 ? 1 : 0;
+    }
+
+    const translations: Partial<Record<ExamLanguage, any>> = {};
+    if (urduTranslationText.trim()) {
+      translations['ur'] = {
+        language: 'ur',
+        questionText: urduTranslationText.trim(),
+        direction: 'rtl'
+      };
+    }
+    if (hindiTranslationText.trim()) {
+      translations['hi'] = {
+        language: 'hi',
+        questionText: hindiTranslationText.trim(),
+        direction: 'ltr'
+      };
+    }
+
+    const newQuestion: ExamQuestion = {
+      id: `q-dir-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+      questionText: questionText.trim(),
+      questionType,
+      primaryLanguage: defaultLanguage,
+      options: finalOptions,
+      correctOptionIndex: finalCorrectIndex,
+      marks: Math.max(1, Number(marks) || 4),
+      negativeMarks: Math.max(0, Number(negativeMarks) || 0),
+      difficulty,
+      explanation: explanation.trim() || undefined,
+      translations: Object.keys(translations).length > 0 ? translations : undefined,
+      bookMastery: chapterNumber ? {
+        bookTitle: defaultBookTitle || 'Prescribed Reading Material',
+        chapterNumber: Number(chapterNumber),
+        chapterTitle: topicTag || `Chapter ${chapterNumber}`,
+        topicTag: topicTag || undefined
+      } : undefined,
+      createdAt: new Date().toISOString()
+    };
+
+    onAdd(newQuestion, alsoSaveToBank ? selectedBankId : undefined);
+  };
+
+  return (
+    <div className="fixed inset-0 z-60 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-scaleIn">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+          <div className="flex items-center space-x-2">
+            <span className="p-2 rounded-xl bg-emerald-100 text-emerald-800">
+              <Plus className="w-4 h-4" />
+            </span>
+            <div>
+              <h3 className="text-base font-bold text-gray-900">
+                Write Question Directly (Method B)
+              </h3>
+              <p className="text-xs text-gray-500">
+                Author and attach directly to current section without needing a Question Bank first.
+              </p>
+            </div>
+          </div>
+          <button 
+            type="button"
+            onClick={onClose} 
+            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {errorNotice && (
+          <div className="my-3 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-800 flex items-center justify-between">
+            <span>{errorNotice}</span>
+            <button onClick={() => setErrorNotice(null)} className="text-rose-600 hover:text-rose-900 text-xs">Dismiss</button>
+          </div>
+        )}
+
+        {/* Scrollable Form Body */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
+          {/* Question Type & Marks */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">Question Type</label>
+              <select
+                value={questionType}
+                onChange={(e) => setQuestionType(e.target.value as QuestionType)}
+                className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-800"
+              >
+                <option value="mcq">Multiple Choice (MCQ)</option>
+                <option value="true_false">True / False</option>
+                <option value="descriptive">Descriptive / Essay</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">Marks (+)</label>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={marks}
+                onChange={(e) => setMarks(Number(e.target.value))}
+                className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-indigo-700"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">Negative Marks (-)</label>
+              <input
+                type="number"
+                min={0}
+                max={10}
+                step={0.25}
+                value={negativeMarks}
+                onChange={(e) => setNegativeMarks(Number(e.target.value))}
+                className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-rose-700"
+              />
+            </div>
+          </div>
+
+          {/* Question Text */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">
+              Question Text ({defaultLanguage.toUpperCase()}) <span className="text-rose-500">*</span>
+            </label>
+            <textarea
+              rows={3}
+              value={questionText}
+              onChange={(e) => setQuestionText(e.target.value)}
+              placeholder="Enter comprehensive question formulation here..."
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-xs text-gray-900 focus:bg-white"
+              required
+            />
+          </div>
+
+          {/* Answer Options for MCQ */}
+          {questionType === 'mcq' && (
+            <div className="space-y-2.5 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-gray-800">
+                  Multiple Choice Options & Correct Answer
+                </label>
+                <span className="text-[11px] text-gray-500">Select the correct radio option</span>
+              </div>
+              <div className="space-y-2">
+                {options.map((opt, idx) => (
+                  <div key={idx} className="flex items-center space-x-2">
+                    <label className="flex items-center space-x-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="direct_correct_option"
+                        checked={correctOptionIndex === idx}
+                        onChange={() => setCorrectOptionIndex(idx)}
+                        className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <span className="w-5 text-center text-xs font-bold text-gray-600">
+                        ({String.fromCharCode(65 + idx)})
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      value={opt}
+                      onChange={(e) => handleOptionChange(idx, e.target.value)}
+                      placeholder={`Option ${String.fromCharCode(65 + idx)} text...`}
+                      className={`flex-1 bg-white border rounded-xl px-3 py-1.5 text-xs text-gray-900 ${
+                        correctOptionIndex === idx ? 'border-emerald-500 ring-1 ring-emerald-500/20' : 'border-gray-300'
+                      }`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* True / False Options */}
+          {questionType === 'true_false' && (
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+              <label className="block text-xs font-bold text-gray-800">Correct Answer Option</label>
+              <div className="flex items-center space-x-6">
+                <label className="flex items-center space-x-2 cursor-pointer text-xs font-bold text-gray-800">
+                  <input
+                    type="radio"
+                    name="direct_tf_option"
+                    checked={correctOptionIndex === 0}
+                    onChange={() => setCorrectOptionIndex(0)}
+                    className="w-4 h-4 text-emerald-600"
+                  />
+                  <span>True</span>
+                </label>
+                <label className="flex items-center space-x-2 cursor-pointer text-xs font-bold text-gray-800">
+                  <input
+                    type="radio"
+                    name="direct_tf_option"
+                    checked={correctOptionIndex === 1}
+                    onChange={() => setCorrectOptionIndex(1)}
+                    className="w-4 h-4 text-emerald-600"
+                  />
+                  <span>False</span>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* Explanation */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">
+              Explanation / Answer Key Justification (Optional)
+            </label>
+            <textarea
+              rows={2}
+              value={explanation}
+              onChange={(e) => setExplanation(e.target.value)}
+              placeholder="Educational explanation shown after evaluation..."
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900"
+            />
+          </div>
+
+          {/* Multilingual Translations (Optional) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-gray-100">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Urdu Translation (اردو) - Optional
+              </label>
+              <textarea
+                rows={2}
+                dir="rtl"
+                value={urduTranslationText}
+                onChange={(e) => setUrduTranslationText(e.target.value)}
+                placeholder="سوال یہاں درج کریں..."
+                className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2 text-xs text-gray-900"
+                style={{ fontFamily: 'Noto Nastaliq Urdu, serif' }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Hindi Translation (हिन्दी) - Optional
+              </label>
+              <textarea
+                rows={2}
+                value={hindiTranslationText}
+                onChange={(e) => setHindiTranslationText(e.target.value)}
+                placeholder="प्रश्न यहाँ दर्ज करें..."
+                className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2 text-xs text-gray-900"
+              />
+            </div>
+          </div>
+
+          {/* Book Mastery Reference (Optional) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-gray-100">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Book Chapter Number</label>
+              <input
+                type="number"
+                value={chapterNumber}
+                onChange={(e) => setChapterNumber(e.target.value)}
+                placeholder="e.g. 3"
+                className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-1.5 text-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Topic / Section Tag</label>
+              <input
+                type="text"
+                value={topicTag}
+                onChange={(e) => setTopicTag(e.target.value)}
+                placeholder="e.g. Rocket Propulsion / Values"
+                className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-1.5 text-xs"
+              />
+            </div>
+          </div>
+
+          {/* Question Bank Reuse Checkbox */}
+          <div className="pt-3 border-t border-gray-100 bg-amber-50/50 p-3.5 rounded-2xl border border-amber-200">
+            <label className="flex items-start space-x-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={alsoSaveToBank}
+                onChange={(e) => setAlsoSaveToBank(e.target.checked)}
+                className="w-4 h-4 text-amber-600 rounded mt-0.5"
+              />
+              <div className="flex-1">
+                <span className="text-xs font-bold text-amber-950 block">
+                  Also save this question into the central Question Bank repository for future reuse
+                </span>
+                <span className="text-[11px] text-amber-800 block mt-0.5">
+                  Stores this item in the repository so other papers can reuse it later. Does not create a duplicate question bank.
+                </span>
+              </div>
+            </label>
+
+            {alsoSaveToBank && (
+              <div className="mt-3 pt-2 border-t border-amber-200">
+                <label className="block text-xs font-semibold text-amber-900 mb-1">Target Question Bank Repository</label>
+                <select
+                  value={selectedBankId}
+                  onChange={(e) => setSelectedBankId(e.target.value)}
+                  className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-800"
+                >
+                  {availableBanks.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.title} ({b.questions?.length || 0} Questions)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* Form Actions */}
+          <div className="pt-3 border-t border-gray-100 flex items-center justify-end space-x-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-xs font-semibold text-gray-600 hover:text-gray-900 rounded-xl"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center space-x-1.5 cursor-pointer"
+            >
+              <Check className="w-4 h-4" />
+              <span>Add Question to Paper</span>
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

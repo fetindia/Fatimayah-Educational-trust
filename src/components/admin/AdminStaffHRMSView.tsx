@@ -3,7 +3,7 @@
  * FET India HRMS & Staff Management Console (Step 47)
  * Fatimyah Educational Trust India
  * Organization Legal Name: Fatimyah Educational Trust
- * Regn. No. E-19842 (BOM) • Section 80G & 12A Certified
+ * Regd. in Jammu & Kashmir through SDM Office (1994) • DARPAN: JK/2026/1153821 • PAN: AABTF0015H
  *
  * Capabilities:
  * - Real-time Trust Staff & Faculty Directory

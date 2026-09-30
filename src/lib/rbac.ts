@@ -7,7 +7,18 @@
  * Tagline: Education • Service • Empowerment
  */
 
-import { AppPermission, CoreRole, PermissionDefinition, RoleMetadata, UserRole } from '../types';
+import { 
+  AppPermission, 
+  CoreRole, 
+  PermissionDefinition, 
+  RoleMetadata, 
+  UserRole,
+  UserProfile,
+  DelegatedAdminScope,
+  CrowdfundingCampaign,
+  CompetitionRegistration,
+  Competition
+} from '../types';
 
 /**
  * Granular Permission Definitions for FET India Platform
@@ -89,6 +100,148 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     description: 'Review candidate answer sheets, evaluate assessments, verify marks, and contribute to question banks.',
     category: 'Core Operations',
     targetModule: 'Examinations'
+  },
+  // Delegated Scoped Permissions
+  {
+    id: 'cases.district_review',
+    name: 'District Case Review',
+    description: 'Review and verify crowdfunding documents and applicant details within assigned district jurisdiction.',
+    category: 'Core Operations',
+    targetModule: 'Crowdfunding & Appeals'
+  },
+  {
+    id: 'cases.state_review',
+    name: 'State/UT Case Review',
+    description: 'Review, audit, and verify crowdfunding cases across assigned State or Union Territory jurisdiction.',
+    category: 'Core Operations',
+    targetModule: 'Crowdfunding & Appeals'
+  },
+  {
+    id: 'cases.national_review',
+    name: 'National Case Review',
+    description: 'Review and verify crowdfunding cases across permitted nationwide jurisdictions.',
+    category: 'Core Operations',
+    targetModule: 'Crowdfunding & Appeals'
+  },
+  {
+    id: 'cases.recommend',
+    name: 'Recommend Case Approval/Rejection',
+    description: 'Submit formal verification recommendations to Super Admin for case decision.',
+    category: 'Core Operations',
+    targetModule: 'Crowdfunding & Appeals'
+  },
+  {
+    id: 'cases.clarify',
+    name: 'Request Applicant Clarification',
+    description: 'Return case appeals to applicants for additional documentation or clarification.',
+    category: 'Core Operations',
+    targetModule: 'Crowdfunding & Appeals'
+  },
+  {
+    id: 'exams.district_manage',
+    name: 'District Exam Administration',
+    description: 'Administer examination registrations, seating, and participant records in assigned district.',
+    category: 'Core Operations',
+    targetModule: 'Examinations'
+  },
+  {
+    id: 'exams.state_manage',
+    name: 'State/UT Exam Administration',
+    description: 'Administer examination operations across permitted districts within assigned State or Union Territory.',
+    category: 'Core Operations',
+    targetModule: 'Examinations'
+  },
+  {
+    id: 'exams.national_manage',
+    name: 'National Exam Administration',
+    description: 'Oversee examination operations across permitted national jurisdictions.',
+    category: 'Core Operations',
+    targetModule: 'Examinations'
+  },
+  {
+    id: 'admin.delegation',
+    name: 'Manage Delegated Authorities',
+    description: 'Super Admin prerogative to delegate District, State, and National jurisdictional authorities.',
+    category: 'User & Role Security',
+    targetModule: 'RBAC Security Subsystem'
+  },
+  // Granular Media & Publishing Permissions
+  {
+    id: 'blog.create',
+    name: 'Create Blog Content',
+    description: 'Create draft blog posts, articles, and institutional updates.',
+    category: 'Core Operations',
+    targetModule: 'Blog, Press & News'
+  },
+  {
+    id: 'blog.edit',
+    name: 'Edit Blog Content',
+    description: 'Modify and update existing blog dispatches, drafts, and circulars.',
+    category: 'Core Operations',
+    targetModule: 'Blog, Press & News'
+  },
+  {
+    id: 'blog.publish',
+    name: 'Publish Blog & Press Content',
+    description: 'Publish, unpublish, and manage public visibility of official blog dispatches and circulars.',
+    category: 'Core Operations',
+    targetModule: 'Blog, Press & News'
+  },
+  {
+    id: 'press.publish',
+    name: 'Publish Press Releases',
+    description: 'Publish official institutional press releases and media updates.',
+    category: 'Core Operations',
+    targetModule: 'Blog, Press & News'
+  },
+  {
+    id: 'news.publish',
+    name: 'Publish Trust News',
+    description: 'Publish news dispatches, circulars, and announcements live on the official portal.',
+    category: 'Core Operations',
+    targetModule: 'Blog, Press & News'
+  },
+  {
+    id: 'news.edit',
+    name: 'Edit News & Drafts',
+    description: 'Draft and edit news dispatches and announcements prior to publication.',
+    category: 'Core Operations',
+    targetModule: 'Blog, Press & News'
+  },
+  {
+    id: 'trust.publish',
+    name: 'Publish Trust Content',
+    description: 'Publish institutional Trust content, About pages, leadership updates, and official legal disclosures.',
+    category: 'Core Operations',
+    targetModule: 'Organization Configuration'
+  },
+  {
+    id: 'trust.edit',
+    name: 'Edit Trust Content',
+    description: 'Draft and edit Trust overview texts, mission statements, and institutional content.',
+    category: 'Core Operations',
+    targetModule: 'Organization Configuration'
+  },
+  {
+    id: 'bulletin.publish',
+    name: 'Publish Official Bulletins',
+    description: 'Publish official institutional bulletins, gazette notices, and formal circulars live.',
+    category: 'Core Operations',
+    targetModule: 'Blog, Press & News'
+  },
+  {
+    id: 'bulletin.edit',
+    name: 'Edit Bulletins & Circulars',
+    description: 'Draft and edit official bulletins and circulars.',
+    category: 'Core Operations',
+    targetModule: 'Blog, Press & News'
+  },
+  {
+    id: 'content.publish',
+    name: 'Content Publishing Authority',
+    description: 'Full authorization to create, edit, and publish content across media modules.',
+    category: 'Core Operations',
+    targetModule: 'Blog, Press & News'
   }
 ];
 
@@ -103,7 +256,27 @@ export const ALL_PERMISSIONS: AppPermission[] = [
   'settings.manage',
   'finance.manage',
   'exams.manage',
-  'exams.evaluate'
+  'exams.evaluate',
+  'cases.district_review',
+  'cases.state_review',
+  'cases.national_review',
+  'cases.recommend',
+  'cases.clarify',
+  'exams.district_manage',
+  'exams.state_manage',
+  'exams.national_manage',
+  'admin.delegation',
+  'blog.create',
+  'blog.edit',
+  'blog.publish',
+  'press.publish',
+  'news.publish',
+  'news.edit',
+  'trust.publish',
+  'trust.edit',
+  'bulletin.publish',
+  'bulletin.edit',
+  'content.publish'
 ];
 
 /**
@@ -306,19 +479,43 @@ export const ROLE_DEFINITIONS: Record<UserRole, RoleMetadata> = {
   content_admin: {
     id: 'content_admin',
     label: 'Content Administrator',
-    description: 'Publishes official trust bulletins, press releases, and articles.',
+    description: 'Full publishing administration across trust news, circulars, leadership announcements, and portal articles.',
     hierarchyLevel: 60,
     isAdministrative: true,
-    defaultPermissions: ['settings.manage'],
+    defaultPermissions: [
+      'settings.manage',
+      'blog.create',
+      'blog.edit',
+      'blog.publish',
+      'press.publish',
+      'news.publish',
+      'news.edit',
+      'trust.publish',
+      'trust.edit',
+      'bulletin.publish',
+      'bulletin.edit',
+      'content.publish'
+    ],
     badgeColor: 'bg-rose-950 text-rose-300 border-rose-800'
   },
   blog_admin: {
     id: 'blog_admin',
-    label: 'Blog Administrator',
-    description: 'Publishes official trust bulletins, press releases, and articles.',
+    label: 'Blog & Media Administrator',
+    description: 'Publishes official trust bulletins, press releases, circulars, and editorial dispatches.',
     hierarchyLevel: 60,
     isAdministrative: true,
-    defaultPermissions: ['settings.manage'],
+    defaultPermissions: [
+      'settings.manage',
+      'blog.create',
+      'blog.edit',
+      'blog.publish',
+      'press.publish',
+      'news.publish',
+      'news.edit',
+      'bulletin.publish',
+      'bulletin.edit',
+      'content.publish'
+    ],
     badgeColor: 'bg-rose-950 text-rose-300 border-rose-800'
   },
   store_admin: {
@@ -365,6 +562,91 @@ export const ROLE_DEFINITIONS: Record<UserRole, RoleMetadata> = {
     isAdministrative: false,
     defaultPermissions: [],
     badgeColor: 'bg-zinc-800 text-zinc-300 border-zinc-700'
+  },
+
+  // -------------------------------------------------------------
+  // DELEGATED JURISDICTIONAL ADMINISTRATORS (District / State / National)
+  // -------------------------------------------------------------
+  district_admin: {
+    id: 'district_admin',
+    label: 'District Administrator',
+    description: 'Delegated district-level administrator managing permitted operations strictly within explicitly assigned districts.',
+    hierarchyLevel: 62,
+    isAdministrative: true,
+    defaultPermissions: ['users.view', 'cases.district_review', 'cases.recommend', 'cases.clarify', 'exams.district_manage'],
+    badgeColor: 'bg-emerald-950 text-emerald-300 border-emerald-800'
+  },
+  district_crowdfunding_admin: {
+    id: 'district_crowdfunding_admin',
+    label: 'District Case Manager',
+    description: 'Delegated district case officer: reviews submitted documents, applicant verification, requests clarification, and submits recommendations for district cases.',
+    hierarchyLevel: 62,
+    isAdministrative: true,
+    defaultPermissions: ['users.view', 'cases.district_review', 'cases.recommend', 'cases.clarify'],
+    badgeColor: 'bg-amber-950 text-amber-300 border-amber-800'
+  },
+  district_exam_admin: {
+    id: 'district_exam_admin',
+    label: 'District Examination Admin',
+    description: 'Delegated district examination coordinator: oversees candidate registrations, seating, and exam administration strictly within assigned district.',
+    hierarchyLevel: 62,
+    isAdministrative: true,
+    defaultPermissions: ['users.view', 'exams.district_manage'],
+    badgeColor: 'bg-purple-950 text-purple-300 border-purple-800'
+  },
+  state_admin: {
+    id: 'state_admin',
+    label: 'State/UT Administrator',
+    description: 'Delegated State or Union Territory administrator managing permitted operations across assigned state jurisdiction.',
+    hierarchyLevel: 65,
+    isAdministrative: true,
+    defaultPermissions: ['users.view', 'cases.state_review', 'cases.recommend', 'cases.clarify', 'exams.state_manage'],
+    badgeColor: 'bg-teal-950 text-teal-300 border-teal-800'
+  },
+  state_crowdfunding_admin: {
+    id: 'state_crowdfunding_admin',
+    label: 'State/UT Case Manager',
+    description: 'Delegated State/UT case officer: conducts state-level case review, cross-district audits, document verification, and recommendations.',
+    hierarchyLevel: 65,
+    isAdministrative: true,
+    defaultPermissions: ['users.view', 'cases.state_review', 'cases.recommend', 'cases.clarify'],
+    badgeColor: 'bg-orange-950 text-orange-300 border-orange-800'
+  },
+  state_exam_admin: {
+    id: 'state_exam_admin',
+    label: 'State/UT Examination Admin',
+    description: 'Delegated State/UT examination administrator: manages competitions and candidate registrations across permitted districts in assigned state.',
+    hierarchyLevel: 65,
+    isAdministrative: true,
+    defaultPermissions: ['users.view', 'exams.state_manage'],
+    badgeColor: 'bg-indigo-950 text-indigo-300 border-indigo-800'
+  },
+  national_admin: {
+    id: 'national_admin',
+    label: 'National Administrator',
+    description: 'Delegated National administrator managing permitted operations across India according to permissions granted by Super Admin.',
+    hierarchyLevel: 68,
+    isAdministrative: true,
+    defaultPermissions: ['users.view', 'cases.national_review', 'cases.recommend', 'cases.clarify', 'exams.national_manage'],
+    badgeColor: 'bg-blue-950 text-blue-300 border-blue-800'
+  },
+  national_crowdfunding_admin: {
+    id: 'national_crowdfunding_admin',
+    label: 'National Case Manager',
+    description: 'Delegated National case officer: performs pan-India case reviews, high-value verifications, and recommendations.',
+    hierarchyLevel: 68,
+    isAdministrative: true,
+    defaultPermissions: ['users.view', 'cases.national_review', 'cases.recommend', 'cases.clarify'],
+    badgeColor: 'bg-rose-950 text-rose-300 border-rose-800'
+  },
+  national_exam_admin: {
+    id: 'national_exam_admin',
+    label: 'National Examination Admin',
+    description: 'Delegated National examination officer: coordinates nationwide competitions and candidate rosters.',
+    hierarchyLevel: 68,
+    isAdministrative: true,
+    defaultPermissions: ['users.view', 'exams.national_manage'],
+    badgeColor: 'bg-violet-950 text-violet-300 border-violet-800'
   }
 };
 
@@ -457,3 +739,521 @@ export function getRoleMetadata(role: UserRole): RoleMetadata {
     }
   );
 }
+
+/**
+ * Checks whether a user possesses any delegated jurisdictional role
+ */
+export function isDelegatedAdmin(userProfile: UserProfile | null): boolean {
+  if (!userProfile) return false;
+  const delegatedRoles: UserRole[] = [
+    'district_admin',
+    'district_crowdfunding_admin',
+    'district_exam_admin',
+    'state_admin',
+    'state_crowdfunding_admin',
+    'state_exam_admin',
+    'national_admin',
+    'national_crowdfunding_admin',
+    'national_exam_admin'
+  ];
+  return (
+    userProfile.roles?.some(r => delegatedRoles.includes(r)) ||
+    delegatedRoles.includes(userProfile.primaryRole) ||
+    Boolean(userProfile.delegatedScopes && userProfile.delegatedScopes.length > 0)
+  );
+}
+
+/**
+ * Resolves the active delegated scope for a specific module
+ */
+export function getDelegatedScope(
+  userProfile: UserProfile | null, 
+  module: 'crowdfunding' | 'examinations'
+): DelegatedAdminScope | undefined {
+  if (!userProfile) return undefined;
+  
+  // Find active scope matching module or 'both'
+  const activeScope = userProfile.delegatedScopes?.find(
+    s => s.status === 'active' && (s.module === module || s.module === 'both')
+  );
+  if (activeScope) return activeScope;
+
+  // Infer scope from assigned roles if not in explicit delegatedScopes array
+  const roles = userProfile.roles || [userProfile.primaryRole];
+  
+  if (module === 'crowdfunding') {
+    if (
+      roles.includes('district_crowdfunding_admin') || 
+      roles.includes('district_admin') || 
+      userProfile.primaryRole === 'district_crowdfunding_admin' || 
+      userProfile.primaryRole === 'district_admin' || 
+      userProfile.activeScopeLevel === 'district'
+    ) {
+      return {
+        uid: userProfile.uid,
+        email: userProfile.email,
+        level: 'district',
+        module: 'crowdfunding',
+        assignedState: userProfile.assignedState || userProfile.state,
+        assignedDistricts: userProfile.assignedDistricts || (userProfile.district ? [userProfile.district] : []),
+        canRead: true,
+        canReview: true,
+        canRecommend: true,
+        canApprove: false,
+        canEdit: false,
+        status: 'active',
+        assignedByUid: 'system',
+        assignedByEmail: 'superadmin@fetindia.org',
+        assignedAt: userProfile.createdAt
+      };
+    }
+    if (
+      roles.includes('state_crowdfunding_admin') || 
+      roles.includes('state_admin') || 
+      userProfile.primaryRole === 'state_crowdfunding_admin' || 
+      userProfile.primaryRole === 'state_admin' || 
+      userProfile.activeScopeLevel === 'state'
+    ) {
+      return {
+        uid: userProfile.uid,
+        email: userProfile.email,
+        level: 'state',
+        module: 'crowdfunding',
+        assignedState: userProfile.assignedState || userProfile.state,
+        assignedDistricts: userProfile.assignedDistricts,
+        canRead: true,
+        canReview: true,
+        canRecommend: true,
+        canApprove: false,
+        canEdit: false,
+        status: 'active',
+        assignedByUid: 'system',
+        assignedByEmail: 'superadmin@fetindia.org',
+        assignedAt: userProfile.createdAt
+      };
+    }
+    if (
+      roles.includes('national_crowdfunding_admin') || 
+      roles.includes('national_admin') || 
+      userProfile.primaryRole === 'national_crowdfunding_admin' || 
+      userProfile.primaryRole === 'national_admin' || 
+      userProfile.activeScopeLevel === 'national'
+    ) {
+      return {
+        uid: userProfile.uid,
+        email: userProfile.email,
+        level: 'national',
+        module: 'crowdfunding',
+        assignedState: 'All India',
+        canRead: true,
+        canReview: true,
+        canRecommend: true,
+        canApprove: false,
+        canEdit: false,
+        status: 'active',
+        assignedByUid: 'system',
+        assignedByEmail: 'superadmin@fetindia.org',
+        assignedAt: userProfile.createdAt
+      };
+    }
+  }
+
+  if (module === 'examinations') {
+    if (
+      roles.includes('district_exam_admin') || 
+      roles.includes('district_admin') || 
+      userProfile.primaryRole === 'district_exam_admin' || 
+      userProfile.primaryRole === 'district_admin' || 
+      userProfile.activeScopeLevel === 'district'
+    ) {
+      return {
+        uid: userProfile.uid,
+        email: userProfile.email,
+        level: 'district',
+        module: 'examinations',
+        assignedState: userProfile.assignedState || userProfile.state,
+        assignedDistricts: userProfile.assignedDistricts || (userProfile.district ? [userProfile.district] : []),
+        canRead: true,
+        canReview: true,
+        canRecommend: true,
+        canApprove: false,
+        canEdit: true,
+        status: 'active',
+        assignedByUid: 'system',
+        assignedByEmail: 'superadmin@fetindia.org',
+        assignedAt: userProfile.createdAt
+      };
+    }
+    if (
+      roles.includes('state_exam_admin') || 
+      roles.includes('state_admin') || 
+      userProfile.primaryRole === 'state_exam_admin' || 
+      userProfile.primaryRole === 'state_admin' || 
+      userProfile.activeScopeLevel === 'state'
+    ) {
+      return {
+        uid: userProfile.uid,
+        email: userProfile.email,
+        level: 'state',
+        module: 'examinations',
+        assignedState: userProfile.assignedState || userProfile.state,
+        assignedDistricts: userProfile.assignedDistricts,
+        canRead: true,
+        canReview: true,
+        canRecommend: true,
+        canApprove: false,
+        canEdit: true,
+        status: 'active',
+        assignedByUid: 'system',
+        assignedByEmail: 'superadmin@fetindia.org',
+        assignedAt: userProfile.createdAt
+      };
+    }
+    if (
+      roles.includes('national_exam_admin') || 
+      roles.includes('national_admin') || 
+      userProfile.primaryRole === 'national_exam_admin' || 
+      userProfile.primaryRole === 'national_admin' || 
+      userProfile.activeScopeLevel === 'national'
+    ) {
+      return {
+        uid: userProfile.uid,
+        email: userProfile.email,
+        level: 'national',
+        module: 'examinations',
+        assignedState: 'All India',
+        canRead: true,
+        canReview: true,
+        canRecommend: true,
+        canApprove: false,
+        canEdit: true,
+        status: 'active',
+        assignedByUid: 'system',
+        assignedByEmail: 'superadmin@fetindia.org',
+        assignedAt: userProfile.createdAt
+      };
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Validates if user has authority to access data belonging to a district
+ */
+export function canAccessDistrict(
+  userProfile: UserProfile | null, 
+  targetDistrict?: string, 
+  targetState?: string
+): boolean {
+  if (!userProfile) return false;
+  if (userProfile.roles?.includes('super_admin') || userProfile.primaryRole === 'super_admin') return true;
+
+  // National scope check
+  if (userProfile.roles?.some(r => ['national_admin', 'national_crowdfunding_admin', 'national_exam_admin'].includes(r))) {
+    return true;
+  }
+  const nationalScope = userProfile.delegatedScopes?.some(s => s.status === 'active' && s.level === 'national');
+  if (nationalScope) return true;
+
+  // State scope check
+  if (targetState) {
+    const userAssignedState = userProfile.assignedState || userProfile.state;
+    const isStateAdmin = userProfile.roles?.some(r => ['state_admin', 'state_crowdfunding_admin', 'state_exam_admin'].includes(r)) ||
+      userProfile.delegatedScopes?.some(s => s.status === 'active' && s.level === 'state');
+    if (isStateAdmin && userAssignedState && userAssignedState.toLowerCase() === targetState.toLowerCase()) {
+      return true;
+    }
+  }
+
+  // District scope check
+  if (!targetDistrict) return false;
+  const normalizedTarget = targetDistrict.toLowerCase().trim();
+
+  // Check explicit assigned districts array
+  const assigned = userProfile.assignedDistricts || [];
+  if (assigned.some(d => d.toLowerCase().trim() === normalizedTarget)) return true;
+
+  // Check delegatedScopes array
+  for (const s of userProfile.delegatedScopes || []) {
+    if (s.status === 'active') {
+      if (s.level === 'national') return true;
+      if (s.level === 'state' && targetState && s.assignedState?.toLowerCase() === targetState.toLowerCase()) {
+        return true;
+      }
+      if (s.assignedDistricts?.some(d => d.toLowerCase().trim() === normalizedTarget)) {
+        return true;
+      }
+    }
+  }
+
+  // Check fallback user profile district if user is district_admin
+  if (userProfile.roles?.some(r => ['district_admin', 'district_crowdfunding_admin', 'district_exam_admin'].includes(r))) {
+    if (userProfile.district?.toLowerCase().trim() === normalizedTarget) return true;
+    if (userProfile.city?.toLowerCase().trim() === normalizedTarget) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Filter Crowdfunding Campaigns strictly isolated by caller's delegated scope
+ */
+export function filterCampaignsByScope(
+  campaigns: CrowdfundingCampaign[], 
+  userProfile: UserProfile | null
+): CrowdfundingCampaign[] {
+  if (!userProfile) return [];
+  // Super Admin and Global Crowdfunding Admin see all campaigns
+  if (
+    userProfile.roles?.includes('super_admin') || 
+    userProfile.primaryRole === 'super_admin' ||
+    userProfile.roles?.includes('crowdfunding_admin') ||
+    userProfile.primaryRole === 'crowdfunding_admin' ||
+    userProfile.roles?.includes('administrator')
+  ) {
+    return campaigns;
+  }
+
+  const scope = getDelegatedScope(userProfile, 'crowdfunding');
+  if (!scope) {
+    // If not delegated for crowdfunding, return empty (Zero-Trust)
+    return [];
+  }
+
+  if (scope.level === 'national') {
+    return campaigns;
+  }
+
+  if (scope.level === 'state') {
+    const assignedState = (scope.assignedState || userProfile.assignedState || userProfile.state || '').toLowerCase().trim();
+    if (!assignedState) return [];
+    return campaigns.filter(c => {
+      const campState = (c.state || c.creatorState || '').toLowerCase().trim();
+      return campState === assignedState;
+    });
+  }
+
+  if (scope.level === 'district') {
+    const assignedDistricts = (scope.assignedDistricts || userProfile.assignedDistricts || [userProfile.district || ''])
+      .map(d => d.toLowerCase().trim())
+      .filter(Boolean);
+    if (assignedDistricts.length === 0) return [];
+
+    return campaigns.filter(c => {
+      const campDistrict = (c.district || c.creatorDistrict || c.city || '').toLowerCase().trim();
+      return assignedDistricts.includes(campDistrict);
+    });
+  }
+
+  return [];
+}
+
+/**
+ * Filter Competition Registrations strictly isolated by caller's delegated scope
+ */
+export function filterRegistrationsByScope(
+  registrations: CompetitionRegistration[], 
+  userProfile: UserProfile | null
+): CompetitionRegistration[] {
+  if (!userProfile) return [];
+  // Super Admin and Exam Controller see all registrations
+  if (
+    userProfile.roles?.includes('super_admin') || 
+    userProfile.primaryRole === 'super_admin' ||
+    userProfile.roles?.includes('exam_controller') ||
+    userProfile.primaryRole === 'exam_controller' ||
+    userProfile.roles?.includes('exam_admin') ||
+    userProfile.primaryRole === 'exam_admin'
+  ) {
+    return registrations;
+  }
+
+  const scope = getDelegatedScope(userProfile, 'examinations');
+  if (!scope) {
+    // Check if examiner
+    if (userProfile.roles?.includes('examiner') || userProfile.primaryRole === 'examiner') {
+      return registrations;
+    }
+    return [];
+  }
+
+  if (scope.level === 'national') {
+    return registrations;
+  }
+
+  if (scope.level === 'state') {
+    const assignedState = (scope.assignedState || userProfile.assignedState || userProfile.state || '').toLowerCase().trim();
+    if (!assignedState) return [];
+    return registrations.filter(r => (r.state || '').toLowerCase().trim() === assignedState);
+  }
+
+  if (scope.level === 'district') {
+    const assignedDistricts = (scope.assignedDistricts || userProfile.assignedDistricts || [userProfile.district || ''])
+      .map(d => d.toLowerCase().trim())
+      .filter(Boolean);
+    if (assignedDistricts.length === 0) return [];
+
+    return registrations.filter(r => {
+      const regDistrict = (r.district || '').toLowerCase().trim();
+      return assignedDistricts.includes(regDistrict);
+    });
+  }
+
+  return [];
+}
+
+/**
+ * Filter Competitions based on delegated scope eligibility
+ */
+export function filterCompetitionsByScope(
+  competitions: Competition[], 
+  userProfile: UserProfile | null
+): Competition[] {
+  if (!userProfile) return [];
+  if (
+    userProfile.roles?.includes('super_admin') || 
+    userProfile.primaryRole === 'super_admin' ||
+    userProfile.roles?.includes('exam_controller') ||
+    userProfile.roles?.includes('exam_admin') ||
+    userProfile.roles?.includes('examiner')
+  ) {
+    return competitions;
+  }
+
+  const scope = getDelegatedScope(userProfile, 'examinations');
+  if (!scope || scope.level === 'national') return competitions;
+
+  if (scope.level === 'state') {
+    const assignedState = (scope.assignedState || userProfile.assignedState || userProfile.state || '').toLowerCase().trim();
+    return competitions.filter(c => {
+      if (!c.eligibleStates || c.eligibleStates.length === 0 || c.eligibleStates.includes('All India')) return true;
+      return c.eligibleStates.some(s => s.toLowerCase().trim() === assignedState);
+    });
+  }
+
+  if (scope.level === 'district') {
+    const assignedDistricts = (scope.assignedDistricts || userProfile.assignedDistricts || [userProfile.district || ''])
+      .map(d => d.toLowerCase().trim())
+      .filter(Boolean);
+    return competitions.filter(c => {
+      if (!c.eligibleDistricts || c.eligibleDistricts.length === 0) return true;
+      return c.eligibleDistricts.some(d => assignedDistricts.includes(d.toLowerCase().trim()));
+    });
+  }
+
+  return competitions;
+}
+
+/**
+ * Checks whether user possesses any delegated publishing authority
+ */
+export function isDelegatedPublisher(userProfile: UserProfile | null): boolean {
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('content_admin') || roles.includes('blog_admin')) return true;
+
+  const perms = [
+    ...(userProfile.permissions || []),
+    ...(userProfile.customPermissions || [])
+  ];
+
+  const publishingPerms: AppPermission[] = [
+    'news.publish', 'news.edit',
+    'trust.publish', 'trust.edit',
+    'bulletin.publish', 'bulletin.edit',
+    'blog.create', 'blog.edit', 'blog.publish',
+    'press.publish', 'content.publish'
+  ];
+
+  return perms.some(p => publishingPerms.includes(p));
+}
+
+/**
+ * Returns true if the user has ONLY delegated publishing access and is NOT a global administrator or super admin.
+ * Used to lock direct routing and present ONLY the dedicated Publishing Dashboard.
+ */
+export function isPublisherOnly(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return false;
+  if (!userProfile) return false;
+
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  
+  // If user has full administrative or governance roles, they are not publisher-only
+  const globalAdminRoles: UserRole[] = [
+    'super_admin', 'administrator', 'core_member',
+    'finance_admin', 'hr_admin', 'exam_controller', 'exam_admin',
+    'donor_admin', 'member_admin', 'volunteer_admin', 'crowdfunding_admin',
+    'district_admin', 'state_admin', 'national_admin'
+  ];
+
+  if (roles.some(r => globalAdminRoles.includes(r))) return false;
+
+  // Check if they have publishing rights
+  return isDelegatedPublisher(userProfile);
+}
+
+/**
+ * Granular permissions checks for publishing modules
+ */
+export function canPublishNews(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('administrator') || roles.includes('content_admin') || roles.includes('blog_admin')) return true;
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('news.publish') || perms.includes('blog.publish') || perms.includes('content.publish');
+}
+
+export function canEditNews(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (canPublishNews(userProfile, isSuperAdmin)) return true;
+  if (!userProfile) return false;
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('news.edit') || perms.includes('blog.edit') || perms.includes('blog.create');
+}
+
+export function canPublishTrustContent(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('administrator') || roles.includes('content_admin')) return true;
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('trust.publish') || perms.includes('content.publish') || perms.includes('settings.manage');
+}
+
+export function canEditTrustContent(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (canPublishTrustContent(userProfile, isSuperAdmin)) return true;
+  if (!userProfile) return false;
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('trust.edit');
+}
+
+export function canPublishBulletin(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('administrator') || roles.includes('content_admin') || roles.includes('blog_admin')) return true;
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('bulletin.publish') || perms.includes('press.publish') || perms.includes('blog.publish') || perms.includes('content.publish');
+}
+
+export function canEditBulletin(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (canPublishBulletin(userProfile, isSuperAdmin)) return true;
+  if (!userProfile) return false;
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('bulletin.edit') || perms.includes('blog.edit') || perms.includes('blog.create');
+}
+
+export function canOperateAnyPublishing(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  return canEditNews(userProfile, false) ||
+    canPublishNews(userProfile, false) ||
+    canEditTrustContent(userProfile, false) ||
+    canPublishTrustContent(userProfile, false) ||
+    canEditBulletin(userProfile, false) ||
+    canPublishBulletin(userProfile, false);
+}
+

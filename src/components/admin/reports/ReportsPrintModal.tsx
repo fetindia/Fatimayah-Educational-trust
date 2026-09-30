@@ -30,7 +30,11 @@ interface ReportsPrintModalProps {
   orgConfig?: {
     legalName?: string;
     registrationNumber?: string;
+    registrationJurisdiction?: string;
+    registrationAct?: string;
     contactEmail?: string;
+    nitiAayogId?: string;
+    panNumber?: string;
   };
 }
 
@@ -91,7 +95,7 @@ export const ReportsPrintModal: React.FC<ReportsPrintModalProps> = ({
                 {orgConfig?.legalName || 'Fatimyah Educational Trust India'}
               </h1>
               <p className="text-xs text-slate-600 font-medium mt-0.5">
-                Official Public Charitable Trust • Registration No: {orgConfig?.registrationNumber || '48/IV/2012'} • Section 80G & 12A Certified
+                Official Public Charitable Trust • Registration No: {orgConfig?.registrationNumber || 'E 9822'} ({orgConfig?.registrationJurisdiction || 'Jammu & Kashmir'}){orgConfig?.registrationAct ? ` • ${orgConfig.registrationAct}` : ''} • DARPAN: {orgConfig?.nitiAayogId || 'JK/2026/1153821'} • PAN: {orgConfig?.panNumber || 'AABTF0015H'} • Sec 80G & 12A Certified
               </p>
               <p className="text-[11px] text-slate-500">
                 Central Administrative Secretariat • Contact: {orgConfig?.contactEmail || 'fetkofficial@gmail.com'} • Web: FETIndia.com

@@ -3,7 +3,7 @@
  * Full-Page Institutional About Trust Experience
  * Fatimyah Educational Trust India (FET India)
  * Education • Service • Empowerment
- * Established 1994 • Registration No: E-19842 (Bombay Public Trust Act 1950)
+ * Established 1994 • Registered in Jammu & Kashmir through SDM Office (1994)
  * 
  * Dynamic Sovereign Source of Truth linked to Firestore OrgConfig:
  * 1. Overview & Work (Educational, Welfare, Community, Empowerment)
@@ -231,7 +231,7 @@ export const AboutTrustFullPage: React.FC<AboutTrustFullPageProps> = ({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-slate-800 text-left">
             <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Registration</span>
-              <span className="text-sm sm:text-base font-black text-white font-mono">{config.registrationNumber || 'E-19842 (Mumbai)'}</span>
+              <span className="text-sm sm:text-base font-black text-white font-mono">{config.registrationNumber || 'E 9822'}</span>
             </div>
             <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Tax Exemption</span>
@@ -590,10 +590,10 @@ export const AboutTrustFullPage: React.FC<AboutTrustFullPageProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               
               <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Trust Act Registration</span>
-                <span className="text-base font-mono font-black text-slate-900 block">{config.registrationNumber || 'E-19842 (Mumbai)'}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Trust Registration</span>
+                <span className="text-base font-mono font-black text-slate-900 block">{config.registrationNumber || 'E 9822'}</span>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  {about.registrationAuthority || 'Registered under the Bombay Public Trust Act, 1950 with the Charity Commissioner of Maharashtra.'}
+                  {about.registrationAuthority || 'Registered in Jammu & Kashmir through the Sub-Divisional Magistrate (SDM) Office.'}
                 </p>
               </div>
 
@@ -615,7 +615,7 @@ export const AboutTrustFullPage: React.FC<AboutTrustFullPageProps> = ({
 
               <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">NITI Aayog NGO Darpan</span>
-                <span className="text-base font-mono font-black text-amber-700 block">{about.darpanNgoId || config.nitiAayogId || 'MH/2021/028914'}</span>
+                <span className="text-base font-mono font-black text-amber-700 block">{about.darpanNgoId || config.nitiAayogId || config.darpanId || 'JK/2026/1153821'}</span>
                 <p className="text-xs text-slate-600 leading-relaxed">
                   Accredited on Government of India NITI Aayog NGO Darpan portal for public welfare and CSR partnerships.
                 </p>
@@ -623,7 +623,7 @@ export const AboutTrustFullPage: React.FC<AboutTrustFullPageProps> = ({
 
               <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Statutory PAN</span>
-                <span className="text-base font-mono font-black text-slate-900 block">{about.panNumberPublic || 'AAATF1234A'}</span>
+                <span className="text-base font-mono font-black text-slate-900 block">{about.panNumberPublic || config.panNumber || 'AABTF0015H'}</span>
                 <p className="text-xs text-slate-600 leading-relaxed">
                   Permanent Account Number verified with the Central Board of Direct Taxes (CBDT).
                 </p>
@@ -966,7 +966,7 @@ export const AboutTrustFullPage: React.FC<AboutTrustFullPageProps> = ({
                       <span className="text-[9px] font-black uppercase text-amber-300 tracking-wider">FET INDIA</span>
                       <span className="text-[7px] font-bold text-slate-300">PUBLIC TRUST</span>
                       <span className="text-[10px] font-black font-serif text-white">ESTD 1994</span>
-                      <span className="text-[7px] font-mono text-emerald-400">{config.registrationNumber || 'REG E-19842'}</span>
+                      <span className="text-[7px] font-mono text-emerald-400">{config.registrationNumber || 'SDM/JK/1994'}</span>
                     </div>
                   )}
                 </div>
@@ -974,7 +974,7 @@ export const AboutTrustFullPage: React.FC<AboutTrustFullPageProps> = ({
                 <div className="space-y-1">
                   <h4 className="text-base font-black text-white">Official Institutional Seal</h4>
                   <p className="text-xs text-slate-400">
-                    Fatimyah Educational Trust Central Secretariat • Mumbai
+                    FATIMYAH EDUCATIONAL TRUST Central Secretariat
                   </p>
                 </div>
 
@@ -1045,10 +1045,10 @@ export const AboutTrustFullPage: React.FC<AboutTrustFullPageProps> = ({
                 <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
                   <span className="font-bold text-slate-900 block">External Auditor Affirmation:</span>
                   <p className="leading-relaxed">
-                    {about.auditStatement || 'Accounts are audited annually by independent Chartered Accountants, and returns are filed with the Charity Commissioner and Income Tax Department.'}
+                    {about.auditStatement || 'Accounts are audited annually by independent Chartered Accountants, and returns are filed with statutory authorities and the Income Tax Department.'}
                   </p>
                   <p className="text-[11px] font-mono text-slate-500 pt-1">
-                    Auditor Firm: {about.auditorFirmName || 'M/s S. K. Lodha & Co., Chartered Accountants'}
+                    Auditor Firm: {about.auditorFirmName || 'M/s S. K. Merchant & Associates, Chartered Accountants'}
                   </p>
                 </div>
               </div>
@@ -1126,7 +1126,7 @@ export const AboutTrustFullPage: React.FC<AboutTrustFullPageProps> = ({
                 <span>Head Secretariat Address</span>
               </div>
               <p className="leading-relaxed text-slate-300">
-                {config.headOfficeAddress || 'Fatimyah Educational Complex, Central Secretariat, Mumbai, Maharashtra 400001, India'}
+                {config.headOfficeAddress || 'FATIMYAH EDUCATIONAL TRUST, Central Secretariat, Jammu & Kashmir 194103, India'}
               </p>
             </div>
 
@@ -1137,7 +1137,7 @@ export const AboutTrustFullPage: React.FC<AboutTrustFullPageProps> = ({
               </div>
               <div className="space-y-1">
                 <a href={`tel:${config.contactPhone}`} className="block text-sm font-bold text-white hover:text-emerald-300">
-                  {config.contactPhone || '+91 22 2876 5432'}
+                  {config.contactPhone || '+91 91494 14549'}
                 </a>
                 {config.emergencyHotline && (
                   <span className="text-[11px] text-rose-400 block">

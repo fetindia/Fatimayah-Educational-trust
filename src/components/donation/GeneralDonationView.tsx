@@ -3,7 +3,7 @@
  * Official Donate Now, Islamic Obligations, Land/Property & Material Portal
  * Fatimyah Educational Trust India (FET India)
  * Legal Name: Fatimyah Educational Trust
- * Regn. No. E-19842 (BOM) • Section 80G & 12A Certified
+ * Regd. in Jammu & Kashmir through SDM Office (1994) • DARPAN: JK/2026/1153821 • PAN: AABTF0015H
  * 
  * 6 Core Donation Streams:
  * 1. Zakat (with interactive Shariah calculator, monetary via Razorpay, 80G receipt)
@@ -550,7 +550,7 @@ export const GeneralDonationView: React.FC<GeneralDonationViewProps> = ({
                 50% TAX RELIEF (80G)
               </span>
               <span className="text-[10px] font-mono text-slate-600 block">
-                Regn. No. E-19842 (BOM)
+                DARPAN: {config.nitiAayogId || 'JK/2026/1153821'} • PAN: {config.panNumber || 'AABTF0015H'}
               </span>
             </div>
           </div>
@@ -1985,8 +1985,8 @@ export const GeneralDonationView: React.FC<GeneralDonationViewProps> = ({
                 <span className="font-mono font-black text-xs text-slate-900 block">
                   {config.bankDetails?.ifscCode || 'SBIN0000300'}
                 </span>
-                <span className="text-[10px] text-slate-500 block truncate" title={`${config.bankDetails?.bankName || 'State Bank of India'} • ${config.bankDetails?.branch || 'Mumbai Main Branch'}`}>
-                  {config.bankDetails?.bankName || 'State Bank of India'} • {config.bankDetails?.branch || 'Mumbai Main Branch'}
+                <span className="text-[10px] text-slate-500 block truncate" title={`${config.bankDetails?.bankName || 'State Bank of India'} • ${config.bankDetails?.branch || 'Main Branch'}`}>
+                  {config.bankDetails?.bankName || 'State Bank of India'} • {config.bankDetails?.branch || 'Main Branch'}
                 </span>
               </div>
 
@@ -2019,7 +2019,7 @@ export const GeneralDonationView: React.FC<GeneralDonationViewProps> = ({
             <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200 text-xs text-emerald-950 flex items-start gap-3">
               <Info className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
               <p className="leading-relaxed">
-                <strong>Form 10BE Tax Exemption Certificate:</strong> {config.bankDetails?.referenceInstructions || `After initiating a direct NEFT/RTGS or UPI transfer, please email your transaction reference (UTR) and PAN card number to ${config.contactEmail || 'contact@fetindia.com'} or contact ${config.contactPhone || '+91 22 2876 5432'} to instantly receive your digitally signed Form 10BE statutory tax receipt.`}
+                <strong>Form 10BE Tax Exemption Certificate:</strong> {config.bankDetails?.referenceInstructions || `After initiating a direct NEFT/RTGS or UPI transfer, please email your transaction reference (UTR) and PAN card number to ${config.contactEmail || 'contact@fetindia.com'} or contact ${config.contactPhone || '+91 91494 14549'} to instantly receive your digitally signed Form 10BE statutory tax receipt.`}
               </p>
             </div>
           </div>

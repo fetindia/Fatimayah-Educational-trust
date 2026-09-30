@@ -582,7 +582,7 @@ export const ProgramsPage: React.FC<ProgramsPageProps> = ({
               <div className="text-xs font-bold text-emerald-700 uppercase">Pillar 4</div>
               <h4 className="font-bold text-slate-900 text-sm">Statutory External Audit</h4>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Annual financial ledgers audited by certified Chartered Accountants with compliance filings submitted to the Charity Commissioner.
+                Annual financial ledgers audited by certified Chartered Accountants with statutory compliance filings submitted punctually.
               </p>
             </div>
           </div>

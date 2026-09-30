@@ -22,6 +22,92 @@ interface ConfigContextType {
 
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 
+// Helper to ensure official Trust identifiers are strictly up to date
+const normalizeConfig = (raw?: Partial<OrgConfig>): OrgConfig => {
+  const merged: OrgConfig = {
+    ...DEFAULT_ORG_CONFIG,
+    ...(raw || {}),
+    legalName: 'FATIMYAH EDUCATIONAL TRUST',
+    trustName: 'FATIMYAH EDUCATIONAL TRUST'
+  };
+
+  // Ensure verified Trust registration number is E 9822
+  if (
+    !merged.registrationNumber ||
+    merged.registrationNumber === 'Registered in Jammu & Kashmir through SDM Office (1994)' ||
+    merged.registrationNumber === 'E-19842' ||
+    merged.registrationNumber === 'E-15344' ||
+    merged.registrationNumber === 'E19842' ||
+    merged.registrationNumber === '48/IV/2012'
+  ) {
+    merged.registrationNumber = 'E 9822';
+  }
+
+  // Ensure Registration Jurisdiction is Jammu & Kashmir
+  if (!merged.registrationJurisdiction || merged.registrationJurisdiction.toLowerCase().includes('mumbai') || merged.registrationJurisdiction.toLowerCase().includes('maharashtra') || merged.registrationJurisdiction.toLowerCase().includes('bombay')) {
+    merged.registrationJurisdiction = 'Jammu & Kashmir';
+  }
+
+  // Ensure Registration Authority is SDM Office
+  if (!merged.registrationAuthority || merged.registrationAuthority.toLowerCase().includes('mumbai') || merged.registrationAuthority.toLowerCase().includes('charity commissioner') || merged.registrationAuthority.toLowerCase().includes('bombay') || merged.registrationAuthority.toLowerCase().includes('maharashtra')) {
+    merged.registrationAuthority = 'Sub-Divisional Magistrate (SDM) Office, Jammu & Kashmir';
+  }
+
+  // Clear any incorrect Bombay/Maharashtra wording or unverified statute/Act (never invent or guess an Act)
+  if (merged.registrationAct && (
+    merged.registrationAct.toLowerCase().includes('mumbai') || 
+    merged.registrationAct.toLowerCase().includes('1950') || 
+    merged.registrationAct.toLowerCase().includes('bombay') ||
+    merged.registrationAct.toLowerCase().includes('maharashtra') ||
+    merged.registrationAct.toLowerCase().includes('charity commissioner')
+  )) {
+    merged.registrationAct = '';
+  }
+
+  // Ensure safe legal description
+  if (!merged.legalStatusDescription || merged.legalStatusDescription.toLowerCase().includes('bombay') || merged.legalStatusDescription.toLowerCase().includes('maharashtra') || merged.legalStatusDescription.toLowerCase().includes('mumbai')) {
+    merged.legalStatusDescription = 'Registered in Jammu & Kashmir';
+  }
+
+  // Automatically modernize outdated placeholder DARPAN and PAN identifiers
+  if (!merged.nitiAayogId || merged.nitiAayogId === 'MH/2021/028914') {
+    merged.nitiAayogId = 'JK/2026/1153821';
+  }
+  if (!merged.darpanId || merged.darpanId === 'MH/2021/028914') {
+    merged.darpanId = 'JK/2026/1153821';
+  }
+  if (!merged.panNumber || merged.panNumber === 'AAATF1234A') {
+    merged.panNumber = 'AABTF0015H';
+  }
+  if (merged.aboutTrust) {
+    if (!merged.aboutTrust.registrationNumber || merged.aboutTrust.registrationNumber === 'Registered in Jammu & Kashmir through SDM Office (1994)' || merged.aboutTrust.registrationNumber === 'E-19842' || merged.aboutTrust.registrationNumber === 'E-15344') {
+      merged.aboutTrust.registrationNumber = 'E 9822';
+    }
+    if (!merged.aboutTrust.registrationJurisdiction || merged.aboutTrust.registrationJurisdiction.toLowerCase().includes('mumbai') || merged.aboutTrust.registrationJurisdiction.toLowerCase().includes('maharashtra') || merged.aboutTrust.registrationJurisdiction.toLowerCase().includes('bombay')) {
+      merged.aboutTrust.registrationJurisdiction = 'Jammu & Kashmir';
+    }
+    if (!merged.aboutTrust.registrationAuthority || merged.aboutTrust.registrationAuthority.toLowerCase().includes('mumbai') || merged.aboutTrust.registrationAuthority.toLowerCase().includes('charity commissioner') || merged.aboutTrust.registrationAuthority.toLowerCase().includes('bombay') || merged.aboutTrust.registrationAuthority.toLowerCase().includes('maharashtra')) {
+      merged.aboutTrust.registrationAuthority = 'Sub-Divisional Magistrate (SDM) Office, Jammu & Kashmir';
+    }
+    if (merged.aboutTrust.registrationAct && (
+      merged.aboutTrust.registrationAct.toLowerCase().includes('mumbai') || 
+      merged.aboutTrust.registrationAct.toLowerCase().includes('1950') ||
+      merged.aboutTrust.registrationAct.toLowerCase().includes('bombay') ||
+      merged.aboutTrust.registrationAct.toLowerCase().includes('maharashtra') ||
+      merged.aboutTrust.registrationAct.toLowerCase().includes('charity commissioner')
+    )) {
+      merged.aboutTrust.registrationAct = '';
+    }
+    if (merged.aboutTrust.darpanNgoId === 'MH/2021/028914') {
+      merged.aboutTrust.darpanNgoId = 'JK/2026/1153821';
+    }
+    if (merged.aboutTrust.panNumberPublic === 'AAATF1234A') {
+      merged.aboutTrust.panNumberPublic = 'AABTF0015H';
+    }
+  }
+  return merged;
+};
+
 export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [config, setConfig] = useState<OrgConfig>(() => {
     if (typeof window !== 'undefined') {
@@ -29,11 +115,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const cached = localStorage.getItem('fet_org_config_cache');
         if (cached) {
           const parsed = JSON.parse(cached);
-          return {
-            ...DEFAULT_ORG_CONFIG,
-            ...parsed,
-            legalName: 'Fatimyah Educational Trust'
-          };
+          return normalizeConfig(parsed);
         }
       } catch (e) {
         console.warn('Failed to parse cached org config:', e);
@@ -46,11 +128,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     // Initial fetch
     fetchOrgConfig().then((cfg) => {
-      const merged: OrgConfig = {
-        ...DEFAULT_ORG_CONFIG,
-        ...cfg,
-        legalName: 'Fatimyah Educational Trust' as const
-      };
+      const merged = normalizeConfig(cfg);
       setConfig(merged);
       setIsLoading(false);
       try {
@@ -63,11 +141,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const unsub = onSnapshot(doc(db, 'organization_config', 'main_config'), (snapshot) => {
         if (snapshot.exists()) {
           const remoteData = snapshot.data() as OrgConfig;
-          const merged: OrgConfig = {
-            ...DEFAULT_ORG_CONFIG,
-            ...remoteData,
-            legalName: 'Fatimyah Educational Trust' as const // Strictly enforce legal protection
-          };
+          const merged = normalizeConfig(remoteData);
           setConfig(merged);
           try {
             localStorage.setItem('fet_org_config_cache', JSON.stringify(merged));

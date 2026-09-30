@@ -94,8 +94,8 @@ export function fileToDataUrl(file: File | Blob): Promise<string> {
  */
 export async function processAndOptimizeImage(
   file: File,
-  maxDimension = 1400,
-  quality = 0.88
+  maxDimension = 1000,
+  quality = 0.82
 ): Promise<{ blob: Blob; file: File; dataUrl: string }> {
   // If not an image or SVG, return as is
   if (!file.type.startsWith('image/') || file.type.includes('svg')) {
@@ -141,7 +141,8 @@ export async function processAndOptimizeImage(
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, width, height);
 
-        const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+        // Standardize on compressed web JPEG to prevent uncompressed PNG Base64 bloating Firestore documents beyond 1MB
+        const mimeType = 'image/jpeg';
         const dataUrl = canvas.toDataURL(mimeType, quality);
 
         canvas.toBlob(
@@ -156,7 +157,7 @@ export async function processAndOptimizeImage(
 
             const optimizedFile = new File(
               [blob], 
-              file.name.replace(/\.[^/.]+$/, '') + (mimeType === 'image/png' ? '.png' : '.jpg'), 
+              file.name.replace(/\.[^/.]+$/, '') + '.jpg', 
               {
                 type: mimeType,
                 lastModified: Date.now()

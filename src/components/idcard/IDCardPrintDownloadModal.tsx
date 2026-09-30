@@ -201,7 +201,7 @@ export const IDCardPrintDownloadModal: React.FC<IDCardPrintDownloadModalProps> =
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(9);
       pdf.setTextColor(80, 80, 80);
-      pdf.text('Regn. No. E-19842 (BOM) • Section 80G & 12A Certified • Official Accreditation Card', pageWidth / 2, 28, { align: 'center' });
+      pdf.text(`Reg No: ${config.registrationNumber || 'E 9822'} (${config.registrationJurisdiction || 'Jammu & Kashmir'})${config.registrationAct ? ` • ${config.registrationAct}` : ''} • DARPAN: ${config.nitiAayogId || 'JK/2026/1153821'} • PAN: ${config.panNumber || 'AABTF0015H'} • Sec 80G & 12A Certified`, pageWidth / 2, 28, { align: 'center' });
 
       pdf.setFontSize(11);
       pdf.setFont('helvetica', 'bold');
@@ -586,7 +586,7 @@ export const IDCardPrintDownloadModal: React.FC<IDCardPrintDownloadModalProps> =
         <div className="print-page-layout">
           <div className="print-header">
             <h2>FATIMYAH EDUCATIONAL TRUST INDIA</h2>
-            <p>Regn. No. E-19842 (BOM) • Section 80G & 12A Certified • Official Accreditation Card</p>
+            <p>NITI Aayog DARPAN: {config.nitiAayogId || 'JK/2026/1153821'} • PAN: {config.panNumber || 'AABTF0015H'} • Section 80G & 12A Certified</p>
           </div>
 
           <div className="print-cards-grid">

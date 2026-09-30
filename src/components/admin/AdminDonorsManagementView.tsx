@@ -794,7 +794,7 @@ export const AdminDonorsManagementView: React.FC = () => {
               <span>Statutory 80G & 12A Trust Accreditation Policy</span>
             </div>
             <p className="text-xs text-slate-300 leading-relaxed">
-              Every verified donation to <strong>{config.legalName || 'Fatimyah Educational Trust'}</strong> generates a system-authenticated Section 80G tax exemption receipt under URN <strong>AAATF1234AF20214</strong>. PII compliance requires masking donor PAN numbers unless specifically authorized by the Super Admin for Form 10BD filing.
+              Every verified donation to <strong>{config.legalName || 'Fatimyah Educational Trust'}</strong> generates a system-authenticated Section 80G tax exemption receipt under URN <strong>AAATF1234AF20214</strong> (Trust PAN: <strong className="font-mono text-white">{config.panNumber || 'AABTF0015H'}</strong> • DARPAN: <strong className="font-mono text-white">{config.nitiAayogId || 'JK/2026/1153821'}</strong>). PII compliance requires masking donor PAN numbers unless specifically authorized by the Super Admin for Form 10BD filing.
             </p>
           </div>
 
@@ -1490,7 +1490,7 @@ export const AdminDonorsManagementView: React.FC = () => {
                 {config.legalName || 'FATIMYAH EDUCATIONAL TRUST'}
               </h2>
               <p className="text-[10px] text-slate-600">
-                Regd. Public Trust • 80G URN: <strong className="font-mono text-slate-900">AAATF1234AF20214</strong> • Sec 12A Certified
+                Regd. Public Trust • PAN: <strong className="font-mono text-slate-900">{config.panNumber || 'AABTF0015H'}</strong> • DARPAN: <strong className="font-mono text-slate-900">{config.nitiAayogId || 'JK/2026/1153821'}</strong> • 80G URN: <strong className="font-mono text-slate-900">AAATF1234AF20214</strong> • Sec 12A Certified
               </p>
             </div>
 

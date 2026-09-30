@@ -41,8 +41,10 @@ import { Competition } from '../../types';
 import { INITIAL_COMPETITIONS } from '../../data/initialCompetitions';
 import { useConfig } from '../../contexts/ConfigContext';
 import { Top100ResultsShowcase } from '../home/Top100ResultsShowcase';
+import { getExamScheduleStatus } from '../../utils/examSchedule';
 
 interface ExaminationPageProps {
+  targetCompetitionId?: string;
   onApplyExam: (competition: Competition) => void;
   onViewExamInfo: (competition: Competition, tab?: 'instructions' | 'book_mastery' | 'eligibility' | 'prizes') => void;
   onOpenStudentResults: () => void;
@@ -52,6 +54,7 @@ interface ExaminationPageProps {
 }
 
 export const ExaminationPage: React.FC<ExaminationPageProps> = ({
+  targetCompetitionId,
   onApplyExam,
   onViewExamInfo,
   onOpenStudentResults,
@@ -64,6 +67,45 @@ export const ExaminationPage: React.FC<ExaminationPageProps> = ({
   const [loading, setLoading] = useState<boolean>(true);
   const [activeCategory, setActiveCategory] = useState<'all' | 'book_reading' | 'competitive_exam' | 'free'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedDirectExamId, setSelectedDirectExamId] = useState<string | undefined>(targetCompetitionId);
+  const [shareToast, setShareToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (targetCompetitionId) {
+      setSelectedDirectExamId(targetCompetitionId);
+      // Scroll to assessment view
+      setTimeout(() => {
+        document.getElementById('active-examinations')?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  }, [targetCompetitionId]);
+
+  const handleShareExam = (comp: Competition) => {
+    const shareUrl = `${window.location.origin}/examination/${comp.id}`;
+    const shareTitle = `${comp.title} - FET India National Examinations`;
+    const shareText = `Official Entrance / Competition: ${comp.title} (${comp.categoryLabel || 'Assessment'}). Proctored Duration: ${comp.examDetails?.durationMinutes || 45} mins. Register online: ${shareUrl}`;
+
+    if (navigator.share) {
+      navigator.share({
+        title: shareTitle,
+        text: shareText,
+        url: shareUrl
+      }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(shareUrl);
+      setShareToast(`Share link copied: ${shareUrl}`);
+      setTimeout(() => setShareToast(null), 4000);
+    }
+  };
+
+  const directCompetition = React.useMemo(() => {
+    if (!selectedDirectExamId) return null;
+    return (
+      competitions.find(
+        (c) => c.id === selectedDirectExamId || c.code?.toLowerCase() === selectedDirectExamId.toLowerCase()
+      ) || null
+    );
+  }, [competitions, selectedDirectExamId]);
 
   const primaryGreen = config.primaryGreen || '#0D6E42';
   const primaryBlue = config.primaryBlue || '#0B2545';
@@ -302,6 +344,150 @@ export const ExaminationPage: React.FC<ExaminationPageProps> = ({
           </div>
         </div>
 
+        {/* Direct Competition Presentation Showcase (When opened via public link) */}
+        {directCompetition && (
+          <div className="mb-10 bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-900 rounded-3xl border-2 border-amber-500/40 p-6 sm:p-8 text-white shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="relative z-10 space-y-6">
+              {/* Header Badges */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Direct Share Link</span>
+                  </span>
+                  <span className="font-mono text-xs text-slate-400 bg-white/10 px-2.5 py-0.5 rounded">
+                    {directCompetition.code}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedDirectExamId(undefined)}
+                  className="text-xs text-slate-400 hover:text-white transition cursor-pointer flex items-center gap-1 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-xl border border-white/10"
+                >
+                  <span>View All Competitions</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Title & Description */}
+              <div className="space-y-2 max-w-4xl">
+                <h2 className="text-2xl sm:text-4xl font-black text-white leading-tight">
+                  {directCompetition.title}
+                </h2>
+                <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+                  {directCompetition.description}
+                </p>
+              </div>
+
+              {/* Detailed Presentation Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                  <div className="text-[11px] uppercase font-bold text-slate-400">Duration Limit</div>
+                  <div className="text-sm sm:text-base font-bold text-amber-400 mt-0.5 flex items-center gap-1">
+                    <Clock className="w-4 h-4" />
+                    <span>{directCompetition.examDetails?.durationMinutes || 45} Minutes</span>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                  <div className="text-[11px] uppercase font-bold text-slate-400">Questions Count</div>
+                  <div className="text-sm sm:text-base font-bold text-white mt-0.5 flex items-center gap-1">
+                    <FileText className="w-4 h-4 text-indigo-400" />
+                    <span>{directCompetition.examDetails?.questions?.length || 25} Questions</span>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                  <div className="text-[11px] uppercase font-bold text-slate-400">Entry Status</div>
+                  <div className="text-sm sm:text-base font-bold text-emerald-400 mt-0.5">
+                    {directCompetition.isPaid ? `Fee: ₹${directCompetition.participationFee}` : '100% Free Entry'}
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                  <div className="text-[11px] uppercase font-bold text-slate-400">Registration End</div>
+                  <div className="text-sm sm:text-base font-bold text-white mt-0.5">
+                    {directCompetition.registrationEndDate || 'Open Now'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Prescribed Literature / Study Material */}
+              {directCompetition.bookDetails && (
+                <div className="p-4 rounded-2xl bg-indigo-900/40 border border-indigo-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400">
+                      <BookOpen className="w-4 h-4" />
+                      <span>Prescribed Book / Study Literature</span>
+                    </div>
+                    <div className="text-sm font-bold text-white">
+                      &ldquo;{directCompetition.bookDetails.bookTitle}&rdquo;
+                    </div>
+                    <div className="text-xs text-slate-300">
+                      Author: {directCompetition.bookDetails.author || 'FET Academic Bureau'} • Scope: {directCompetition.bookDetails.requiredChapters || 'Entire Syllabus'}
+                    </div>
+                  </div>
+
+                  {directCompetition.bookDetails.pdfReadingMaterialUrl && (
+                    <a
+                      href={directCompetition.bookDetails.pdfReadingMaterialUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/20 transition flex items-center justify-center gap-1.5 flex-shrink-0"
+                    >
+                      <Download className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Download Study Material</span>
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {/* Rewards Summary */}
+              {directCompetition.prizesSummary && directCompetition.prizesSummary.length > 0 && (
+                <div className="p-4 rounded-2xl bg-amber-950/30 border border-amber-500/20 text-xs text-amber-200">
+                  <span className="font-bold text-amber-400">Medals & Rewards: </span>
+                  {directCompetition.prizesSummary.join(' • ')}
+                </div>
+              )}
+
+              {/* Action Buttons: Apply & Share */}
+              <div className="pt-2 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => onApplyExam(directCompetition)}
+                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-950/40 transition flex items-center gap-2 cursor-pointer"
+                >
+                  <span>Apply / Register for this Exam</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleShareExam(directCompetition)}
+                  className="px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/20 transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Share2 className="w-4 h-4 text-indigo-300" />
+                  <span>Copy Public Share Link</span>
+                </button>
+
+                <a
+                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                    `Register for ${directCompetition.title} at Fatimyah Educational Trust India. Link: ${window.location.origin}/examination/${directCompetition.id}`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-3 rounded-xl bg-emerald-700/80 hover:bg-emerald-600 text-white font-bold text-xs transition flex items-center gap-1.5"
+                >
+                  <span>Share on WhatsApp</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Competitions Cards Grid */}
         {filteredCompetitions.length === 0 ? (
           <div className="bg-white rounded-3xl p-12 border border-slate-200 text-center max-w-lg mx-auto space-y-3">
@@ -326,6 +512,7 @@ export const ExaminationPage: React.FC<ExaminationPageProps> = ({
                 : false;
               const isPaid = competition.isPaid || false;
               const feeAmount = competition.participationFee || 0;
+              const scheduleStatus = getExamScheduleStatus(competition);
 
               return (
                 <div
@@ -348,6 +535,16 @@ export const ExaminationPage: React.FC<ExaminationPageProps> = ({
                         <span className="font-mono text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
                           {competition.code}
                         </span>
+
+                        {scheduleStatus.status === 'open' ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse">
+                            Exam Live Now
+                          </span>
+                        ) : scheduleStatus.status === 'upcoming' ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
+                            Opens {scheduleStatus.formattedOpenTime}
+                          </span>
+                        ) : null}
                       </div>
 
                       {/* Fee Badge */}
@@ -400,10 +597,13 @@ export const ExaminationPage: React.FC<ExaminationPageProps> = ({
                       </div>
 
                       <div className="space-y-0.5">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Examination Date</span>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Exam Schedule</span>
                         <span className="font-semibold text-slate-800 flex items-center gap-1">
                           <Calendar className="w-3.5 h-3.5 text-indigo-500" />
-                          {competition.competitionDate || 'To Be Announced'}
+                          {scheduleStatus.formattedDate}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-mono block">
+                          {scheduleStatus.formattedOpenTime}–{scheduleStatus.formattedCloseTime}
                         </span>
                       </div>
 
@@ -418,14 +618,26 @@ export const ExaminationPage: React.FC<ExaminationPageProps> = ({
 
                   {/* Card Bottom Actions */}
                   <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-100 rounded-b-3xl flex flex-wrap items-center justify-between gap-3">
-                    <button
-                      type="button"
-                      onClick={() => onViewExamInfo(competition, 'instructions')}
-                      className="text-xs font-bold text-indigo-700 hover:text-indigo-900 transition-colors flex items-center gap-1 cursor-pointer"
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      <span>Syllabus & Guidelines</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onViewExamInfo(competition, 'instructions')}
+                        className="text-xs font-bold text-indigo-700 hover:text-indigo-900 transition-colors flex items-center gap-1 cursor-pointer"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Syllabus & Info</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleShareExam(competition)}
+                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 border border-slate-200 text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                        title="Share public exam link"
+                      >
+                        <Share2 className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Share</span>
+                      </button>
+                    </div>
 
                     <div className="flex items-center gap-2">
                       {competition.bookDetails?.pdfReadingMaterialUrl && (
@@ -593,6 +805,14 @@ export const ExaminationPage: React.FC<ExaminationPageProps> = ({
           )}
         </div>
       </section>
+
+      {/* Floating Share Link Copied Toast Notification */}
+      {shareToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center space-x-2.5 animate-bounce text-xs font-semibold">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{shareToast}</span>
+        </div>
+      )}
     </div>
   );
 };

@@ -175,8 +175,8 @@ const SEARCH_INDEX: SearchResultItem[] = [
     title: 'Section 80G(5)(vi) Income Tax Exemption Details',
     category: 'governance',
     categoryLabel: 'Statutory Compliance',
-    snippet: 'FET India registration under the Bombay Public Trust Act 1950 (Regn. No. E-19842) and IT Act 80G verification.',
-    tags: ['80g', 'tax', '12a', 'pan', 'trust deed', 'bombay public trust', 'compliance', 'legal'],
+    snippet: 'FATIMYAH EDUCATIONAL TRUST statutory registration in Jammu & Kashmir through SDM Office and IT Act 80G verification.',
+    tags: ['80g', 'tax', '12a', 'pan', 'trust deed', 'sdm registration', 'jammu kashmir', 'compliance', 'legal'],
     actionType: 'modal',
     targetId: 'legal_terms'
   },

@@ -51,34 +51,34 @@ export const ContactUsPage: React.FC<ContactUsPageProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [submittedTicket, setSubmittedTicket] = useState<string | null>(null);
 
-  const primaryAddress = config.headOfficeAddress || 'FATIMYAH EDUCATIONAL TRUST, 1st Floor, Trust Building, Noor Baug, Dongri, Mumbai - 400009, Maharashtra, India';
-  const primaryPhone = config.contactPhone || '+91 22 2876 5432';
-  const primaryEmail = config.contactEmail || 'secretariat@fetindia.com';
-  const whatsappNumber = config.contactPhone || config.emergencyHotline || '+91 98765 43210';
+  const primaryAddress = config.headOfficeAddress || 'FATIMYAH EDUCATIONAL TRUST, Central Secretariat, Jammu & Kashmir 194103, India';
+  const primaryPhone = config.contactPhone || '+91 91494 14549';
+  const primaryEmail = config.contactEmail || 'contact@fetindia.com';
+  const whatsappNumber = config.contactPhone || config.emergencyHotline || '+91 91494 14549';
 
   const departments = [
     {
       name: 'Scholarship & Academic Grants Directorate',
       email: 'scholarship@fetindia.com',
-      phone: '+91 22 2876 5433',
+      phone: '+91 91494 14549',
       scope: 'Higher education fee sponsorships, laptop allocations, and student document verification.'
     },
     {
       name: 'National Examination Bureau',
       email: 'exams@fetindia.com',
-      phone: '+91 22 2876 5434',
+      phone: '+91 91494 14549',
       scope: 'Talent search olympiads, book reading competitions, admit cards, and merit certificates.'
     },
     {
       name: 'Donor Relations & Form 10BE Tax Exemption',
       email: 'accounts@fetindia.com',
-      phone: '+91 22 2876 5435',
+      phone: '+91 91494 14549',
       scope: 'Section 80G tax exemption certificates, bank wire confirmations, and CSR collaborations.'
     },
     {
       name: 'Member & Volunteer Registry',
       email: 'community@fetindia.com',
-      phone: '+91 22 2876 5436',
+      phone: '+91 91494 14549',
       scope: 'Digital membership cards, chapter admissions, and volunteer mission assignments.'
     }
   ];
@@ -149,7 +149,7 @@ export const ContactUsPage: React.FC<ContactUsPageProps> = ({
             </h1>
 
             <p className="text-base sm:text-lg text-slate-300 leading-relaxed">
-              We welcome students, parents, institutional patrons, and volunteers. Connect directly with our central offices in Mumbai or submit an inquiry to the relevant Trust department below.
+              We welcome students, parents, institutional patrons, and volunteers. Connect directly with our central offices or submit an inquiry to the relevant Trust department below.
             </p>
           </div>
 
@@ -383,20 +383,24 @@ export const ContactUsPage: React.FC<ContactUsPageProps> = ({
               <div className="space-y-2 text-xs text-slate-300">
                 <div>
                   <span className="text-slate-400 block text-[10px] uppercase font-bold">Statutory Authority</span>
-                  <p className="font-semibold text-white">Office of the Charity Commissioner, Greater Mumbai</p>
+                  <p className="font-semibold text-white">Sub-Divisional Magistrate (SDM) Office, Jammu & Kashmir</p>
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Registration Act</span>
-                  <p className="font-semibold text-white">Bombay Public Trusts Act, 1950 (Reg No. E-12345)</p>
+                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Registration Jurisdiction</span>
+                  <p className="font-semibold text-white">Registered in Jammu & Kashmir through SDM Office (1994)</p>
                 </div>
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div>
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Income Tax 12A / 80G</span>
-                    <p className="font-mono text-emerald-400 font-semibold">AAATF1234AF20216</p>
-                  </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-bold">NITI Aayog Darpan ID</span>
-                    <p className="font-mono text-amber-400 font-semibold">MH/2021/028914</p>
+                    <p className="font-mono text-amber-400 font-semibold">{config.nitiAayogId || config.darpanId || 'JK/2026/1153821'}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Trust PAN</span>
+                    <p className="font-mono text-emerald-400 font-semibold">{config.panNumber || 'AABTF0015H'}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Income Tax 80G</span>
+                    <p className="font-mono text-sky-400 font-semibold">{config.section80GNumber || 'AAATF1234AF20216'}</p>
                   </div>
                 </div>
               </div>

@@ -4,7 +4,7 @@
  * Fatimyah Educational Trust India (FET India)
  * 
  * Compliant with:
- * - Bombay Public Trust Act 1950 (Regn. No. E-19842)
+ * - Registration No: E 9822 (Jammu & Kashmir)
  * - Section 80G(5)(vi) and Section 12A of the Income Tax Act, 1961
  * - Form 10BE / 10BD Statutory Requirements
  * - Authentic, unparaphrased Qur'anic Verse in pure Arabic: Qur'an 2:261
@@ -268,13 +268,13 @@ export const PrintableDonationReceiptModal: React.FC<PrintableDonationReceiptMod
               </h1>
               <div className="text-[10px] sm:text-[11px] text-slate-600 font-medium space-y-0.5">
                 <p>
-                  Regd. Public Charitable Trust • Bombay Public Trust Act 1950 (Regn. No. E-19842 BOM)
+                  Regd. Public Charitable Trust • Registration No. {config.registrationNumber || 'E 9822'} • Registered in {config.registrationJurisdiction || 'Jammu & Kashmir'}{config.registrationAuthority ? ` (${config.registrationAuthority})` : ''}{config.registrationAct ? ` • ${config.registrationAct}` : ''}
                 </p>
                 <p className="font-semibold text-emerald-900">
                   Section 80G(5)(vi) & 12A Certified • Unique Regn. No. (URN): AAATF1234AF20214
                 </p>
                 <p className="text-slate-500 text-[9.5px]">
-                  PAN of Trust: AAATF1234A • Central Form 10BE / 10BD Compliant Donative Voucher
+                  PAN of Trust: {config.panNumber || 'AABTF0015H'} • NITI Aayog DARPAN: {config.nitiAayogId || config.darpanId || 'JK/2026/1153821'} • Form 10BE / 10BD Compliant
                 </p>
               </div>
 

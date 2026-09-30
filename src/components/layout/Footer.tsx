@@ -84,13 +84,13 @@ export const Footer: React.FC<FooterProps> = ({
                   <span>Official Legal Non-Profit Entity</span>
                 </div>
                 <p className="text-slate-300 leading-relaxed">
-                  <strong className="text-white">{config.legalName}</strong> is a registered public charitable and educational trust established in 1994, governed under the Public Trusts Registration Act.
+                  <strong className="text-white">{config.legalName}</strong> is a registered public charitable and educational trust established in 1994, registered in Jammu & Kashmir through the SDM Office.
                 </p>
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800 text-[11px] text-slate-400">
                   <div>Reg: <span className="text-slate-200">{config.registrationNumber}</span></div>
                   <div>NITI Aayog: <span className="text-slate-200">{config.nitiAayogId}</span></div>
+                  <div>PAN: <span className="text-slate-200 font-mono">{config.panNumber || 'AABTF0015H'}</span></div>
                   <div>80G Tax Exemption: <span className="text-slate-200 font-mono">Available</span></div>
-                  <div>12A Exemption: <span className="text-slate-200 font-mono">Active</span></div>
                 </div>
               </div>
             )}

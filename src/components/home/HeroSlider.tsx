@@ -338,7 +338,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ onExplorePrograms, onOpe
                 <div className="space-y-2">
                   <h3 className="text-lg font-extrabold text-white tracking-tight">{config.legalName}</h3>
                   <p className="text-xs text-slate-400 leading-relaxed">
-                    Headquartered in Mumbai, Maharashtra with verified NITI Aayog NGO Darpan credentials, Section 12A full exemption, and Section 80G tax benefit orders.
+                    Registered in Jammu & Kashmir through SDM Office with verified NITI Aayog NGO Darpan credentials, Section 12A full exemption, and Section 80G tax benefit orders.
                   </p>
                 </div>
 

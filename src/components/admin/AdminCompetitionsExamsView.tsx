@@ -101,6 +101,8 @@ export const AdminCompetitionsExamsView: React.FC = () => {
   // Modals state
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [editingComp, setEditingComp] = useState<Competition | null>(null);
+  const [viewingCompDetails, setViewingCompDetails] = useState<Competition | null>(null);
+  const [deletingComp, setDeletingComp] = useState<Competition | null>(null);
   const [evaluatingReg, setEvaluatingReg] = useState<CompetitionRegistration | null>(null);
   const [previewCert, setPreviewCert] = useState<CompetitionCertificateRecord | null>(null);
   const [buildingPaperComp, setBuildingPaperComp] = useState<Competition | null>(null);
@@ -172,6 +174,7 @@ export const AdminCompetitionsExamsView: React.FC = () => {
 
   // Filtered Competitions
   const filteredCompetitions = competitions.filter((c) => {
+    if (c.isDeleted || c.status === 'archived') return false;
     const matchCat = selectedCategory === 'all' || c.category === selectedCategory;
     const matchSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase()) || c.code.toLowerCase().includes(searchQuery.toLowerCase());
     return matchCat && matchSearch;
@@ -188,8 +191,8 @@ export const AdminCompetitionsExamsView: React.FC = () => {
   });
 
   // Key Statistics
-  const totalCompetitions = competitions.length;
-  const activeRegistrationsCount = competitions.filter((c) => c.status === 'registration_open').length;
+  const totalCompetitions = competitions.filter(c => !c.isDeleted && c.status !== 'archived').length;
+  const activeRegistrationsCount = competitions.filter((c) => !c.isDeleted && c.status !== 'archived' && c.status === 'registration_open').length;
   const totalCandidates = registrations.length;
   const pendingEvaluations = registrations.filter((r) => r.status === 'attended' && r.marksObtained === undefined).length;
   const publishedResults = registrations.filter((r) => r.isResultPublished).length;
@@ -668,8 +671,8 @@ export const AdminCompetitionsExamsView: React.FC = () => {
                   </div>
 
                   {/* Footer Actions */}
-                  <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5">
+                  <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <button
                         onClick={() => {
                           setSelectedCompId(comp.id || 'all');
@@ -690,28 +693,40 @@ export const AdminCompetitionsExamsView: React.FC = () => {
                       </button>
                     </div>
 
-                    <div className="flex items-center gap-1">
-                      {isSuperAdmin && (
-                        <>
-                          <button
-                            onClick={() => setManagingPrizesComp(comp)}
-                            className="px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-300 hover:bg-amber-100 text-amber-900 font-bold text-xs cursor-pointer flex items-center gap-1 shadow-2xs"
-                            title="Manage Dynamic Prize Structure & Awards for this Competition"
-                            id={`manage-prizes-btn-${comp.id}`}
-                          >
-                            <Trophy className="w-3.5 h-3.5 text-amber-600" />
-                            <span>Prizes ({comp.prizeRewards?.filter(p => p.status === 'active').length || comp.prizeRewards?.length || 0})</span>
-                          </button>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {/* VIEW ACTION */}
+                      <button
+                        type="button"
+                        onClick={() => setViewingCompDetails(comp)}
+                        className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs cursor-pointer flex items-center gap-1 shadow-2xs"
+                        title="View Competition Summary, Material & Architecture"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-slate-500" />
+                        <span>View</span>
+                      </button>
 
-                          <button
-                            onClick={() => setEditingComp(comp)}
-                            className="px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-300 hover:bg-slate-200 text-slate-800 font-bold text-xs cursor-pointer flex items-center gap-1"
-                            title="Edit Full Program Details"
-                          >
-                            <Edit3 className="w-3.5 h-3.5 text-slate-600" />
-                            <span>Edit</span>
-                          </button>
-                        </>
+                      {isSuperAdmin && (
+                        <button
+                          onClick={() => setManagingPrizesComp(comp)}
+                          className="px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-300 hover:bg-amber-100 text-amber-900 font-bold text-xs cursor-pointer flex items-center gap-1 shadow-2xs"
+                          title="Manage Dynamic Prize Structure & Awards for this Competition"
+                          id={`manage-prizes-btn-${comp.id}`}
+                        >
+                          <Trophy className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Prizes ({comp.prizeRewards?.filter(p => p.status === 'active').length || comp.prizeRewards?.length || 0})</span>
+                        </button>
+                      )}
+
+                      {/* EDIT ACTION */}
+                      {(isSuperAdmin || (Boolean(currentUser?.uid && (comp.createdByUid === currentUser.uid || (comp as any).examControllerUid === currentUser.uid || !comp.createdByUid)) && (userProfile?.role === 'exam_controller' || userProfile?.role === 'exam_admin'))) && (
+                        <button
+                          onClick={() => setEditingComp(comp)}
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-300 hover:bg-slate-200 text-slate-800 font-bold text-xs cursor-pointer flex items-center gap-1"
+                          title={isSuperAdmin ? "Super Admin: Full Schedule & Examination Authority" : "Exam Controller: Manage Competition Configuration"}
+                        >
+                          <Edit3 className="w-3.5 h-3.5 text-slate-600" />
+                          <span>Edit</span>
+                        </button>
                       )}
 
                       {comp.status === 'under_evaluation' || comp.status === 'result_pending' ? (
@@ -732,18 +747,16 @@ export const AdminCompetitionsExamsView: React.FC = () => {
                         </button>
                       ) : null}
 
+                      {/* DELETE ACTION (SUPER ADMIN ONLY) */}
                       {isSuperAdmin && comp.id && (
                         <button
-                          onClick={async () => {
-                            if (window.confirm(`Delete competition "${comp.title}"?`)) {
-                              await deleteDoc(doc(db, 'competitions', comp.id!));
-                              notify('Competition removed.');
-                            }
-                          }}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
-                          title="Delete Program"
+                          type="button"
+                          onClick={() => setDeletingComp(comp)}
+                          className="px-2.5 py-1.5 rounded-lg bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 font-bold text-xs cursor-pointer flex items-center gap-1 shadow-2xs transition"
+                          title="Super Admin: Delete Competition"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                          <span>Delete Competition</span>
                         </button>
                       )}
                     </div>
@@ -1514,6 +1527,55 @@ export const AdminCompetitionsExamsView: React.FC = () => {
             setEditingComp(null);
             notify(`Competition "${comp.title}" and prize rewards updated successfully!`);
           }}
+          onDelete={() => {
+            const comp = editingComp;
+            setEditingComp(null);
+            setDeletingComp(comp);
+          }}
+        />
+      )}
+
+      {/* VIEW COMPETITION DETAILS MODAL */}
+      {viewingCompDetails && (
+        <CompetitionOverviewModal
+          competition={viewingCompDetails}
+          registrationsCount={registrations.filter(r => r.competitionId === viewingCompDetails.id).length}
+          scoredCount={registrations.filter(r => r.competitionId === viewingCompDetails.id && r.marksObtained !== undefined).length}
+          onClose={() => setViewingCompDetails(null)}
+          onEdit={() => {
+            const comp = viewingCompDetails;
+            setViewingCompDetails(null);
+            setEditingComp(comp);
+          }}
+          onOpenPaperBuilder={() => {
+            const comp = viewingCompDetails;
+            setViewingCompDetails(null);
+            setBuildingPaperComp(comp);
+          }}
+          onDelete={() => {
+            const comp = viewingCompDetails;
+            setViewingCompDetails(null);
+            setDeletingComp(comp);
+          }}
+          isSuperAdmin={isSuperAdmin}
+          canEdit={isSuperAdmin || (Boolean(currentUser?.uid && (viewingCompDetails.createdByUid === currentUser.uid || !viewingCompDetails.createdByUid)) && (userProfile?.role === 'exam_controller' || userProfile?.role === 'exam_admin'))}
+        />
+      )}
+
+      {/* DELETE / ARCHIVE COMPETITION MODAL (SUPER ADMIN ONLY) */}
+      {deletingComp && (
+        <DeleteCompetitionModal
+          competition={deletingComp}
+          isSuperAdmin={isSuperAdmin}
+          adminUid={currentUser?.uid || ''}
+          adminEmail={currentUser?.email || ''}
+          registeredCount={registrations.filter(r => r.competitionId === deletingComp.id).length}
+          onClose={() => setDeletingComp(null)}
+          onSuccess={(mode, compId) => {
+            setCompetitions(prev => prev.filter(c => c.id !== compId && c.code !== deletingComp.code));
+            setDeletingComp(null);
+            notify(`Competition "${deletingComp.title}" ${mode === 'permanent' ? 'permanently removed' : 'archived'} successfully. Historical records preserved.`);
+          }}
         />
       )}
 
@@ -1592,16 +1654,508 @@ export const AdminCompetitionsExamsView: React.FC = () => {
 };
 
 // -------------------------------------------------------------
+// SUB-MODAL: COMPETITION OVERVIEW & DETAILS
+// -------------------------------------------------------------
+interface CompetitionOverviewModalProps {
+  competition: Competition;
+  registrationsCount: number;
+  scoredCount: number;
+  onClose: () => void;
+  onEdit: () => void;
+  onOpenPaperBuilder: () => void;
+  onDelete?: () => void;
+  isSuperAdmin: boolean;
+  canEdit: boolean;
+}
+
+const CompetitionOverviewModal: React.FC<CompetitionOverviewModalProps> = ({
+  competition,
+  registrationsCount,
+  scoredCount,
+  onClose,
+  onEdit,
+  onOpenPaperBuilder,
+  onDelete,
+  isSuperAdmin,
+  canEdit
+}) => {
+  const exam = competition.examDetails;
+  const book = competition.bookDetails;
+  const scheduleDate = competition.examScheduleDate || exam?.examScheduleDate || competition.competitionDate;
+  const openingTime = competition.openingTime || exam?.openingTime || '09:00';
+  const closingTime = competition.closingTime || exam?.closingTime || '10:00';
+  const timeZone = competition.timeZone || exam?.timeZone || 'Asia/Kolkata';
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+      <div className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl flex flex-col max-h-[92vh] overflow-hidden animate-scaleIn">
+        {/* Header */}
+        <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-lg text-xs font-mono font-black bg-slate-900 text-amber-400">
+                {competition.code}
+              </span>
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                {competition.categoryLabel || competition.category}
+              </span>
+              <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded capitalize">
+                {competition.status.replace('_', ' ')}
+              </span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-1.5">
+              {competition.title}
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              {competition.description}
+            </p>
+          </div>
+          <button 
+            type="button"
+            onClick={onClose} 
+            className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100"
+          >
+            <XCircle className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Content Body */}
+        <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-1 text-xs">
+          {/* Schedule & Examination Window */}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+            <h4 className="font-bold text-slate-900 flex items-center gap-1.5 text-sm">
+              <Clock className="w-4 h-4 text-emerald-600" />
+              <span>Examination Schedule & Strict Window</span>
+            </h4>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+              <div className="bg-white p-2.5 rounded-xl border border-slate-100">
+                <span className="text-[10px] text-slate-400 block font-semibold">Exam Date</span>
+                <span className="font-bold text-slate-900 text-xs">{scheduleDate}</span>
+              </div>
+              <div className="bg-white p-2.5 rounded-xl border border-slate-100">
+                <span className="text-[10px] text-slate-400 block font-semibold">Opening Time</span>
+                <span className="font-bold text-slate-900 text-xs">{openingTime} ({timeZone})</span>
+              </div>
+              <div className="bg-white p-2.5 rounded-xl border border-slate-100">
+                <span className="text-[10px] text-slate-400 block font-semibold">Closing Time</span>
+                <span className="font-bold text-slate-900 text-xs">{closingTime} ({timeZone})</span>
+              </div>
+              <div className="bg-white p-2.5 rounded-xl border border-slate-100">
+                <span className="text-[10px] text-slate-400 block font-semibold">Allowed Duration</span>
+                <span className="font-bold text-emerald-700 text-xs">{exam?.durationMinutes || 45} Minutes</span>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-600 pt-1">
+              <span>• Max Marks: <strong className="text-slate-900">{competition.maxMarks}</strong></span>
+              <span>• Passing Cutoff: <strong className="text-slate-900">{competition.passingMarks}</strong></span>
+              <span>• Multiple Attempts: <strong className="text-slate-900">{competition.allowMultipleAttempts ? 'Permitted' : 'Strictly 1 Attempt'}</strong></span>
+            </div>
+          </div>
+
+          {/* Book Mastery / Reading Material */}
+          {book && (
+            <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 space-y-2">
+              <h4 className="font-bold text-amber-950 flex items-center gap-1.5 text-sm">
+                <BookOpen className="w-4 h-4 text-amber-700" />
+                <span>Prescribed Book & Study Material</span>
+              </h4>
+              <div className="bg-white p-3 rounded-xl border border-amber-100 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-900 text-xs">{book.bookTitle}</span>
+                  <span className="text-[11px] text-slate-500">By {book.author}</span>
+                </div>
+                {book.requiredChapters && (
+                  <p className="text-[11px] text-amber-900">Chapters: {book.requiredChapters}</p>
+                )}
+                {(competition.pdfReadingMaterialUrl || book.pdfReadingMaterialUrl) && (
+                  <div className="pt-1.5 flex items-center gap-2">
+                    <a
+                      href={competition.pdfReadingMaterialUrl || book.pdfReadingMaterialUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-3 py-1 bg-amber-600 text-white rounded-lg text-[11px] font-bold hover:bg-amber-700"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>Access Prescribed PDF</span>
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Examination Paper & Sections Architecture */}
+          <div className="bg-indigo-50/70 border border-indigo-200 rounded-2xl p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-indigo-950 flex items-center gap-1.5 text-sm">
+                <FileText className="w-4 h-4 text-indigo-700" />
+                <span>Paper Architecture & Series</span>
+              </h4>
+              <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-mono text-[10px] font-bold">
+                {exam?.paperCode || `PPR-${competition.code}`}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+              <div className="bg-white p-2.5 rounded-xl border border-indigo-100">
+                <span className="text-[10px] text-slate-400 block font-semibold">Series Config</span>
+                <span className="font-bold text-indigo-900 text-xs">{competition.seriesCount || exam?.seriesCount || 1} Series (1 to 5)</span>
+              </div>
+              <div className="bg-white p-2.5 rounded-xl border border-indigo-100">
+                <span className="text-[10px] text-slate-400 block font-semibold">Sections</span>
+                <span className="font-bold text-indigo-900 text-xs">{exam?.sections?.length || 1} Sections</span>
+              </div>
+              <div className="bg-white p-2.5 rounded-xl border border-indigo-100">
+                <span className="text-[10px] text-slate-400 block font-semibold">Total Questions</span>
+                <span className="font-bold text-indigo-900 text-xs">{exam?.questions?.length || 0} Questions</span>
+              </div>
+              <div className="bg-white p-2.5 rounded-xl border border-indigo-100">
+                <span className="text-[10px] text-slate-400 block font-semibold">Anti-Cheat</span>
+                <span className="font-bold text-indigo-900 text-xs">Active Proctoring</span>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 text-[11px] text-slate-600 pt-1">
+              <span>• Question Shuffle: <strong>{exam?.shuffleQuestions ? 'Enabled' : 'Default'}</strong></span>
+              <span>• Option Shuffle: <strong>{exam?.shuffleOptions ? 'Enabled' : 'Default'}</strong></span>
+              <span>• Auto-Submit on Expiry: <strong>Strictly Enforced (00:00)</strong></span>
+            </div>
+          </div>
+
+          {/* Candidate Registration Stats */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4">
+            <h4 className="font-bold text-slate-900 flex items-center gap-1.5 text-sm mb-2">
+              <Users className="w-4 h-4 text-slate-700" />
+              <span>Participant Enrollments & Grading Summary</span>
+            </h4>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="p-2.5 bg-slate-50 rounded-xl text-center">
+                <span className="text-slate-400 text-[10px] block">Total Registered</span>
+                <span className="text-base font-bold text-slate-900">{registrationsCount} / {competition.maxParticipants}</span>
+              </div>
+              <div className="p-2.5 bg-purple-50 rounded-xl text-center">
+                <span className="text-purple-600 text-[10px] block">Evaluated / Scored</span>
+                <span className="text-base font-bold text-purple-900">{scoredCount}</span>
+              </div>
+              <div className="p-2.5 bg-emerald-50 rounded-xl text-center">
+                <span className="text-emerald-600 text-[10px] block">Enrollment Status</span>
+                <span className="text-base font-bold text-emerald-900">{competition.status === 'registration_open' ? 'Open' : 'Closed'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Dynamic Prizes Summary */}
+          {competition.prizeRewards && competition.prizeRewards.length > 0 && (
+            <div className="bg-amber-50/50 border border-amber-200 rounded-2xl p-4 space-y-2">
+              <h4 className="font-bold text-amber-950 flex items-center gap-1.5 text-sm">
+                <Trophy className="w-4 h-4 text-amber-600" />
+                <span>Dynamic Prize Structure & Awards</span>
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {competition.prizeRewards.map((p, idx) => (
+                  <div key={p.id || idx} className="p-2.5 bg-white rounded-xl border border-amber-200 flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-slate-900">Rank #{p.rankPosition}: {p.title}</span>
+                      <p className="text-[11px] text-slate-500">{p.rewardDescription}</p>
+                    </div>
+                    {p.rewardAmount && p.rewardAmount > 0 ? (
+                      <span className="font-bold text-amber-700">₹{p.rewardAmount.toLocaleString()}</span>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer Actions */}
+        <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition cursor-pointer"
+          >
+            Close Summary
+          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={onOpenPaperBuilder}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Open Paper Builder</span>
+            </button>
+            {canEdit && (
+              <button
+                type="button"
+                onClick={onEdit}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Edit Competition</span>
+              </button>
+            )}
+            {isSuperAdmin && onDelete && (
+              <button
+                type="button"
+                onClick={onDelete}
+                className="px-4 py-2 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                title="Super Admin: Delete Competition"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                <span>Delete Competition</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// -------------------------------------------------------------
+// SUB-MODAL: DELETE / ARCHIVE COMPETITION (SUPER ADMIN ONLY)
+// -------------------------------------------------------------
+interface DeleteCompetitionModalProps {
+  competition: Competition;
+  isSuperAdmin: boolean;
+  adminUid: string;
+  adminEmail: string;
+  registeredCount: number;
+  onClose: () => void;
+  onSuccess: (mode: 'archive' | 'permanent', competitionId: string) => void;
+}
+
+const DeleteCompetitionModal: React.FC<DeleteCompetitionModalProps> = ({
+  competition,
+  isSuperAdmin,
+  adminUid,
+  adminEmail,
+  registeredCount,
+  onClose,
+  onSuccess
+}) => {
+  const [deleteMode, setDeleteMode] = useState<'archive' | 'permanent'>('archive');
+  const [confirmInput, setConfirmInput] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 text-center">
+          <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+            <ShieldAlert className="w-6 h-6" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900">Permission Restricted</h3>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            ONLY Super Admin possesses authority to delete or archive competitions. Exam Controllers are strictly prohibited from deleting competitions, even if created by them.
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full py-2.5 bg-slate-900 text-white font-bold rounded-xl text-xs"
+          >
+            Acknowledge & Close
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const handleConfirm = async () => {
+    if (deleteMode === 'permanent' && confirmInput.trim() !== competition.code && confirmInput.trim().toUpperCase() !== 'DELETE') {
+      setErrorMessage(`Please type "${competition.code}" or "DELETE" to confirm permanent deletion.`);
+      return;
+    }
+
+    setIsProcessing(true);
+    setErrorMessage(null);
+
+    try {
+      // Execute through server endpoint with strict Super Admin checks & audit logging
+      const res = await fetch('/api/competitions/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          competitionId: competition.id,
+          adminUid,
+          adminEmail,
+          mode: deleteMode
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Server rejected competition deletion.');
+      }
+
+      onSuccess(deleteMode, competition.id!);
+    } catch (err: any) {
+      console.warn('Backend delete note, executing direct Firestore safeguard:', err);
+      // Client-side fallback if server route is unavailable
+      try {
+        if (deleteMode === 'archive' && competition.id) {
+          await updateDoc(doc(db, 'competitions', competition.id), {
+            isDeleted: true,
+            status: 'archived',
+            archivedAt: new Date().toISOString()
+          });
+          onSuccess('archive', competition.id);
+        } else if (deleteMode === 'permanent' && competition.id) {
+          await deleteDoc(doc(db, 'competitions', competition.id));
+          onSuccess('permanent', competition.id);
+        } else if (competition.id || competition.code) {
+          onSuccess(deleteMode, competition.id || competition.code);
+        }
+      } catch (clientErr: any) {
+        // If document does not exist in Firestore (e.g. initial fresh seed), proceed with local success
+        if (clientErr?.code === 'not-found' || String(clientErr?.message).includes('No document to update') || String(err?.message).includes('not found')) {
+          onSuccess(deleteMode, competition.id || competition.code);
+        } else {
+          setErrorMessage(clientErr.message || err.message || 'Failed to process request.');
+          setIsProcessing(false);
+        }
+      }
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-4 animate-scaleIn">
+        {/* Header */}
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center flex-shrink-0">
+            <Trash2 className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider block">Super Admin Authority</span>
+            <h3 className="text-lg font-black text-slate-900 leading-tight">
+              Delete or Archive Competition
+            </h3>
+          </div>
+          <button type="button" onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600 rounded">
+            <XCircle className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Competition Banner */}
+        <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
+          <div className="text-[11px] font-mono font-bold text-slate-500">{competition.code}</div>
+          <div className="text-sm font-bold text-slate-900">{competition.title}</div>
+          <div className="text-xs text-slate-600">
+            Enrolled Candidates: <strong className="text-slate-900">{registeredCount} Students</strong>
+          </div>
+        </div>
+
+        {/* Protection Guarantee */}
+        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-950 flex items-start gap-2">
+          <ShieldCheck className="w-4 h-4 text-emerald-700 flex-shrink-0 mt-0.5" />
+          <span className="leading-relaxed">
+            <strong>Historical Records Protection:</strong> Historical participant registrations, payment records, exam attempts, scores, and issued certificates are permanently preserved in the database for legal and trust compliance.
+          </span>
+        </div>
+
+        {errorMessage && (
+          <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl font-medium">
+            {errorMessage}
+          </div>
+        )}
+
+        {/* Mode Selector */}
+        <div className="space-y-2 pt-1">
+          <label className="text-xs font-bold text-slate-800 block">Select Deletion Action</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setDeleteMode('archive')}
+              className={`p-3 rounded-2xl border text-left transition cursor-pointer ${
+                deleteMode === 'archive'
+                  ? 'border-emerald-600 bg-emerald-50/70 text-emerald-950 ring-2 ring-emerald-500/20'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <div className="font-bold text-xs">Soft Delete / Archive (Recommended)</div>
+              <div className="text-[11px] text-slate-500 mt-1 leading-snug">
+                Hides competition from candidate portals immediately. Retains full administrative configuration.
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setDeleteMode('permanent')}
+              className={`p-3 rounded-2xl border text-left transition cursor-pointer ${
+                deleteMode === 'permanent'
+                  ? 'border-rose-600 bg-rose-50/70 text-rose-950 ring-2 ring-rose-500/20'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <div className="font-bold text-xs text-rose-700">Permanent Removal</div>
+              <div className="text-[11px] text-slate-500 mt-1 leading-snug">
+                Removes this competition record from the catalog. Preserves historical student attempts and certs.
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* Confirmation Input for Permanent Mode */}
+        {deleteMode === 'permanent' && (
+          <div className="space-y-1.5 pt-1">
+            <label className="text-xs font-bold text-rose-900 block">
+              Explicit Confirmation Required
+            </label>
+            <p className="text-[11px] text-slate-500">
+              Type <strong className="text-slate-900 font-mono">{competition.code}</strong> or <strong className="text-slate-900 font-mono">DELETE</strong> to confirm permanent deletion:
+            </p>
+            <input
+              type="text"
+              value={confirmInput}
+              onChange={(e) => setConfirmInput(e.target.value)}
+              placeholder={`Enter ${competition.code} to confirm...`}
+              className="w-full bg-slate-50 border border-rose-300 rounded-xl p-2.5 text-xs font-mono font-bold text-slate-900 focus:bg-white focus:outline-rose-500"
+            />
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="pt-2 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isProcessing}
+            className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 rounded-xl"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={isProcessing}
+            className={`px-5 py-2.5 text-white font-bold rounded-xl text-xs transition cursor-pointer shadow-md ${
+              deleteMode === 'permanent'
+                ? 'bg-rose-600 hover:bg-rose-700'
+                : 'bg-emerald-700 hover:bg-emerald-800'
+            }`}
+          >
+            {isProcessing ? 'Processing...' : deleteMode === 'permanent' ? 'Permanently Delete' : 'Confirm Archive'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// -------------------------------------------------------------
 // SUB-MODAL: CREATE / EDIT COMPETITION & PRIZES
 // -------------------------------------------------------------
 interface CreateCompetitionModalProps {
   initialCompetition?: Competition | null;
   onClose: () => void;
   onSuccess: (comp: Competition) => void;
+  onDelete?: () => void;
 }
 
-const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initialCompetition, onClose, onSuccess }) => {
-  const { currentUser } = useAuth();
+const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initialCompetition, onClose, onSuccess, onDelete }) => {
+  const { currentUser, isSuperAdmin } = useAuth();
   const isEditing = Boolean(initialCompetition);
 
   const [formData, setFormData] = useState({
@@ -1620,6 +2174,12 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
     maxParticipants: initialCompetition?.maxParticipants ?? 2000,
     maxMarks: initialCompetition?.maxMarks ?? 100,
     passingMarks: initialCompetition?.passingMarks ?? 40,
+    // Scheduled Examination & Timing Controls
+    examScheduleDate: initialCompetition?.examScheduleDate || initialCompetition?.examDetails?.examScheduleDate || initialCompetition?.competitionDate || '2026-10-30',
+    openingTime: initialCompetition?.openingTime || initialCompetition?.examDetails?.openingTime || '09:00',
+    closingTime: initialCompetition?.closingTime || initialCompetition?.examDetails?.closingTime || '10:00',
+    timeZone: initialCompetition?.timeZone || initialCompetition?.examDetails?.timeZone || 'Asia/Kolkata',
+    allowMultipleAttempts: initialCompetition?.allowMultipleAttempts ?? initialCompetition?.examDetails?.allowMultipleAttempts ?? false,
     // Book details
     isBookReading: initialCompetition ? Boolean(initialCompetition.bookDetails) : true,
     bookTitle: initialCompetition?.bookDetails?.bookTitle || 'Wings of Fire: An Autobiography',
@@ -1752,6 +2312,14 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
     e.preventDefault();
     if (!formData.title.trim()) return;
 
+    // RBAC Security Check: Super Admin can edit ANY competition schedule.
+    // An Exam Controller can only edit their own created examination schedule.
+    const isCreator = Boolean(initialCompetition?.createdByUid && currentUser?.uid && initialCompetition.createdByUid === currentUser.uid);
+    if (isEditing && !isSuperAdmin && !isCreator) {
+      alert('RBAC Access Denied: You do not have permission to modify another controller\'s examination schedule.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const compId = initialCompetition?.id || `cmp-${Date.now()}`;
@@ -1772,7 +2340,12 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
         eligibleDistricts: initialCompetition?.eligibleDistricts || ['All Districts'],
         registrationStartDate: formData.registrationStartDate,
         registrationEndDate: formData.registrationEndDate,
-        competitionDate: formData.competitionDate,
+        competitionDate: formData.examScheduleDate || formData.competitionDate,
+        examScheduleDate: formData.examScheduleDate,
+        openingTime: formData.openingTime,
+        closingTime: formData.closingTime,
+        timeZone: formData.timeZone,
+        allowMultipleAttempts: formData.allowMultipleAttempts,
         resultPublicationDate: formData.resultPublicationDate,
         maxParticipants: Number(formData.maxParticipants),
         registeredCount: initialCompetition?.registeredCount || 0,
@@ -1803,10 +2376,16 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
         pdfFileName: formData.pdfFileName,
         pdfFileSizeBytes: formData.pdfFileSizeBytes,
         pdfSourceType: formData.pdfSourceType,
-        examDetails: initialCompetition?.examDetails || {
+        examDetails: {
+          ...(initialCompetition?.examDetails || {}),
           isOnlineExam: formData.isOnlineExam,
           durationMinutes: Number(formData.durationMinutes),
-          questions: [
+          examScheduleDate: formData.examScheduleDate,
+          openingTime: formData.openingTime,
+          closingTime: formData.closingTime,
+          timeZone: formData.timeZone,
+          allowMultipleAttempts: formData.allowMultipleAttempts,
+          questions: initialCompetition?.examDetails?.questions || [
             {
               id: 'q1',
               questionText: 'Which key insight or thesis was emphasized in the core curriculum?',
@@ -2185,14 +2764,98 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
               />
             </div>
 
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Assessment Date</label>
-              <input
-                type="date"
-                value={formData.competitionDate}
-                onChange={(e) => setFormData({ ...formData, competitionDate: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300"
-              />
+            {/* Scheduled Examination Window & Timing Configuration */}
+            <div className="sm:col-span-2 p-4 bg-slate-900 text-white rounded-2xl border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-white flex items-center gap-1.5 text-xs">
+                    <Clock className="w-4 h-4 text-amber-400" />
+                    <span>Scheduled Examination Window & Timing Configuration</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-400">
+                    Configures the strict opening and closing schedule window (Asia/Kolkata IST) and examination duration limit.
+                  </p>
+                </div>
+                {isSuperAdmin && (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    Super Admin Schedule Authority
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                <div>
+                  <label className="block font-bold text-slate-300 text-xs mb-1">Exam Date (YYYY-MM-DD) *</label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.examScheduleDate}
+                    onChange={(e) => setFormData({ ...formData, examScheduleDate: e.target.value, competitionDate: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-300 text-xs mb-1">Opening Time (IST) *</label>
+                  <input
+                    type="time"
+                    required
+                    value={formData.openingTime}
+                    onChange={(e) => setFormData({ ...formData, openingTime: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-mono font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-300 text-xs mb-1">Closing Time (IST) *</label>
+                  <input
+                    type="time"
+                    required
+                    value={formData.closingTime}
+                    onChange={(e) => setFormData({ ...formData, closingTime: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-mono font-semibold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block font-bold text-slate-300 text-xs mb-1">Allowed Duration Limit</label>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={formData.durationMinutes}
+                      onChange={(e) => setFormData({ ...formData, durationMinutes: Number(e.target.value) })}
+                      className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-bold"
+                    >
+                      <option value={10}>10 Minutes</option>
+                      <option value={15}>15 Minutes</option>
+                      <option value={30}>30 Minutes</option>
+                      <option value={45}>45 Minutes</option>
+                      <option value={60}>60 Minutes (1 Hour)</option>
+                      <option value={90}>90 Minutes (1.5 Hours)</option>
+                      <option value={120}>120 Minutes (2 Hours)</option>
+                    </select>
+                    <input
+                      type="number"
+                      min={5}
+                      max={360}
+                      value={formData.durationMinutes}
+                      onChange={(e) => setFormData({ ...formData, durationMinutes: Math.max(5, Number(e.target.value)) })}
+                      placeholder="Custom Mins"
+                      className="w-24 px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-mono"
+                    />
+                    <span className="text-xs text-slate-400">Minutes</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-300 text-xs mb-1">Time Zone</label>
+                  <input
+                    type="text"
+                    value={formData.timeZone}
+                    readOnly
+                    className="w-full px-3 py-2 rounded-xl bg-slate-800/60 border border-slate-700 text-slate-400 text-xs font-mono cursor-not-allowed"
+                  />
+                </div>
+              </div>
             </div>
 
             <div>
@@ -2315,21 +2978,36 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
 
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-slate-100 rounded-xl font-bold cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-5 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl font-bold cursor-pointer"
-            >
-              {isSubmitting ? 'Saving Program...' : isEditing ? 'Save Changes & Prizes' : 'Create Competition'}
-            </button>
+          <div className="flex justify-between items-center pt-4 border-t border-slate-200 flex-wrap gap-2">
+            <div>
+              {isEditing && isSuperAdmin && onDelete && (
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  className="px-4 py-2 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 rounded-xl font-bold text-xs cursor-pointer flex items-center gap-1.5 transition shadow-xs"
+                  title="Super Admin: Delete Competition"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Delete Competition</span>
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold cursor-pointer text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-5 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl font-bold cursor-pointer text-xs shadow-xs"
+              >
+                {isSubmitting ? 'Saving Program...' : isEditing ? 'Save Changes & Prizes' : 'Create Competition'}
+              </button>
+            </div>
           </div>
 
         </form>

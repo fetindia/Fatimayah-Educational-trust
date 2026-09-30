@@ -139,6 +139,41 @@ export const MembershipPage: React.FC<MembershipPageProps> = ({
 
     try {
       const generatedId = `FET-APP-${Math.floor(100000 + Math.random() * 900000)}`;
+      const now = new Date().toISOString();
+      const applicantUid = currentUser?.uid || `guest_${Date.now()}`;
+      const isLifeMember = selectedTier === 'life';
+      const canonicalType = isLifeMember ? 'life_member' : selectedTier === 'patron' ? 'core_member' : 'general_member';
+      const tierTitle = selectedTier === 'life' ? 'Life Member' : selectedTier === 'patron' ? 'Patron Member' : selectedTier === 'student' ? 'Student Member' : 'Associate Member';
+
+      // 1. Write to canonical membershipApplications collection
+      try {
+        await addDoc(collection(db, 'membershipApplications'), {
+          applicantUid,
+          applicantEmail: email || currentUser?.email || 'applicant@fetindia.org',
+          fullLegalName: fullName,
+          guardianName: guardianName || '',
+          mobileNumber: phone,
+          country: 'India',
+          state: stateName || 'Jammu & Kashmir',
+          district: city || 'Srinagar',
+          fullAddress: `${city || ''}, ${stateName || ''}`.trim() || 'Address on file',
+          occupation: profession || '',
+          membershipType: canonicalType,
+          requestedTier: canonicalType,
+          tier: tierTitle,
+          applicationNumber: generatedId,
+          reasonForJoining: statement || `Application submitted via Public Membership Portal (${tierTitle})`,
+          declarationAccepted: true,
+          termsAccepted: true,
+          status: 'pending',
+          createdAt: now,
+          updatedAt: now
+        });
+      } catch (canonicalErr) {
+        console.warn('Canonical membershipApplications write notice:', canonicalErr);
+      }
+
+      // 2. Also write to legacy member_applications collection for backward-compatibility
       await addDoc(collection(db, 'member_applications'), {
         applicationNumber: generatedId,
         fullName,

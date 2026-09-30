@@ -28,6 +28,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { CampaignDonation } from '../../types';
+import { useConfig } from '../../contexts/ConfigContext';
 import { PrintableDonationReceiptModal } from '../donor/PrintableDonationReceiptModal';
 
 export interface DonationRecord {
@@ -87,6 +88,7 @@ const INITIAL_DONATIONS: DonationRecord[] = [
 
 export const MemberDonationsView: React.FC<MemberDonationsViewProps> = ({ onNotify, onExploreCampaigns }) => {
   const { userProfile, currentUser } = useAuth();
+  const { config } = useConfig();
   const [liveDonations, setLiveDonations] = useState<DonationRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -268,8 +270,8 @@ export const MemberDonationsView: React.FC<MemberDonationsViewProps> = ({ onNoti
             Official Tax Exemption Endorsement (Section 80G & 12A)
           </h4>
           <p className="text-[11px] text-amber-900/90 leading-relaxed">
-            All donations made to <strong>Fatimyah Educational Trust</strong> qualify for 50% income tax deduction under Section 80G of the Income Tax Act, 1961. 
-            Unique Registration Number: <strong className="font-mono text-slate-900">AAATF1234AF20214</strong>. 
+            All donations made to <strong>{config.legalName || 'Fatimyah Educational Trust'}</strong> qualify for 50% income tax deduction under Section 80G of the Income Tax Act, 1961. 
+            Trust PAN: <strong className="font-mono text-slate-900">{config.panNumber || 'AABTF0015H'}</strong> • NITI Aayog DARPAN: <strong className="font-mono text-slate-900">{config.nitiAayogId || 'JK/2026/1153821'}</strong> • 80G URN: <strong className="font-mono text-slate-900">AAATF1234AF20214</strong>. 
             All certificates reflect Form 10BD statement of donations for seamless pre-fill in your annual ITR.
           </p>
         </div>

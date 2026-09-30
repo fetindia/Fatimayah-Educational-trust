@@ -122,6 +122,59 @@ const FETIndiaPlatform: React.FC = () => {
   const [generalDonationTab, setGeneralDonationTab] = useState<DonationTab>('general');
   const [isStudentResultModalOpen, setIsStudentResultModalOpen] = useState<boolean>(false);
   const [studentResultPrefill, setStudentResultPrefill] = useState<string>('');
+  const [examinationTargetId, setExaminationTargetId] = useState<string>('');
+
+  // Pending Authenticated Action State (Exam Application & Crowdfunding Case Creation)
+  const [pendingAuthAction, setPendingAuthAction] = useState<{
+    type: 'apply_exam' | 'create_crowdfunding' | 'start_exam';
+    competition?: Competition | null;
+    competitionId?: string;
+  } | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = sessionStorage.getItem('fet_pending_auth_action');
+        return stored ? JSON.parse(stored) : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
+
+  // Automatically return user to original action after successful authentication
+  useEffect(() => {
+    if (currentUser) {
+      let pending = pendingAuthAction;
+      if (!pending && typeof window !== 'undefined') {
+        try {
+          const stored = sessionStorage.getItem('fet_pending_auth_action');
+          if (stored) pending = JSON.parse(stored);
+        } catch {}
+      }
+
+      if (pending) {
+        if (pending.type === 'apply_exam') {
+          const targetComp = pending.competition || INITIAL_COMPETITIONS.find(c => c.id === pending?.competitionId) || INITIAL_COMPETITIONS[0];
+          if (targetComp) {
+            setSelectedExamForApply(targetComp);
+            setIsExamApplyOpen(true);
+          }
+        } else if (pending.type === 'create_crowdfunding') {
+          setDashboardInitialTab('campaigns');
+          setCurrentExperience('dashboard');
+        } else if (pending.type === 'start_exam') {
+          setDashboardInitialTab('competitions');
+          setCurrentExperience('dashboard');
+        }
+        setPendingAuthAction(null);
+        if (typeof window !== 'undefined') {
+          try {
+            sessionStorage.removeItem('fet_pending_auth_action');
+          } catch {}
+        }
+      }
+    }
+  }, [currentUser]);
 
   // Lock body scroll when mobile menu is open
   useEffect(() => {
@@ -222,16 +275,41 @@ const FETIndiaPlatform: React.FC = () => {
         setCurrentExperience('events_news');
       } else if (hash === '#contact' || hash === '#contact-us' || path.startsWith('/contact')) {
         setCurrentExperience('contact');
-      } else if (hash === '#examinations' || hash === '#examination' || path.startsWith('/examination')) {
+      } else if (hash.startsWith('#examinations') || hash.startsWith('#examination') || path.startsWith('/examination')) {
+        let compId = '';
+        if (searchParams.has('exam') || searchParams.has('competition') || searchParams.has('id')) {
+          compId = searchParams.get('exam') || searchParams.get('competition') || searchParams.get('id') || '';
+        }
+        if (!compId && path.startsWith('/examination/')) {
+          compId = decodeURIComponent(path.replace(/^\/examination\/?/i, ''));
+        }
+        if (!compId && hash.startsWith('#examination/')) {
+          compId = decodeURIComponent(hash.replace(/^#examination\/?/i, ''));
+        }
+        if (compId) {
+          setExaminationTargetId(compId.trim());
+        }
         setCurrentExperience('examination');
       } else if (hash === '#chairman' || hash === '#chairman_message' || hash === '#chairmans_message') {
         setIsChairmanModalOpen(true);
         setCurrentExperience('public');
       } else if (hash === '#apply_exam' || hash === '#exam_apply') {
         const exam = INITIAL_COMPETITIONS[0] || null;
-        setSelectedExamForApply(exam);
-        setIsExamApplyOpen(true);
-        setCurrentExperience('public');
+        if (!currentUser) {
+          const pending = { type: 'apply_exam' as const, competition: exam, competitionId: exam?.id };
+          setPendingAuthAction(pending);
+          if (typeof window !== 'undefined') {
+            try {
+              sessionStorage.setItem('fet_pending_auth_action', JSON.stringify(pending));
+            } catch {}
+          }
+          setIsAuthModalOpen(true);
+          setCurrentExperience('public');
+        } else {
+          setSelectedExamForApply(exam);
+          setIsExamApplyOpen(true);
+          setCurrentExperience('public');
+        }
       } else if (hash === '#featured_cases' || hash === '#cases') {
         setActiveSection('featured_cases');
         setCurrentExperience('public');
@@ -466,12 +544,34 @@ const FETIndiaPlatform: React.FC = () => {
   };
 
   const handleApplyExam = (competition: Competition) => {
+    if (!currentUser) {
+      const pending = { type: 'apply_exam' as const, competition, competitionId: competition.id };
+      setPendingAuthAction(pending);
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem('fet_pending_auth_action', JSON.stringify(pending));
+        } catch {}
+      }
+      setIsAuthModalOpen(true);
+      return;
+    }
     setSelectedExamForApply(competition);
     setIsExamApplyOpen(true);
   };
 
   const handleOpenApplyExamDirect = () => {
     const exam = INITIAL_COMPETITIONS[0] || null;
+    if (!currentUser) {
+      const pending = { type: 'apply_exam' as const, competition: exam, competitionId: exam?.id };
+      setPendingAuthAction(pending);
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem('fet_pending_auth_action', JSON.stringify(pending));
+        } catch {}
+      }
+      setIsAuthModalOpen(true);
+      return;
+    }
     setSelectedExamForApply(exam);
     setIsExamApplyOpen(true);
   };
@@ -749,7 +849,17 @@ const FETIndiaPlatform: React.FC = () => {
                           <FeaturedCrowdfundingSection 
                             key={itemKey} 
                             onOpenDonate={handleOpenDonate}
-                            onOpenLegal={handleOpenLegal} 
+                            onOpenLegal={handleOpenLegal}
+                            onOpenAuth={() => {
+                              const pending = { type: 'create_crowdfunding' as const };
+                              setPendingAuthAction(pending);
+                              if (typeof window !== 'undefined') {
+                                try {
+                                  sessionStorage.setItem('fet_pending_auth_action', JSON.stringify(pending));
+                                } catch {}
+                              }
+                              setIsAuthModalOpen(true);
+                            }}
                           />
                         );
                       case 'featured_cases':
@@ -1533,6 +1643,7 @@ const FETIndiaPlatform: React.FC = () => {
 
           <main className="flex-1">
             <ExaminationPage
+              targetCompetitionId={examinationTargetId}
               onApplyExam={handleApplyExam}
               onViewExamInfo={handleViewExamInfo}
               onOpenStudentResults={() => {
@@ -1647,6 +1758,15 @@ const FETIndiaPlatform: React.FC = () => {
             setSelectedExamForApply(null);
           }}
           onOpenAuth={() => {
+            if (selectedExamForApply) {
+              const pending = { type: 'apply_exam' as const, competition: selectedExamForApply, competitionId: selectedExamForApply.id };
+              setPendingAuthAction(pending);
+              if (typeof window !== 'undefined') {
+                try {
+                  sessionStorage.setItem('fet_pending_auth_action', JSON.stringify(pending));
+                } catch {}
+              }
+            }
             setIsExamApplyOpen(false);
             setIsAuthModalOpen(true);
           }}

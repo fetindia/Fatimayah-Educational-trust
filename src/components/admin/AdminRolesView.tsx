@@ -23,7 +23,12 @@ import {
   Eye,
   UserCog,
   Award,
-  GraduationCap
+  GraduationCap,
+  MapPin,
+  Globe,
+  Building2,
+  ExternalLink,
+  Plus
 } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db, updateUserRoles, adminUpdateUserProfile, updateUserAccountStatus, SYSTEM_SUPER_ADMIN_EMAIL } from '../../lib/firebase';
@@ -35,12 +40,14 @@ import {
   getEffectivePermissions,
   getRoleMetadata 
 } from '../../lib/rbac';
-import { UserProfile, UserRole, AppPermission, CoreRole } from '../../types';
+import { UserProfile, UserRole, AppPermission, CoreRole, DelegatedAdminScope } from '../../types';
 import { AssignExamRoleModal } from './exam/AssignExamRoleModal';
+import { AssignDelegatedAdminModal } from './roles/AssignDelegatedAdminModal';
 
 export const AdminRolesView: React.FC = () => {
   const { currentUser, activeRole, isSuperAdmin, canManageRoles } = useAuth();
   const [selectedUserForExamRole, setSelectedUserForExamRole] = useState<UserProfile | null>(null);
+  const [selectedUserForDelegation, setSelectedUserForDelegation] = useState<UserProfile | null>(null);
   const [users, setUsers] = useState<UserProfile[]>([
     {
       uid: 'sys-super-admin-01',
@@ -68,7 +75,7 @@ export const AdminRolesView: React.FC = () => {
   const [editState, setEditState] = useState('');
   const [editCountry, setEditCountry] = useState('India');
   const [editStatus, setEditStatus] = useState<'active' | 'suspended'>('active');
-  const [activeTab, setActiveTab] = useState<'users' | 'matrix'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'delegated' | 'matrix'>('users');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -305,6 +312,15 @@ export const AdminRolesView: React.FC = () => {
             User Directory & Roles
           </button>
           <button
+            onClick={() => setActiveTab('delegated')}
+            className={`px-3.5 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'delegated' ? 'bg-white text-slate-900 shadow-xs' : 'hover:text-slate-900'
+            }`}
+          >
+            <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Delegated Jurisdictions (District / State / National)</span>
+          </button>
+          <button
             onClick={() => setActiveTab('matrix')}
             className={`px-3.5 py-1.5 rounded-lg transition-all cursor-pointer ${
               activeTab === 'matrix' ? 'bg-white text-slate-900 shadow-xs' : 'hover:text-slate-900'
@@ -451,6 +467,12 @@ export const AdminRolesView: React.FC = () => {
                               {r}
                             </span>
                           ))}
+                          {u.delegatedScopes && u.delegatedScopes.filter(s => s.status === 'active').map((s, sIdx) => (
+                            <span key={`del-${sIdx}`} className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                              <MapPin className="w-2.5 h-2.5" />
+                              <span>{s.level.toUpperCase()}: {s.assignedDistricts?.join(', ') || s.assignedState || 'National'}</span>
+                            </span>
+                          ))}
                         </div>
                       </td>
                       <td className="py-3 px-4">
@@ -469,6 +491,17 @@ export const AdminRolesView: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {isSuperAdmin && (
+                            <button
+                              onClick={() => setSelectedUserForDelegation(u)}
+                              className="px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 border border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100"
+                              title="Assign or Manage Delegated Jurisdictional Scope (District / State / National)"
+                            >
+                              <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Delegate Scope</span>
+                            </button>
+                          )}
+
                           <button
                             onClick={() => setSelectedUserForExamRole(u)}
                             disabled={!canManageRoles}
@@ -505,6 +538,191 @@ export const AdminRolesView: React.FC = () => {
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      ) : activeTab === 'delegated' ? (
+        /* Delegated Jurisdictions Governance View */
+        <div className="space-y-6">
+          {/* Header & Overview */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    Tiered Delegated Scopes
+                  </span>
+                  <span className="text-xs text-slate-500">Pan-India RBAC Architecture</span>
+                </div>
+                <h3 className="text-base font-bold text-slate-900 mt-1">Delegated Jurisdictional Governance</h3>
+                <p className="text-xs text-slate-500 max-w-2xl mt-0.5 leading-relaxed">
+                  Super Admin control center for District, State/UT, and National administrators. Appoint regional coordinators to conduct case document verification, review examinations, and submit formal recommendations with strict data isolation.
+                </p>
+              </div>
+
+              {isSuperAdmin && (
+                <button
+                  onClick={() => {
+                    const firstNonSuper = users.find(u => !u.roles.includes('super_admin')) || users[0];
+                    setSelectedUserForDelegation(firstNonSuper);
+                  }}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-600 transition-all shadow-md active:scale-98 flex items-center gap-2 cursor-pointer shrink-0"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Delegate Administrator</span>
+                </button>
+              )}
+            </div>
+
+            {/* Metrics Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">District Administrators</span>
+                <div className="text-2xl font-black text-slate-900">
+                  {users.filter(u => u.roles.some(r => r.startsWith('district_')) || u.delegatedScopes?.some(s => s.status === 'active' && s.level === 'district')).length}
+                </div>
+                <p className="text-[10px] text-slate-500">Kathua, Jammu, Srinagar & all Indian districts</p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">State / UT Administrators</span>
+                <div className="text-2xl font-black text-slate-900">
+                  {users.filter(u => u.roles.some(r => r.startsWith('state_')) || u.delegatedScopes?.some(s => s.status === 'active' && s.level === 'state')).length}
+                </div>
+                <p className="text-[10px] text-slate-500">Jammu & Kashmir, Ladakh & 36 States/UTs</p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">National Administrators</span>
+                <div className="text-2xl font-black text-slate-900">
+                  {users.filter(u => u.roles.some(r => r.startsWith('national_')) || u.delegatedScopes?.some(s => s.status === 'active' && s.level === 'national')).length}
+                </div>
+                <p className="text-[10px] text-slate-500">Pan-India oversight under Super Admin guidance</p>
+              </div>
+            </div>
+
+            {/* Multi-Tier Approval Workflow Flowchart */}
+            <div className="p-4 rounded-xl bg-indigo-50/60 border border-indigo-100 space-y-2 text-xs">
+              <span className="font-bold text-indigo-950 flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
+                <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Multi-Tier Verification & Approval Flow</span>
+              </span>
+              <div className="flex flex-wrap items-center gap-2 text-slate-700 text-[11px]">
+                <span className="px-2.5 py-1 rounded-md bg-white border border-slate-200 font-semibold shadow-2xs">Applicant Case</span>
+                <span className="text-indigo-400 font-bold">→</span>
+                <span className="px-2.5 py-1 rounded-md bg-emerald-100 text-emerald-900 border border-emerald-200 font-bold shadow-2xs">District Review & Doc Verification</span>
+                <span className="text-indigo-400 font-bold">→</span>
+                <span className="px-2.5 py-1 rounded-md bg-teal-100 text-teal-900 border border-teal-200 font-bold shadow-2xs">State/UT Audit & Recommendation</span>
+                <span className="text-indigo-400 font-bold">→</span>
+                <span className="px-2.5 py-1 rounded-md bg-amber-100 text-amber-900 border border-amber-300 font-bold shadow-2xs">Super Admin Final Approval</span>
+              </div>
+              <p className="text-[10px] text-slate-500 leading-relaxed pt-1">
+                * Configurable per appeal: Super Admin retains sovereign final authority and may approve cases directly without forcing every case through all tiers. Delegated administrators cannot alter global settings or delete records.
+              </p>
+            </div>
+          </div>
+
+          {/* Delegated Administrators Roster */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-4">
+            <h3 className="text-sm font-bold text-slate-900">Active Delegated Officers & Jurisdictions</h3>
+
+            {users.filter(u => 
+              (u.delegatedScopes && u.delegatedScopes.some(s => s.status === 'active')) ||
+              u.roles.some(r => r.startsWith('district_') || r.startsWith('state_') || r.startsWith('national_'))
+            ).length === 0 ? (
+              <div className="text-center py-10 px-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-3">
+                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+                  <MapPin className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800">No Delegated Administrators Appointed Yet</h4>
+                  <p className="text-[11px] text-slate-500 max-w-sm mx-auto mt-0.5">
+                    Click "Delegate Administrator" above or select any user from the "User Directory & Roles" tab to assign District, State/UT, or National jurisdiction.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                      <th className="py-3 px-4">Administrator</th>
+                      <th className="py-3 px-4">Level</th>
+                      <th className="py-3 px-4">Module Scope</th>
+                      <th className="py-3 px-4">Assigned Jurisdiction</th>
+                      <th className="py-3 px-4">Review Rights</th>
+                      <th className="py-3 px-4">Approval Rights</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {users.filter(u => 
+                      (u.delegatedScopes && u.delegatedScopes.some(s => s.status === 'active')) ||
+                      u.roles.some(r => r.startsWith('district_') || r.startsWith('state_') || r.startsWith('national_'))
+                    ).map((u) => {
+                      const activeScope = u.delegatedScopes?.find(s => s.status === 'active');
+                      const inferredLevel = activeScope?.level || (u.roles.some(r => r.startsWith('district_')) ? 'district' : u.roles.some(r => r.startsWith('state_')) ? 'state' : 'national');
+                      const inferredModule = activeScope?.module || 'both';
+
+                      return (
+                        <tr key={u.uid} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="font-bold text-slate-900">{u.displayName || u.fullLegalName || 'FET Officer'}</div>
+                            <div className="text-[10px] text-slate-500 font-mono">{u.email}</div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              inferredLevel === 'district' ? 'bg-emerald-100 text-emerald-800' :
+                              inferredLevel === 'state' ? 'bg-teal-100 text-teal-800' : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {inferredLevel} Level
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold text-[10px] uppercase">
+                              {inferredModule}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="font-semibold text-slate-900">
+                              {activeScope?.assignedState || u.assignedState || u.state || 'All India'}
+                            </div>
+                            {(activeScope?.assignedDistricts || u.assignedDistricts) && (
+                              <div className="text-[10px] text-emerald-700 font-medium">
+                                Districts: {(activeScope?.assignedDistricts || u.assignedDistricts || []).join(', ')}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                              Verify & Clarify
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            {activeScope?.canApprove ? (
+                              <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                                Final Approval Granted
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                                Recommendation Only
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              onClick={() => setSelectedUserForDelegation(u)}
+                              className="px-3 py-1.5 rounded-lg text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors cursor-pointer"
+                            >
+                              Configure
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -786,26 +1004,48 @@ export const AdminRolesView: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                 {PERMISSION_DEFINITIONS.map((perm) => {
-                  const isGranted = editedRoles.includes('super_admin') || 
-                    editedRoles.some(r => ROLE_DEFINITIONS[r]?.defaultPermissions.includes(perm.id)) ||
-                    editedCustomPermissions.includes(perm.id);
+                  const isInherited = editedRoles.includes('super_admin') || 
+                    editedRoles.some(r => ROLE_DEFINITIONS[r]?.defaultPermissions.includes(perm.id));
+                  const isCustom = editedCustomPermissions.includes(perm.id);
+                  const isGranted = isInherited || isCustom;
 
                   return (
-                    <div 
-                      key={perm.id} 
-                      className={`p-2 rounded-lg border text-[11px] flex items-center justify-between ${
-                        isGranted 
-                          ? 'bg-emerald-50/60 border-emerald-200 text-emerald-950 font-medium' 
-                          : 'bg-white border-slate-200 text-slate-400'
+                    <button
+                      key={perm.id}
+                      type="button"
+                      disabled={isInherited}
+                      onClick={() => toggleCustomPermission(perm.id)}
+                      className={`p-2.5 rounded-xl border text-[11px] flex items-center justify-between text-left transition-all ${
+                        isInherited 
+                          ? 'bg-slate-100 border-slate-200 text-slate-700 cursor-default opacity-90' 
+                          : isCustom
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold shadow-xs cursor-pointer'
+                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 cursor-pointer'
                       }`}
+                      title={isInherited ? 'Granted via assigned role' : isCustom ? 'Explicitly granted custom permission. Click to revoke.' : 'Click to grant custom permission'}
                     >
-                      <span className="truncate pr-2">{perm.name}</span>
+                      <div className="min-w-0 pr-2">
+                        <div className="font-bold flex items-center gap-1.5 truncate">
+                          <span>{perm.name}</span>
+                          {isInherited && (
+                            <span className="text-[9px] px-1 py-0.2 rounded bg-slate-200 text-slate-700 font-semibold shrink-0">
+                              via Role
+                            </span>
+                          )}
+                          {isCustom && (
+                            <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-200 text-emerald-800 font-semibold shrink-0">
+                              Custom Grant
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-slate-400 line-clamp-1">{perm.description}</div>
+                      </div>
                       {isGranted ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <Check className="w-4 h-4 text-emerald-600 shrink-0" />
                       ) : (
-                        <X className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+                        <Plus className="w-4 h-4 text-slate-300 shrink-0 hover:text-slate-600" />
                       )}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -844,6 +1084,16 @@ export const AdminRolesView: React.FC = () => {
         isOpen={Boolean(selectedUserForExamRole)}
         onClose={() => setSelectedUserForExamRole(null)}
         targetUser={selectedUserForExamRole}
+        onSuccess={(updatedUser) => {
+          setUsers(prev => prev.map(u => u.uid === updatedUser.uid ? updatedUser : u));
+        }}
+      />
+
+      {/* Delegated Jurisdictional Administrative Governance Modal */}
+      <AssignDelegatedAdminModal
+        isOpen={Boolean(selectedUserForDelegation)}
+        onClose={() => setSelectedUserForDelegation(null)}
+        targetUser={selectedUserForDelegation}
         onSuccess={(updatedUser) => {
           setUsers(prev => prev.map(u => u.uid === updatedUser.uid ? updatedUser : u));
         }}

@@ -69,15 +69,36 @@ export const LatestNewsBlogSection: React.FC<LatestNewsBlogSectionProps> = ({
 
   useEffect(() => {
     let isMounted = true;
-    async function loadDynamicNews() {
-      try {
-        // Query official news collection updated by Blog Admin Console
-        const newsSnap = await getDocs(collection(db, 'news'));
-        if (!newsSnap.empty && isMounted) {
-          const loaded: NewsArticle[] = [];
-          newsSnap.forEach((doc) => {
+    try {
+      const unsub = onSnapshot(collection(db, 'news'), (snapshot) => {
+        if (!isMounted) return;
+
+        if (!snapshot.empty) {
+          const loaded: (NewsArticle & { _sortTimestamp?: number })[] = [];
+          const firestoreIds = new Set<string>();
+          const firestoreTitles = new Set<string>();
+
+          snapshot.forEach((doc) => {
             const d = doc.data();
-            if (d.status === 'draft') return; // Skip drafts on public page
+            firestoreIds.add(doc.id);
+            if (d.title) firestoreTitles.add(d.title.toLowerCase().trim());
+
+            // Filter out drafts, unpublished, or deleted items
+            if (d.status === 'draft' || d.status === 'unpublished' || d.status === 'deleted' || d.isDeleted) return;
+
+            // Determine sort timestamp
+            let sortTime = 0;
+            if (d.updatedAt?.toMillis) {
+              sortTime = d.updatedAt.toMillis();
+            } else if (d.updatedAt?.seconds) {
+              sortTime = d.updatedAt.seconds * 1000;
+            } else if (typeof d.updatedAt === 'string') {
+              sortTime = Date.parse(d.updatedAt) || 0;
+            } else if (d.date) {
+              const parsed = Date.parse(d.date);
+              if (!isNaN(parsed)) sortTime = parsed;
+            }
+
             loaded.push({
               id: doc.id,
               title: d.title || 'Untitled Bulletin',
@@ -88,46 +109,43 @@ export const LatestNewsBlogSection: React.FC<LatestNewsBlogSectionProps> = ({
               imageUrl: d.imageUrl || d.coverImageUrl,
               author: d.author || 'FET Editorial Bureau',
               readTime: d.readTime || '3 min read',
-              tag: d.tag || 'Official Bulletin'
+              tag: d.tag || 'Official Bulletin',
+              status: 'published',
+              _sortTimestamp: sortTime
             });
           });
-          if (loaded.length > 0) {
-            setArticles(loaded.slice(0, 3));
-            return;
+
+          // Sort loaded news newest first
+          loaded.sort((a, b) => (b._sortTimestamp || 0) - (a._sortTimestamp || 0));
+
+          const merged = [...loaded];
+          for (const def of defaultArticles) {
+            if (merged.length >= 3) break;
+            if (firestoreIds.has(def.id) || firestoreTitles.has(def.title.toLowerCase().trim())) {
+              continue;
+            }
+            if (!merged.some(m => m.id === def.id || m.title.toLowerCase() === def.title.toLowerCase())) {
+              merged.push(def);
+            }
           }
+          setArticles(merged.slice(0, 3));
+          return;
         }
 
-        // Fallback check to legacy posts collection if news collection is empty
-        const postsQuery = query(collection(db, 'posts'), where('status', '==', 'published'));
-        const snap = await getDocs(postsQuery);
-        if (!snap.empty && isMounted) {
-          const loaded: NewsArticle[] = [];
-          snap.forEach((doc) => {
-            const d = doc.data();
-            loaded.push({
-              id: doc.id,
-              title: d.title || 'Untitled Post',
-              category: d.category || 'Trust Announcement',
-              date: d.date || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-              summary: d.summary || d.content?.slice(0, 150) || '',
-              content: d.content || d.summary,
-              imageUrl: d.imageUrl || d.coverImageUrl,
-              author: d.author,
-              readTime: d.readTime
-            });
-          });
-          if (loaded.length > 0) {
-            setArticles(loaded.slice(0, 3));
-          }
-        }
-      } catch (err) {
-        // Quiet fallback to verified static articles
-      }
+        // If news collection has no published docs, fallback to defaultArticles
+        setArticles(defaultArticles);
+      }, (err) => {
+        console.warn('Real-time news listener notice:', err);
+      });
+
+      return () => {
+        isMounted = false;
+        unsub();
+      };
+    } catch (err) {
+      // Quiet fallback
+      setArticles(defaultArticles);
     }
-    loadDynamicNews();
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
   return (

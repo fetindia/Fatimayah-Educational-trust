@@ -447,7 +447,7 @@ export const CampaignDetailsModal: React.FC<CampaignDetailsModalProps> = ({
         {/* Modal Footer */}
         <div className="border-t border-slate-200 p-4 bg-slate-50 px-6 flex items-center justify-between rounded-b-3xl">
           <p className="text-xs text-slate-500">
-            {config.legalName} • Public Trust Act Registration
+            {config.legalName} • Section 80G Certified
           </p>
           <button
             onClick={onClose}

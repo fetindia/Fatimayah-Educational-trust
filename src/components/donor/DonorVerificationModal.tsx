@@ -3,7 +3,7 @@
  * Official Donor QR Verification Modal & Public Portal
  * Fatimyah Educational Trust India (FET India)
  * Organization Legal Name: Fatimyah Educational Trust
- * Regn. No. E-19842 (BOM) • Section 80G & 12A Certified
+ * Regd. in Jammu & Kashmir through SDM Office (1994) • DARPAN: JK/2026/1153821 • PAN: AABTF0015H
  */
 
 import React, { useState, useEffect } from 'react';
@@ -297,7 +297,7 @@ export const DonorVerificationModal: React.FC<DonorVerificationModalProps> = ({
         {/* Modal Footer */}
         <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
           <span className="font-mono text-[10px]">
-            Statutory Regn: E-19842 (BOM) • Section 80G Certified
+            Reg No: {config.registrationNumber || 'E 9822'} ({config.registrationJurisdiction || 'Jammu & Kashmir'}){config.registrationAct ? ` • ${config.registrationAct}` : ''} • DARPAN: {config.nitiAayogId || 'JK/2026/1153821'} • PAN: {config.panNumber || 'AABTF0015H'} • Section 80G Certified
           </span>
           <button
             onClick={onClose}

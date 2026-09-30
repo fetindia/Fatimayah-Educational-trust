@@ -467,7 +467,7 @@ export const EventsBlogSection: React.FC = () => {
                   By partnering with academic institutions and verifying fee structures directly with college bursars, 100% of disbursed funds directly offset tuition. Beneficiaries are subsequently enrolled in FET’s mentorship alumni network, creating a self-sustaining cycle of give-back.
                 </p>
                 <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600">
-                  <strong>Published by:</strong> {config.legalName} Secretariat Communications Cell • Mumbai, Maharashtra.
+                  <strong>Published by:</strong> {config.legalName} Secretariat Communications Cell.
                 </div>
               </div>
 

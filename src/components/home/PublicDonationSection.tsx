@@ -540,7 +540,7 @@ export const PublicDonationSection: React.FC<PublicDonationSectionProps> = ({ on
                     <div>
                       <span className="text-[10px] uppercase text-slate-400 block font-bold">Bank & Branch</span>
                       <span className="font-bold text-slate-900">
-                        {config.bankDetails?.bankName || 'State Bank of India'} ({config.bankDetails?.branch || 'Mumbai Main Branch'})
+                        {config.bankDetails?.bankName || 'State Bank of India'} ({config.bankDetails?.branch || 'Main Branch'})
                       </span>
                     </div>
                   </div>

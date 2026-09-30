@@ -29,6 +29,7 @@ export interface NewsArticle {
   readTime?: string;
   imageUrl?: string;
   tag?: string;
+  status?: 'published' | 'draft' | 'archived' | 'unpublished';
 }
 
 interface NewsBlogReaderModalProps {

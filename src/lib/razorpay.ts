@@ -89,9 +89,9 @@ export async function fetchRazorpayConfig(): Promise<RazorpayPublicConfig> {
       isConfigured: false,
       mode: 'live',
       currency: 'INR',
-      merchantName: 'Fatimyah Educational Trust',
-      supportEmail: 'fetkofficial@gmail.com',
-      supportPhone: '+91 98923 00000',
+      merchantName: 'FATIMYAH EDUCATIONAL TRUST',
+      supportEmail: 'contact@fetindia.com',
+      supportPhone: '+91 91494 14549',
       trust80GNumber: 'AAATF2843PF20214',
       description: '80G Certified Educational and Welfare Contributions'
     };

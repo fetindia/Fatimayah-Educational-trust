@@ -77,12 +77,13 @@ import {
   VolunteerCategory
 } from '../../types';
 import { DigitalVolunteerCard } from '../volunteer/DigitalVolunteerCard';
+import { AdminMembershipApplicationsView } from './AdminMembershipApplicationsView';
 
 export const AdminVolunteerApplicationsView: React.FC = () => {
   const { currentUser, userProfile, activeRole } = useAuth();
 
   // Primary Console Sub-Tab
-  const [activeTab, setActiveTab] = useState<'applications' | 'volunteers' | 'activities' | 'community_groups' | 'service_logs' | 'categories'>('applications');
+  const [activeTab, setActiveTab] = useState<'applications' | 'member_applications' | 'volunteers' | 'activities' | 'community_groups' | 'service_logs' | 'categories'>('applications');
 
   // 1. Applications State
   const [applications, setApplications] = useState<VolunteerApplication[]>([]);
@@ -902,14 +903,28 @@ export const AdminVolunteerApplicationsView: React.FC = () => {
               ? 'border-emerald-700 text-emerald-900'
               : 'border-transparent text-slate-500 hover:text-slate-900'
           }`}
+          id="tab-volunteer-applications"
         >
-          <FileText className="w-3.5 h-3.5" />
-          <span>Intake & Applications Queue</span>
+          <HeartHandshake className="w-3.5 h-3.5" />
+          <span>Volunteer Applications</span>
           {pendingCount > 0 && (
             <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-900 font-black">
               {pendingCount}
             </span>
           )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('member_applications')}
+          className={`py-3.5 px-4 text-xs font-bold whitespace-nowrap border-b-2 cursor-pointer transition-colors flex items-center gap-1.5 ${
+            activeTab === 'member_applications'
+              ? 'border-emerald-700 text-emerald-900'
+              : 'border-transparent text-slate-500 hover:text-slate-900'
+          }`}
+          id="tab-volunteer-member-applications"
+        >
+          <FileText className="w-3.5 h-3.5" />
+          <span>Member Application Intake / Member Applications</span>
         </button>
 
         <button
@@ -988,7 +1003,16 @@ export const AdminVolunteerApplicationsView: React.FC = () => {
       </div>
 
       {/* ============================================================ */}
-      {/* 1. INTAKE & APPLICATIONS QUEUE TAB */}
+      {/* 0. MEMBER APPLICATION INTAKE / MEMBER APPLICATIONS TAB */}
+      {/* ============================================================ */}
+      {activeTab === 'member_applications' && (
+        <div className="space-y-4 animate-in fade-in" id="volunteer-member-applications-container">
+          <AdminMembershipApplicationsView />
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* 1. VOLUNTEER APPLICATIONS QUEUE TAB */}
       {/* ============================================================ */}
       {activeTab === 'applications' && (
         <div className="space-y-4 animate-in fade-in">

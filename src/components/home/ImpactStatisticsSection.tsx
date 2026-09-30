@@ -298,7 +298,7 @@ export const ImpactStatisticsSection: React.FC = () => {
           <div className="flex items-center gap-2">
             <Info className="w-4 h-4 text-emerald-700 shrink-0" />
             <span>
-              <strong>Statutory Transparency Notice:</strong> All disbursement figures are independently audited annually under Bombay Public Trust Act 1950 & Section 80G regulations.
+              <strong>Statutory Transparency Notice:</strong> All disbursement figures are independently audited annually under applicable Jammu & Kashmir statutory regulations & Section 80G provisions.
             </span>
           </div>
           <span className="text-[11px] text-slate-500 font-mono shrink-0">

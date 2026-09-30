@@ -83,7 +83,7 @@ export const TrustPillars: React.FC<TrustPillarsProps> = ({ onOpenSection }) => 
   ];
 
   const milestones = [
-    { year: '1994', title: 'Trust Inception', desc: 'Fatimyah Educational Trust registered in Mumbai under Bombay Public Trust Act 1950 by eminent community visionaries.' },
+    { year: '1994', title: 'Trust Inception', desc: 'FATIMYAH EDUCATIONAL TRUST registered in Jammu & Kashmir through the Sub-Divisional Magistrate (SDM) Office by visionary community elders.' },
     { year: '2005', title: 'Income Tax 80G Exemption', desc: 'Granted permanent Section 80G 50% tax deduction status and Section 12A tax exemption by Income Tax Department.' },
     { year: '2015', title: '10,000+ Scholars Milestone', desc: 'Crossed over 10,000 scholarship disbursements for Engineering, Medical (MBBS/BAMS), and Postgraduate degrees.' },
     { year: '2026', title: 'Unified Digital Architecture', desc: 'Launch of 27-chapter master digital portal and cross-platform Firebase backend uniting web and mobile apps.' }

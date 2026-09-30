@@ -65,6 +65,7 @@ interface CreateCampaignModalProps {
   onClose: () => void;
   onSuccess?: (campaignId: string) => void;
   initialCampaign?: CrowdfundingCampaign | null;
+  onOpenAuth?: () => void;
 }
 
 const DOCUMENT_CATEGORIES = [
@@ -89,7 +90,8 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  initialCampaign
+  initialCampaign,
+  onOpenAuth
 }) => {
   const { currentUser, userProfile } = useAuth();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -653,12 +655,16 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
         {/* Sticky Header */}
         <div className="sticky top-0 bg-white/95 backdrop-blur-md border-b border-slate-200 px-6 py-4 flex items-center justify-between z-20 rounded-t-3xl">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-emerald-100 text-emerald-900 border border-emerald-300">
-              <HeartHandshake className="w-5 h-5 text-emerald-800" />
+            <div className={`p-2.5 rounded-2xl ${!currentUser ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-emerald-100 text-emerald-900 border border-emerald-300'}`}>
+              {!currentUser ? <Lock className="w-5 h-5 text-amber-800" /> : <HeartHandshake className="w-5 h-5 text-emerald-800" />}
             </div>
             <div>
-              <h2 className="text-base font-black text-slate-900">Create Fundraising Appeal</h2>
-              <p className="text-xs text-slate-500">Step {currentStep} of 8 — {stepsList[currentStep - 1]?.label}</p>
+              <h2 className="text-base font-black text-slate-900">
+                {!currentUser ? 'Authentication Required' : 'Create Fundraising Appeal'}
+              </h2>
+              <p className="text-xs text-slate-500">
+                {!currentUser ? 'FET India Crowdfunding & Emergency Relief Bureau' : `Step ${currentStep} of 8 — ${stepsList[currentStep - 1]?.label}`}
+              </p>
             </div>
           </div>
 
@@ -671,6 +677,42 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
           </button>
         </div>
 
+        {!currentUser ? (
+          <div className="p-8 sm:p-12 text-center space-y-6">
+            <div className="w-16 h-16 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center mx-auto shadow-inner border border-amber-200">
+              <Lock className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-2 max-w-md mx-auto">
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900">
+                Sign In to Apply for Crowdfunding
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                An authenticated FET India account is required to create, submit, or continue a crowdfunding humanitarian appeal. This guarantees case accountability, applicant verification, and zero-leakage direct institutional disbursals. Unauthenticated visitors are free to view and share public cases.
+              </p>
+            </div>
+
+            <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
+              {onOpenAuth && (
+                <button
+                  type="button"
+                  onClick={onOpenAuth}
+                  className="px-7 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-md transition cursor-pointer"
+                >
+                  Sign In / Register to Submit Appeal
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-6 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
+              >
+                Return to Appeals
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
         {/* Step Progress Bar & Nav Pills */}
         <div className="bg-slate-50 px-4 sm:px-6 py-3 border-b border-slate-200">
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] font-bold">
@@ -1665,6 +1707,8 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
             </button>
           )}
         </div>
+        </>
+        )}
 
       </div>
     </div>

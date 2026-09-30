@@ -50,6 +50,7 @@ import {
   UserProfile
 } from '../../types';
 import { AdminVolunteerApplicationsView } from './AdminVolunteerApplicationsView';
+import { AdminMembershipApplicationsView } from './AdminMembershipApplicationsView';
 import { AdminCoreMembersView } from './AdminCoreMembersView';
 import { AdminReportsAnalyticsView } from './AdminReportsAnalyticsView';
 import { AdminDonorsManagementView } from './AdminDonorsManagementView';
@@ -66,6 +67,7 @@ export const AdminSpecializedConsoles: React.FC<SpecializedConsolesProps> = ({ c
   const { config } = useConfig();
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [usersList, setUsersList] = useState<UserProfile[]>([]);
+  const [memberSection, setMemberSection] = useState<'applications' | 'directory'>('applications');
 
   useEffect(() => {
     if (currentTab === 'members') {
@@ -109,10 +111,44 @@ export const AdminSpecializedConsoles: React.FC<SpecializedConsolesProps> = ({ c
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" /> {successMsg}
           </div>
         )}
-        <AdminCoreMembersView 
-          users={usersList} 
-          onNotify={(msg) => showNotification(msg)} 
-        />
+
+        {/* Section Navigation Tabs: Member Applications & Core Members */}
+        <div className="flex border-b border-slate-200 overflow-x-auto bg-white px-4 rounded-2xl shadow-2xs">
+          <button
+            onClick={() => setMemberSection('applications')}
+            className={`py-3.5 px-4 text-xs font-bold whitespace-nowrap border-b-2 cursor-pointer transition-colors flex items-center gap-1.5 ${
+              memberSection === 'applications'
+                ? 'border-emerald-700 text-emerald-900'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
+            }`}
+            id="tab-membership-applications"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Member Applications / Pending Applications</span>
+          </button>
+
+          <button
+            onClick={() => setMemberSection('directory')}
+            className={`py-3.5 px-4 text-xs font-bold whitespace-nowrap border-b-2 cursor-pointer transition-colors flex items-center gap-1.5 ${
+              memberSection === 'directory'
+                ? 'border-emerald-700 text-emerald-900'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
+            }`}
+            id="tab-membership-directory"
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Core Members & Member Directory</span>
+          </button>
+        </div>
+
+        {memberSection === 'applications' ? (
+          <AdminMembershipApplicationsView />
+        ) : (
+          <AdminCoreMembersView 
+            users={usersList} 
+            onNotify={(msg) => showNotification(msg)} 
+          />
+        )}
       </div>
     );
   }

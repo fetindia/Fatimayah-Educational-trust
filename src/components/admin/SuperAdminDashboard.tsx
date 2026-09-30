@@ -48,7 +48,8 @@ import {
   HardDrive,
   Edit,
   X,
-  Check
+  Check,
+  Compass
 } from 'lucide-react';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db, updateUserAccountStatus, adminUpdateUserProfile, SYSTEM_SUPER_ADMIN_EMAIL } from '../../lib/firebase';
@@ -63,6 +64,7 @@ import { AdminMembershipApplicationsView } from './AdminMembershipApplicationsVi
 import { AdminCoreMembersView } from './AdminCoreMembersView';
 import { AdminCampaignManagementView } from './AdminCampaignManagementView';
 import { AdminReportsAnalyticsView } from './AdminReportsAnalyticsView';
+import { AdminPeopleDemographicsView } from './AdminPeopleDemographicsView';
 import { AssignExamRoleModal } from './exam/AssignExamRoleModal';
 import { AdminDonorsManagementView } from './AdminDonorsManagementView';
 import { AdminFinanceAccountingView } from './AdminFinanceAccountingView';
@@ -78,7 +80,7 @@ interface SuperAdminDashboardProps {
   onOpenUserDashboard?: () => void;
 }
 
-type SuperAdminTab = 'overview' | 'reports' | 'users' | 'roles' | 'coremembers' | 'applications' | 'campaigns' | 'donations' | 'finance' | 'hrms' | 'cms' | 'settings' | 'audit';
+type SuperAdminTab = 'overview' | 'reports' | 'demographics' | 'users' | 'roles' | 'coremembers' | 'applications' | 'campaigns' | 'donations' | 'finance' | 'hrms' | 'cms' | 'settings' | 'audit';
 
 export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   onReturnToPublic,
@@ -507,6 +509,21 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('demographics')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeTab === 'demographics'
+                ? 'bg-indigo-900 text-white shadow-md'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+            }`}
+          >
+            <Compass className="w-4 h-4 text-indigo-400" />
+            <span>3. People & Demographics</span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-indigo-100 text-indigo-900 font-extrabold">
+              {users.length}
+            </span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('users')}
             className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
               activeTab === 'users'
@@ -515,7 +532,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
             }`}
           >
             <Users className="w-4 h-4" />
-            <span>3. User Management</span>
+            <span>4. User Management</span>
             <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-200 text-slate-800 font-extrabold">
               {users.length}
             </span>
@@ -873,6 +890,18 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         {activeTab === 'reports' && (
           <div id="super-admin-reports-section">
             <AdminReportsAnalyticsView />
+          </div>
+        )}
+
+        {/* ------------------------------------------------------------- */}
+        {/* TAB: PEOPLE & PROFESSIONAL DEMOGRAPHICS                      */}
+        {/* ------------------------------------------------------------- */}
+        {activeTab === 'demographics' && (
+          <div id="super-admin-demographics-section">
+            <AdminPeopleDemographicsView 
+              users={users} 
+              isLoading={isLoading} 
+            />
           </div>
         )}
 

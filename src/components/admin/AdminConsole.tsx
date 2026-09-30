@@ -46,6 +46,12 @@ import { AdminRolesView } from './AdminRolesView';
 import { AdminAuditView } from './AdminAuditView';
 import { AdminNotificationsView } from './AdminNotificationsView';
 import { AdminSpecializedConsoles } from './AdminSpecializedConsoles';
+import { AdminPeopleDemographicsView } from './AdminPeopleDemographicsView';
+import { PublishingDashboard } from './PublishingDashboard';
+import { isPublisherOnly, isDelegatedPublisher } from '../../lib/rbac';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db, SYSTEM_SUPER_ADMIN_EMAIL } from '../../lib/firebase';
+import { UserProfile, UserRole } from '../../types';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useModules } from '../../contexts/ModuleContext';
@@ -65,16 +71,68 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
   onOpenUserDashboard
 }) => {
   const { config } = useConfig();
-  const { currentUser, userProfile, activeRole, setActiveRole, isSuperAdmin, hasAdminAccess, signOut, isLoading } = useAuth();
+  const { currentUser, userProfile, activeRole, setActiveRole, isSuperAdmin, hasAdminAccess, hasPermission, hasAnyPermission, signOut, isLoading } = useAuth();
   const { modules, lifecycleStats } = useModules();
 
   const isExaminer = activeRole === 'examiner' || userProfile?.roles?.includes('examiner');
   const isExamController = activeRole === 'exam_controller' || userProfile?.roles?.includes('exam_controller');
   const isExamPersonnel = isExaminer || isExamController;
   const isExamPersonnelOnly = !isSuperAdmin && Boolean(isExamPersonnel) && !userProfile?.roles?.some(r => ['super_admin', 'platform_super_admin'].includes(r));
-  const effectiveInitialView = (isExamPersonnelOnly && (initialView === 'dashboard' || initialView === 'super_admin')) ? 'exams' : initialView;
+
+  const isPublisherUser = isPublisherOnly(userProfile, isSuperAdmin);
+
+  const effectiveInitialView = 
+    isPublisherUser ? 'publishing' :
+    (isExamPersonnelOnly && (initialView === 'dashboard' || initialView === 'super_admin')) ? 'exams' : 
+    initialView;
 
   const [currentView, setCurrentView] = useState<string>(effectiveInitialView);
+  const [consoleUsers, setConsoleUsers] = useState<UserProfile[]>([]);
+  const [isLoadingConsoleUsers, setIsLoadingConsoleUsers] = useState<boolean>(false);
+
+  // Subscribe to users for Demographics view when accessible
+  React.useEffect(() => {
+    if (!isSuperAdmin) return;
+    setIsLoadingConsoleUsers(true);
+    const unsub = onSnapshot(collection(db, 'users'), (snap) => {
+      const list: UserProfile[] = [];
+      snap.forEach(doc => {
+        const data = doc.data() as UserProfile;
+        list.push({
+          ...data,
+          uid: doc.id,
+          roles: data.roles || (data.role ? [data.role as UserRole] : ['member']),
+          primaryRole: data.primaryRole || (data.roles ? data.roles[0] : 'member'),
+          accountStatus: data.accountStatus || data.status || 'active'
+        });
+      });
+      if (!list.some(u => u.email.toLowerCase() === SYSTEM_SUPER_ADMIN_EMAIL.toLowerCase())) {
+        list.unshift({
+          uid: 'sys-root-super-admin',
+          email: SYSTEM_SUPER_ADMIN_EMAIL,
+          displayName: 'FET Secretariat Lead',
+          fullLegalName: 'FET Secretariat Super Admin',
+          roles: ['super_admin', 'member'],
+          primaryRole: 'super_admin',
+          role: 'super_admin',
+          membershipStatus: 'core_member',
+          volunteerStatus: 'active_volunteer',
+          donorStatus: 'active_donor',
+          status: 'active',
+          accountStatus: 'active',
+          emailVerified: true,
+          profileCompleted: true,
+          createdAt: '1994-08-15T00:00:00Z'
+        });
+      }
+      setConsoleUsers(list);
+      setIsLoadingConsoleUsers(false);
+    }, (err) => {
+      console.warn('AdminConsole users note:', err);
+      setIsLoadingConsoleUsers(false);
+    });
+    return () => unsub();
+  }, [isSuperAdmin]);
 
   // Security enforcement: lock Exam Personnel strictly to exams view
   React.useEffect(() => {
@@ -82,6 +140,13 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
       setCurrentView('exams');
     }
   }, [isExamPersonnelOnly, currentView]);
+
+  // Security enforcement: lock Delegated Publishers strictly to publishing view
+  React.useEffect(() => {
+    if (isPublisherUser && currentView !== 'publishing') {
+      setCurrentView('publishing');
+    }
+  }, [isPublisherUser, currentView]);
 
   // 1. Loading State
   if (isLoading) {
@@ -192,8 +257,9 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
     );
   }
 
-  const coreAdminItems = [
+  const coreAdminItems = isPublisherUser ? [] : [
     { id: 'super_admin', label: 'Super Admin Dashboard', icon: ShieldCheck, description: 'Overview, Users, RBAC, Apps, Settings & Audit', requiresSuper: true },
+    { id: 'demographics', label: 'People & Demographics', icon: Users, description: 'Unified census, professional taxonomy, geographical clustering & intelligence', requiresSuper: true },
     { id: 'dashboard', label: 'Platform Overview', icon: Activity, description: 'Health, active series & stats' },
     { id: 'about_cms', label: 'About Trust CMS & Leadership', icon: Building2, description: 'Overview, Governance, Trustees, Seal & Tax 12A/80G', requiresSuper: true },
     { id: 'cms', label: 'Branding & Dynamic CMS', icon: Palette, description: 'Display name, 3 colors, hero sliders (Legal name locked)', requiresSuper: true },
@@ -203,7 +269,9 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
     { id: 'notifications', label: 'Broadcast Center', icon: Bell, description: 'Global and role announcements' }
   ];
 
-  const specializedAdminItems = [
+  const specializedAdminItems = isPublisherUser ? [
+    { id: 'publishing', label: 'Publishing Dashboard', icon: Newspaper, role: 'content_admin' }
+  ] : [
     { id: 'volunteers', label: 'Volunteer Management', icon: HeartHandshake, role: 'volunteer_admin' },
     { id: 'members', label: 'Membership Management', icon: Users, role: 'member_admin' },
     { id: 'donors', label: 'Donations & 80G Receipts', icon: BadgeDollarSign, role: 'donor_admin' },
@@ -213,6 +281,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
     { id: 'madrasa', label: 'Madrasa ERP', icon: BookOpen, role: 'madrasa_admin' },
     { id: 'finance', label: 'Finance & Accounting', icon: Landmark, role: 'finance_admin' },
     { id: 'hrms', label: 'HRMS & Staff', icon: UserCog, role: 'hr_admin' },
+    { id: 'publishing', label: 'Publishing Control Center', icon: Newspaper, role: 'content_admin' },
     { id: 'blog', label: 'Blog, Press & News', icon: Newspaper, role: 'blog_admin' },
     { id: 'store', label: 'FET Store (Pre-Launch)', icon: ShoppingBag, role: 'store_admin', badge: 'Pre-Architected' },
     { id: 'travel', label: 'FET Travel (Pre-Launch)', icon: Plane, role: 'travel_admin', badge: 'Pre-Architected' },
@@ -220,16 +289,17 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
   ];
 
   // Filter specialized items based on user's roles
-  const allowedSpecializedItems = specializedAdminItems.filter(item => {
+  const allowedSpecializedItems = isPublisherUser ? specializedAdminItems : specializedAdminItems.filter(item => {
     if (isSuperAdmin) return true;
     if (isExamPersonnelOnly) {
       return item.id === 'exams';
     }
     if (item.id === 'exams' && (isExamPersonnel || activeRole === 'exam_admin' || userProfile?.roles?.includes('exam_admin'))) return true;
+    if (item.id === 'publishing' && isDelegatedPublisher(userProfile)) return true;
     return activeRole === item.role || userProfile?.roles?.includes(item.role as any);
   });
 
-  const allAdminItems = [...coreAdminItems, ...specializedAdminItems];
+  const allAdminItems = isPublisherUser ? specializedAdminItems : [...coreAdminItems, ...specializedAdminItems];
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col" id="fet-admin-console-root">
@@ -261,11 +331,16 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
             <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700">
               <span className="text-slate-400">Active Scope:</span>
               <span className="font-bold text-emerald-400">
-                {ADMIN_ROLE_DEFINITIONS[activeRole]?.label || activeRole}
+                {isPublisherUser ? 'Delegated Publisher' : (ADMIN_ROLE_DEFINITIONS[activeRole]?.label || activeRole)}
               </span>
               {isSuperAdmin && (
                 <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-amber-500 text-slate-950">
                   Super Admin
+                </span>
+              )}
+              {isPublisherUser && (
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-rose-600 text-white">
+                  Publishing
                 </span>
               )}
             </div>
@@ -303,7 +378,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
               className="flex-1 px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 cursor-pointer"
               id="admin-mobile-view-select"
             >
-              {!isExamPersonnelOnly && (
+              {!isExamPersonnelOnly && !isPublisherUser && (
                 <optgroup label="Super Admin Governance">
                   {coreAdminItems.map((item) => (
                     <option 
@@ -316,7 +391,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
                   ))}
                 </optgroup>
               )}
-              <optgroup label={isExamPersonnelOnly ? "Examination Authority" : "Specialized Consoles"}>
+              <optgroup label={isPublisherUser ? "Authorized Publishing Console" : isExamPersonnelOnly ? "Examination Authority" : "Specialized Consoles"}>
                 {allowedSpecializedItems.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.label}
@@ -331,7 +406,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
         <aside className="hidden lg:block lg:col-span-3 space-y-4">
           
           {/* Master Super Admin Menu */}
-          {!isExamPersonnelOnly && (
+          {!isExamPersonnelOnly && !isPublisherUser && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-3 space-y-1">
               <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
                 Super Admin Control
@@ -368,7 +443,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
           {/* Specialized Portfolios Menu */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-3 space-y-1 max-h-[380px] overflow-y-auto">
             <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-              Specialized Consoles ({allowedSpecializedItems.length})
+              {isPublisherUser ? "Publishing Workspace" : `Specialized Consoles (${allowedSpecializedItems.length})`}
             </div>
             {allowedSpecializedItems.map((item) => {
               const Icon = item.icon;
@@ -407,7 +482,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
               <span>Protected Legal Entity</span>
             </div>
             <p className="text-[11px] text-amber-800 leading-relaxed">
-              <strong>{config.legalName}</strong> is registered under the Public Trusts Act. The legal identity cannot be modified via dynamic CMS.
+              <strong>{config.legalName}</strong> is registered in {config.registrationJurisdiction || 'Jammu & Kashmir'} (Registration No. {config.registrationNumber || 'E 9822'}). The legal entity title is strictly protected.
             </p>
           </div>
         </aside>
@@ -415,8 +490,15 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
         {/* Main Content View (9 Cols) */}
         <main className="lg:col-span-9 bg-white rounded-2xl border border-slate-200 shadow-xs p-6 sm:p-8">
           
-          {/* Dashboard Overview */}
-          {currentView === 'dashboard' && (
+          {isPublisherUser ? (
+            <PublishingDashboard 
+              onReturnToPublic={onReturnToPublic} 
+              onOpenUserDashboard={onOpenUserDashboard} 
+            />
+          ) : (
+            <>
+              {/* Dashboard Overview */}
+              {currentView === 'dashboard' && (
             <div className="space-y-8" id="admin-dashboard-view">
               <div className="border-b border-slate-200 pb-5">
                 <h2 className="text-xl font-extrabold text-slate-900">FET India Administrative Control Center</h2>
@@ -535,12 +617,24 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
               onOpenUserDashboard={onOpenUserDashboard} 
             />
           )}
+          {currentView === 'demographics' && (
+            <AdminPeopleDemographicsView 
+              users={consoleUsers} 
+              isLoading={isLoadingConsoleUsers} 
+            />
+          )}
           {currentView === 'about_cms' && <AdminAboutTrustCMSView />}
           {currentView === 'cms' && <AdminCMSView />}
           {currentView === 'modules' && <AdminModulesView />}
           {currentView === 'roles' && <AdminRolesView />}
           {currentView === 'audit' && <AdminAuditView />}
           {currentView === 'notifications' && <AdminNotificationsView />}
+          {currentView === 'publishing' && (
+            <PublishingDashboard 
+              onReturnToPublic={onReturnToPublic} 
+              onOpenUserDashboard={onOpenUserDashboard} 
+            />
+          )}
 
           {/* Specialized Sub-Views */}
           {[
@@ -559,6 +653,8 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
             'reports'
           ].includes(currentView) && (
             <AdminSpecializedConsoles currentTab={currentView} />
+          )}
+          </>
           )}
 
         </main>

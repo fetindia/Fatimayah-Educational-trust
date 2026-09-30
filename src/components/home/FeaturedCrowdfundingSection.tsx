@@ -360,6 +360,7 @@ export const FeaturedCrowdfundingSection: React.FC<FeaturedCrowdfundingSectionPr
       {isCreateOpen && (
         <CreateCampaignModal
           isOpen={isCreateOpen}
+          onOpenAuth={onOpenAuth}
           onClose={() => {
             setIsCreateOpen(false);
             loadApprovedCampaigns();

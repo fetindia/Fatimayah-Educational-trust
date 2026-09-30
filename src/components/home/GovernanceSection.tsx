@@ -57,7 +57,7 @@ export const GovernanceSection: React.FC<GovernanceSectionProps> = ({ onOpenAdmi
               <FileCheck className="w-4 h-4 text-emerald-600" />
             </div>
             <div className="text-base font-bold text-slate-900">{config.registrationNumber}</div>
-            <p className="text-xs text-slate-500">Registered under Public Trust Act 1950</p>
+            <p className="text-xs text-slate-500">Registered in Jammu & Kashmir through SDM Office</p>
           </div>
 
           <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2">

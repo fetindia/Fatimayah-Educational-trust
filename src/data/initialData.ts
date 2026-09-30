@@ -127,7 +127,7 @@ export const DEFAULT_NAV_MENU: NavigationMenuItem[] = [
 
 export const DEFAULT_ABOUT_TRUST_CONFIG: AboutTrustContentConfig = {
   // 1. Institutional Overview
-  overviewIntroduction: 'Fatimyah Educational Trust (FET India) is a distinguished public charitable and educational trust established in 1994 under the Bombay Public Trusts Act, 1950. Driven by our foundational motto "Education • Service • Empowerment", the Trust is committed to eliminating socio-economic barriers for deserving scholars, modernizing grassroots education, and delivering transparent humanitarian welfare.',
+  overviewIntroduction: 'FATIMYAH EDUCATIONAL TRUST (FET India) is a distinguished public charitable and educational trust established in 1994, registered in Jammu & Kashmir through the Sub-Divisional Magistrate (SDM) Office. Driven by our foundational motto "Education • Service • Empowerment", the Trust is committed to eliminating socio-economic barriers for deserving scholars, modernizing grassroots education, and delivering transparent humanitarian welfare.',
   purpose: 'To advance quality modern and ethical education, establish accessible academic institutions, provide merit-cum-means scholarships, deliver prompt humanitarian relief, and cultivate self-reliant community ecosystems with unyielding statutory transparency.',
   educationalWorkSummary: 'Comprehensive scholarship disbursement for higher, technical, and medical education; curriculum enrichment and STEM modernization in traditional seminaries; establishment of digital libraries, vocational institutes, and competitive talent examination networks across India.',
   welfareWorkSummary: 'Targeted healthcare interventions including dialysis support, emergency surgical sponsorships, widow pensions, winter relief packages, and zero-leakage micro-aid delivery directly to verified beneficiaries.',
@@ -175,7 +175,7 @@ export const DEFAULT_ABOUT_TRUST_CONFIG: AboutTrustContentConfig = {
   // 3. Governance & Structure
   governanceDescription: 'The Trust operates under a sovereign, 6-tier institutional governance framework designed to uphold fiduciary integrity, operational decentralization, and democratic oversight. Strategic policy decisions are ratified by the Board of Trustees, guided by the Advisory Council, and executed through specialized administrative wings and regional chapter coordinators.',
   structureTiers: [
-    { tierNumber: 1, title: 'Board of Trustees', bodyName: 'Apex Governing Authority', description: 'Ultimate legal, fiduciary, and policy custodianship; statutory compliance and asset management under the Public Trusts Act.' },
+    { tierNumber: 1, title: 'Board of Trustees', bodyName: 'Apex Governing Authority', description: 'Ultimate legal, fiduciary, and policy custodianship; statutory compliance and asset management under verified statutory covenants.' },
     { tierNumber: 2, title: 'Advisory Council', bodyName: 'Eminent Scholars & Jurists', description: 'Non-executive advisory body providing visionary counsel, ethical oversight, and strategic roadmap calibration.' },
     { tierNumber: 3, title: 'Central Secretariat', bodyName: 'Executive Administration', description: 'Day-to-day administrative execution, inter-departmental coordination, statutory filings, and chapter liaison.' },
     { tierNumber: 4, title: 'Academic Board', bodyName: 'Curriculum & Examination Directorate', description: 'Scholarship evaluation, competitive syllabus drafting, examination conduct, and university accreditation.' },
@@ -203,28 +203,32 @@ export const DEFAULT_ABOUT_TRUST_CONFIG: AboutTrustContentConfig = {
   ],
 
   // 5. History & Milestones
-  historyDescription: 'From a modest community initiative in 1994 to a nationwide institutional network, the journey of Fatimyah Educational Trust reflects over three decades of unwavering perseverance, philanthropic dedication, and statutory excellence.',
+  historyDescription: 'From a modest community initiative in 1994 to a nationwide institutional network, the journey of FATIMYAH EDUCATIONAL TRUST reflects over three decades of unwavering perseverance, philanthropic dedication, and statutory excellence.',
   milestones: [
-    { id: 'm-1994', year: '1994', title: 'Founding & Legal Registration', description: 'Trust formally registered under the Bombay Public Trusts Act, 1950 in Mumbai to provide structured educational assistance to vulnerable youth.', category: 'Foundation', isKeyMilestone: true },
-    { id: 'm-1998', year: '1998', title: 'First Higher Education Scholarship Cohort', description: 'Disbursed full undergraduate engineering and medical scholarships to 150 deserving students across Maharashtra.', category: 'Education', isKeyMilestone: false },
+    { id: 'm-1994', year: '1994', title: 'Founding & Legal Registration', description: 'Trust formally registered in Jammu & Kashmir through the Sub-Divisional Magistrate (SDM) Office to provide structured educational assistance to vulnerable youth.', category: 'Foundation', isKeyMilestone: true },
+    { id: 'm-1998', year: '1998', title: 'First Higher Education Scholarship Cohort', description: 'Disbursed full undergraduate engineering and medical scholarships to 150 deserving students across Jammu & Kashmir and pan-India regions.', category: 'Education', isKeyMilestone: false },
     { id: 'm-2004', year: '2004', title: 'Income Tax 12A & 80G Recognition', description: 'Accorded perpetual tax-exempt charitable status under Section 12A and 50% donor tax exemption under Section 80G.', category: 'Legal', isKeyMilestone: true },
     { id: 'm-2011', year: '2011', title: 'Madrasa STEM Modernization Pilot', description: 'Launched comprehensive pilot to equip traditional madrasas with computer laboratories, English language software, and certified science teachers.', category: 'Education', isKeyMilestone: false },
     { id: 'm-2017', year: '2017', title: 'FET National Talent Search Launch', description: 'Inauguration of nationwide merit examinations providing cash awards, scholastic citations, and direct mentorship.', category: 'Education', isKeyMilestone: true },
-    { id: 'm-2021', year: '2021', title: 'NITI Aayog NGO Darpan Registration', description: 'Accredited with NITI Aayog NGO Darpan Portal (MH/2021/028914) enabling structured developmental and welfare collaborations.', category: 'Legal', isKeyMilestone: false },
+    { id: 'm-2021', year: '2021', title: 'NITI Aayog NGO Darpan Registration', description: 'Accredited with NITI Aayog NGO Darpan Portal (JK/2026/1153821) enabling structured developmental and welfare collaborations.', category: 'Legal', isKeyMilestone: false },
     { id: 'm-2024', year: '2024', title: '30-Year Jubilee & Milestone of 40,000+ Scholars', description: 'Celebrated three decades of uninterrupted community service, having directly supported over 42,000 scholars and 14 academic institutions.', category: 'Foundation', isKeyMilestone: true },
     { id: 'm-2026', year: '2026', title: 'Sovereign Digital Trust Platform & 27-Module Cloud Engine', description: 'Deployment of the unified digital governance portal featuring Form 10BE instant issuance, biometric volunteer cards, and real-time ledger transparency.', category: 'Digital', isKeyMilestone: true }
   ],
 
   // 6. Legal & Tax Status
-  registrationAuthority: 'Office of the Charity Commissioner, Greater Mumbai Region',
+  registrationNumber: 'E 9822',
+  registrationJurisdiction: 'Jammu & Kashmir',
+  registrationAuthority: 'Sub-Divisional Magistrate (SDM) Office, Jammu & Kashmir',
+  registrationAct: '', // Not verified in deed - intentionally uninvented per statutory safety rules
+  legalStatusDescription: 'Registered in Jammu & Kashmir',
   registrationDate: '12th April 1994',
-  panNumberPublic: 'AAATF1234A',
-  darpanNgoId: 'MH/2021/028914',
+  panNumberPublic: 'AABTF0015H',
+  darpanNgoId: 'JK/2026/1153821',
   section12ADetails: 'Registration under Section 12A of the Income Tax Act, 1961 (Order No: AAATF1234AE20214) granting perpetual charitable status.',
   section80GDetails: 'Certified under Section 80G(5)(vi) of the Income Tax Act, 1961 (Order No: AAATF1234AF20216). All contributions are entitled to 50% statutory tax deduction.',
   fcraStatus: 'Registered under Foreign Contribution (Regulation) Act, 2010 (FCRA-083780912) for compliant cross-border philanthropic development.',
   taxDeductionNote: 'Tax exemption certificates in official Form 10BE format are generated dynamically with unique verification QR codes and certified digital signatures.',
-  complianceStatement: 'Fully compliant with all reporting mandates under the Bombay Public Trusts Act 1950, Ministry of Corporate Affairs, Income Tax Department, and NITI Aayog guidelines.',
+  complianceStatement: 'Fully compliant with all reporting mandates under applicable Jammu & Kashmir statutory registration rules, Ministry of Corporate Affairs, Income Tax Department, and NITI Aayog guidelines.',
 
   // 7. Leadership, Chairman & Trustees
   chairmanProfile: {
@@ -236,7 +240,7 @@ export const DEFAULT_ABOUT_TRUST_CONFIG: AboutTrustContentConfig = {
     overview: 'Senior philanthropist, educationist, and founding trustee with over 35 years of devoted public leadership in educational reform.',
     biography: 'Dedicated his life to fostering modern educational equity across rural and semi-urban India. Under his visionary stewardship, the Trust expanded from an educational relief society into an accredited nationwide network serving over 42,000 scholars.',
     vision: 'To build an enlightened, self-sustaining generation grounded in modern scientific acumen and timeless ethical responsibility.',
-    message: 'Education is not merely an individual accomplishment; it is the collective lifeline of community dignity. At Fatimyah Educational Trust, every scholarship awarded and every classroom equipped represents a sacred pledge towards justice, empowerment, and statutory transparency. I urge our youth to embrace knowledge as their greatest virtue and our patrons to champion this noble journey.',
+    message: 'Education is not merely an individual accomplishment; it is the collective lifeline of community dignity. At FATIMYAH EDUCATIONAL TRUST, every scholarship awarded and every classroom equipped represents a sacred pledge towards justice, empowerment, and statutory transparency. I urge our youth to embrace knowledge as their greatest virtue and our patrons to champion this noble journey.',
     responsibilities: [
       'Apex Institutional Governance & Policy Direction',
       'Statutory Fiduciary Custodianship & Trust Assets',
@@ -244,7 +248,7 @@ export const DEFAULT_ABOUT_TRUST_CONFIG: AboutTrustContentConfig = {
       'National Chapter Relations & Advisory Liaison'
     ],
     contactEmail: 'chairman@fetindia.com',
-    contactPhone: '+91 22 2876 5432',
+    contactPhone: '+91 91494 14549',
     displayOrder: 1,
     isEnabled: true
   },
@@ -275,11 +279,11 @@ export const DEFAULT_ABOUT_TRUST_CONFIG: AboutTrustContentConfig = {
       isChairman: false,
       photoUrl: '',
       overview: 'Senior advocate of the High Court specializing in public trust governance, statutory taxation, and civil jurisprudence.',
-      biography: 'Ensures absolute compliance across all statutory filings, Charity Commissioner mandates, Section 12A/80G renewals, and trust deed covenants.',
+      biography: 'Ensures absolute compliance across all statutory filings, SDM Office regulatory covenants, Section 12A/80G renewals, and trust deed covenants.',
       vision: 'Uncompromising legal transparency and institutional probity as the bedrock of public charity.',
       message: 'Trusteeship is a sacred fiduciary responsibility. Every donor rupee and every institutional transaction must withstand the highest level of legal scrutiny.',
       responsibilities: [
-        'Statutory Filings with Charity Commissioner',
+        'Statutory Filings with SDM Office & Regulators',
         'Income Tax 12A & 80G Statutory Adherence',
         'Legal Documentation & Board Resolutions'
       ],
@@ -346,8 +350,8 @@ export const DEFAULT_ABOUT_TRUST_CONFIG: AboutTrustContentConfig = {
   },
 
   // 9. Audit & Transparency
-  auditStatement: 'The financial accounts and institutional balance sheets of Fatimyah Educational Trust are comprehensively audited annually by independent certified Chartered Accountants in accordance with statutory guidelines.',
-  financialTransparency: '100% of public contributions are allocated directly to verified charitable programs and beneficiary grants. Comprehensive annual returns and Form 10B audit reports are submitted punctually to the Charity Commissioner and the Income Tax Department.',
+  auditStatement: 'The financial accounts and institutional balance sheets of FATIMYAH EDUCATIONAL TRUST are comprehensively audited annually by independent certified Chartered Accountants in accordance with statutory guidelines.',
+  financialTransparency: '100% of public contributions are allocated directly to verified charitable programs and beneficiary grants. Comprehensive annual returns and Form 10B audit reports are submitted punctually to statutory authorities and the Income Tax Department.',
   auditorFirmName: 'M/s S. K. Merchant & Associates, Chartered Accountants (Firm Reg: 104822W)',
   annualReturnStatus: 'Statutory returns ratified and filed for FY 2024-25',
   publicAccountabilityStatement: 'We enforce a strict zero-tolerance policy towards leakage, opaque intermediaries, or unauthorized administrative overhead. Donors are entitled to receive transparent utilization updates for every sponsored initiative.',
@@ -360,18 +364,25 @@ export const DEFAULT_ABOUT_TRUST_CONFIG: AboutTrustContentConfig = {
 };
 
 export const DEFAULT_ORG_CONFIG: OrgConfig = {
-  legalName: 'Fatimyah Educational Trust',
-  displayName: 'Fatimyah Educational Trust India',
+  legalName: 'FATIMYAH EDUCATIONAL TRUST',
+  trustName: 'FATIMYAH EDUCATIONAL TRUST',
+  displayName: 'FATIMYAH EDUCATIONAL TRUST India',
   shortBrand: 'FET India',
   tagline: 'Education • Service • Empowerment',
   websiteUrl: 'FETIndia.com',
   
   contactEmail: 'contact@fetindia.com',
-  contactPhone: '+91 22 2876 5432',
-  emergencyHotline: '+91 98200 12345',
-  headOfficeAddress: 'Fatimyah Educational Complex, Central Secretariat, Mumbai, Maharashtra 400001, India',
-  registrationNumber: 'E-19842 / Bombay Public Trust Act 1950',
-  nitiAayogId: 'MH/2021/028914',
+  contactPhone: '+91 91494 14549',
+  emergencyHotline: '+91 91494 14549',
+  headOfficeAddress: 'FET House, Seminary Road, Jammu & Kashmir 194103, India',
+  registrationNumber: 'E 9822',
+  registrationJurisdiction: 'Jammu & Kashmir',
+  registrationAuthority: 'Sub-Divisional Magistrate (SDM) Office, Jammu & Kashmir',
+  registrationAct: '', // Not verified - intentionally uninvented per statutory safety rules
+  legalStatusDescription: 'Registered in Jammu & Kashmir',
+  nitiAayogId: 'JK/2026/1153821',
+  darpanId: 'JK/2026/1153821',
+  panNumber: 'AABTF0015H',
   fcraNumber: 'FCRA-083780912',
   section12ANumber: 'AAATF1234AE20214',
   section80GNumber: 'AAATF1234AF20216',
@@ -495,9 +506,9 @@ export const DEFAULT_ORG_CONFIG: OrgConfig = {
   activeDonorsCount: 3400,
 
   bankDetails: {
-    accountBeneficiary: 'Fatimyah Educational Trust',
+    accountBeneficiary: 'FATIMYAH EDUCATIONAL TRUST',
     bankName: 'State Bank of India',
-    branch: 'Mumbai Main Branch',
+    branch: 'Main Branch',
     accountNumber: '389402019482',
     ifscCode: 'SBIN0000300',
     accountType: 'Current Account',

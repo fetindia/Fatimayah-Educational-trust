@@ -3,7 +3,7 @@
  * Dedicated About Us, Governance & Institutional Transparency Modal
  * Fatimyah Educational Trust India (FET India)
  * Education • Service • Empowerment
- * Established 1994 • Registration No: E-15344 (Mumbai)
+ * Established 1994 • Registration No: E 9822 (Jammu & Kashmir)
  */
 
 import React, { useState, useEffect } from 'react';
@@ -77,8 +77,8 @@ export const AboutTrustModal: React.FC<AboutTrustModalProps> = ({
   const milestones = [
     {
       year: '1994',
-      title: 'Foundation in Mumbai',
-      description: 'Established under the Bombay Public Trust Act 1950 (Reg No. E-15344) to provide educational scholarships and medical subsidies to impoverished families.'
+      title: 'Foundation',
+      description: 'Established in 1994 and registered in Jammu & Kashmir through the Sub-Divisional Magistrate (SDM) Office to provide educational scholarships and medical subsidies to impoverished families.'
     },
     {
       year: '2005',
@@ -122,7 +122,7 @@ export const AboutTrustModal: React.FC<AboutTrustModalProps> = ({
                 {config.legalName}
               </h2>
               <p className="text-[11px] font-bold text-slate-500">
-                Established 1994 • Reg No: {config.registrationNumber} • Mumbai, India
+                Established 1994 • Registration No. {config.registrationNumber || 'E 9822'} ({config.registrationJurisdiction || 'Jammu & Kashmir'}){config.registrationAct ? ` • ${config.registrationAct}` : ''} • DARPAN: {config.nitiAayogId || config.darpanId || 'JK/2026/1153821'} • PAN: {config.panNumber || 'AABTF0015H'}
               </p>
             </div>
           </div>
@@ -319,8 +319,8 @@ export const AboutTrustModal: React.FC<AboutTrustModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
                   <span className="text-[10px] font-bold text-slate-400 uppercase">Trust Registration</span>
-                  <div className="text-sm font-bold text-slate-900">{config.registrationNumber}</div>
-                  <p className="text-xs text-slate-500">Registered under Bombay Public Trusts Act 1950</p>
+                  <div className="text-sm font-bold text-slate-900 font-mono">Registration No. {config.registrationNumber || 'E 9822'}</div>
+                  <p className="text-xs text-slate-500">{config.registrationAuthority || 'Registered in Jammu & Kashmir through SDM Office'}</p>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">

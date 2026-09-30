@@ -11,6 +11,7 @@ import {
   getDoc, 
   setDoc, 
   updateDoc, 
+  deleteDoc,
   collection, 
   query, 
   where, 
@@ -577,6 +578,583 @@ app.post('/api/razorpay/webhook', async (req: Request, res: Response) => {
   } catch (webhookErr: any) {
     console.error('Razorpay Webhook Error:', webhookErr);
     res.status(500).json({ error: 'Webhook processing failed.' });
+  }
+});
+
+// -------------------------------------------------------------
+// 5b. EXAMINATION TIME ENFORCEMENT & SCHEDULE API
+// -------------------------------------------------------------
+function parseServerScheduleDate(dateStr: string, timeStr: string, timeZone = 'Asia/Kolkata'): number {
+  if (!dateStr) return 0;
+  const dateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!dateMatch) return 0;
+  const cleanDate = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`;
+  let hours = 9;
+  let minutes = 0;
+  if (timeStr) {
+    const parts = timeStr.split(':');
+    if (parts.length >= 2) {
+      hours = parseInt(parts[0], 10) || 0;
+      minutes = parseInt(parts[1], 10) || 0;
+    }
+  }
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const isoTime = `${pad(hours)}:${pad(minutes)}:00`;
+  if (timeZone.toLowerCase().includes('kolkata') || timeZone.toLowerCase().includes('calcutta') || timeZone.toLowerCase().includes('ist')) {
+    return Date.parse(`${cleanDate}T${isoTime}+05:30`);
+  }
+  return Date.parse(`${cleanDate}T${isoTime}Z`);
+}
+
+// Server Time check endpoint
+app.get('/api/exam/server-time', (_req: Request, res: Response) => {
+  res.json({
+    serverTimeIso: new Date().toISOString(),
+    serverTimestampMs: Date.now()
+  });
+});
+
+// Helper to authoritatively verify candidate identity or administrative role
+async function verifyCandidateOrAdmin(req: Request, expectedParticipantUid?: string): Promise<{ authorized: boolean; reason?: string }> {
+  const authHeader = req.headers.authorization;
+  const participantUid = (req.body?.participantUid || (authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null) || '').trim();
+  
+  if (!participantUid) {
+    return { authorized: false, reason: 'Authentication required. Missing candidate identity credential.' };
+  }
+  
+  // If the registration record specifies a participantUid, ensure matching identity or administrative role
+  if (expectedParticipantUid && expectedParticipantUid !== participantUid) {
+    try {
+      const userSnap = await getDoc(doc(db, 'users', participantUid));
+      if (userSnap.exists()) {
+        const u = userSnap.data();
+        if (
+          u.role === 'super_admin' || 
+          u.primaryRole === 'super_admin' || 
+          u.roles?.includes('super_admin') || 
+          u.roles?.includes('examination_admin') || 
+          u.roles?.includes('exam_admin') || 
+          u.roles?.includes('administrator')
+        ) {
+          return { authorized: true };
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return { authorized: false, reason: 'Access forbidden. Candidate account does not match this registration record.' };
+  }
+  
+  return { authorized: true };
+}
+
+// Server-authoritative Exam Attempt Starter & Validator
+app.post('/api/exam/start-attempt', async (req: Request, res: Response) => {
+  try {
+    const { registrationId, competitionId } = req.body;
+    if (!registrationId) {
+      res.status(400).json({ error: 'registrationId is required.' });
+      return;
+    }
+
+    const regRef = doc(db, 'competition_registrations', registrationId);
+    const regSnap = await getDoc(regRef);
+    if (!regSnap.exists()) {
+      res.status(404).json({ error: 'Registration record not found.' });
+      return;
+    }
+
+    const regData = regSnap.data();
+
+    // Authoritative Candidate Session Authentication Guard
+    const authCheck = await verifyCandidateOrAdmin(req, regData.participantUid);
+    if (!authCheck.authorized) {
+      res.status(401).json({
+        allowed: false,
+        error: authCheck.reason || 'Authentication required to start this examination.'
+      });
+      return;
+    }
+    const compDocId = competitionId || regData.competitionId;
+    let compData: any = null;
+    if (compDocId) {
+      const compSnap = await getDoc(doc(db, 'competitions', compDocId));
+      if (compSnap.exists()) {
+        compData = compSnap.data();
+      }
+    }
+
+    const now = Date.now();
+    const nowIso = new Date().toISOString();
+
+    // 1. Check if already submitted or finalized
+    if (
+      regData.examAttemptStatus === 'submitted' || 
+      regData.examAttemptStatus === 'auto_submitted' || 
+      regData.status === 'completed' || 
+      regData.status === 'evaluated'
+    ) {
+      res.status(403).json({
+        allowed: false,
+        error: 'Examination attempt has already been submitted and finalized.',
+        examAttemptStatus: regData.examAttemptStatus,
+        alreadySubmitted: true
+      });
+      return;
+    }
+
+    // 2. Validate Examination Schedule Window (Strict Opening & Closing Window)
+    const scheduleDate = compData?.examScheduleDate || compData?.examDetails?.examScheduleDate || compData?.competitionDate;
+    const openTime = compData?.openingTime || compData?.examDetails?.openingTime || '09:00';
+    const closeTime = compData?.closingTime || compData?.examDetails?.closingTime || '10:00';
+    const timeZone = compData?.timeZone || compData?.examDetails?.timeZone || 'Asia/Kolkata';
+
+    if (scheduleDate) {
+      const openMs = parseServerScheduleDate(scheduleDate, openTime, timeZone);
+      const closeMs = parseServerScheduleDate(scheduleDate, closeTime, timeZone);
+
+      if (openMs && now < openMs) {
+        res.status(403).json({
+          allowed: false,
+          error: `This examination is not open yet. It will open on ${scheduleDate} at ${openTime} (${timeZone}).`,
+          isBeforeOpening: true,
+          openTimestampMs: openMs
+        });
+        return;
+      }
+
+      if (closeMs && now > closeMs) {
+        res.status(403).json({
+          allowed: false,
+          error: `Examination window has closed (${scheduleDate} at ${closeTime} ${timeZone}). Late attempts are strictly prohibited.`,
+          isAfterClosing: true,
+          closeTimestampMs: closeMs
+        });
+        return;
+      }
+    }
+
+    // 3. Duration & Timer Enforcement
+    const durationMinutes = Number(compData?.examDetails?.durationMinutes || 45);
+    const durationSeconds = durationMinutes * 60;
+
+    let examStartedAt = regData.examStartedAt;
+    if (examStartedAt) {
+      // Existing attempt in progress - Validate elapsed time authoritatively
+      const startMs = new Date(examStartedAt).getTime();
+      const elapsedSeconds = Math.max(0, Math.floor((now - startMs) / 1000));
+      const remainingSeconds = Math.max(0, durationSeconds - elapsedSeconds);
+
+      if (remainingSeconds <= 0) {
+        // Time expired! Server immediately finalizes attempt
+        await updateDoc(regRef, cleanObject({
+          examAttemptStatus: 'auto_submitted',
+          submissionReason: 'Auto-Submitted — Time Expired',
+          submissionType: 'Auto-Submitted — Time Expired',
+          submittedAt: nowIso,
+          updatedAt: nowIso
+        }));
+
+        res.json({
+          allowed: false,
+          expired: true,
+          error: 'Allocated examination time has expired. Your attempt has been automatically locked and submitted.',
+          examAttemptStatus: 'auto_submitted',
+          remainingSeconds: 0
+        });
+        return;
+      }
+
+      res.json({
+        allowed: true,
+        examStartedAt,
+        durationMinutes,
+        durationSeconds,
+        remainingSeconds,
+        serverTimeIso: nowIso
+      });
+      return;
+    }
+
+    // First time starting: set authoritative server start time
+    examStartedAt = nowIso;
+    await updateDoc(regRef, cleanObject({
+      examStartedAt,
+      examAttemptStatus: 'in_progress',
+      updatedAt: nowIso
+    }));
+
+    res.json({
+      allowed: true,
+      examStartedAt,
+      durationMinutes,
+      durationSeconds,
+      remainingSeconds: durationSeconds,
+      serverTimeIso: nowIso
+    });
+  } catch (err: any) {
+    console.error('Error starting exam attempt:', err);
+    res.status(500).json({ error: err.message || 'Server error starting exam attempt.' });
+  }
+});
+
+// Server-authoritative Exam Attempt Submitter & Result Evaluation
+app.post('/api/exam/submit-attempt', async (req: Request, res: Response) => {
+  try {
+    const {
+      registrationId,
+      competitionId,
+      answers = {},
+      violations = [],
+      selectedLanguage = 'en',
+      isAutoExpired = false
+    } = req.body;
+
+    if (!registrationId) {
+      res.status(400).json({ error: 'registrationId is required.' });
+      return;
+    }
+
+    const regRef = doc(db, 'competition_registrations', registrationId);
+    const regSnap = await getDoc(regRef);
+    if (!regSnap.exists()) {
+      res.status(404).json({ error: 'Registration record not found.' });
+      return;
+    }
+
+    const regData = regSnap.data();
+
+    // Authoritative Candidate Session Authentication Guard
+    const authCheck = await verifyCandidateOrAdmin(req, regData.participantUid);
+    if (!authCheck.authorized) {
+      res.status(401).json({
+        error: authCheck.reason || 'Authentication required to submit this examination attempt.'
+      });
+      return;
+    }
+
+    const compDocId = competitionId || regData.competitionId;
+    let compData: any = null;
+    if (compDocId) {
+      const compSnap = await getDoc(doc(db, 'competitions', compDocId));
+      if (compSnap.exists()) {
+        compData = compSnap.data();
+      }
+    }
+
+    const now = Date.now();
+    const nowIso = new Date().toISOString();
+
+    // Idempotency: If already submitted or evaluated, return existing result
+    if (
+      regData.examAttemptStatus === 'submitted' || 
+      regData.examAttemptStatus === 'auto_submitted' || 
+      regData.status === 'completed' || 
+      regData.status === 'evaluated'
+    ) {
+      res.json({
+        success: true,
+        alreadySubmitted: true,
+        marksObtained: regData.marksObtained || 0,
+        totalMarks: regData.totalMarks || 100,
+        percentage: regData.percentage || 0,
+        status: regData.status,
+        examAttemptStatus: regData.examAttemptStatus,
+        submissionReason: regData.submissionReason || 'Auto-Submitted — Time Expired'
+      });
+      return;
+    }
+
+    // Server-Side Time Validation
+    const durationMinutes = Number(compData?.examDetails?.durationMinutes || 45);
+    const durationSeconds = durationMinutes * 60;
+    const startMs = regData.examStartedAt ? new Date(regData.examStartedAt).getTime() : now;
+    const elapsedSeconds = Math.max(0, Math.floor((now - startMs) / 1000));
+    
+    // Check if time expired: client flagged isAutoExpired OR elapsed >= durationSeconds
+    const isExpired = Boolean(isAutoExpired || (elapsedSeconds >= durationSeconds));
+    const submissionType = isExpired ? 'Auto-Submitted — Time Expired' : 'Manual Submission';
+    const submissionReason = isExpired ? 'Auto-Submitted — Time Expired' : 'Candidate Manual Submission';
+    const examAttemptStatus = isExpired ? 'auto_submitted' : 'submitted';
+
+    // Objective scoring logic against competition questions
+    let questions = compData?.examDetails?.questions || [];
+    if ((!questions || questions.length === 0) && compData?.examDetails?.sections && compData.examDetails.sections.length > 0) {
+      questions = [];
+      compData.examDetails.sections.forEach((sec: any) => {
+        if (Array.isArray(sec.questions)) {
+          questions.push(...sec.questions);
+        }
+      });
+    }
+    let score = 0;
+    let totalMarks = compData?.maxMarks || 100;
+    let correctCount = 0;
+    let incorrectCount = 0;
+    let unansweredCount = 0;
+
+    if (questions.length > 0) {
+      let calculatedTotal = 0;
+      questions.forEach((q: any) => {
+        const qMarks = q.marks || 4;
+        calculatedTotal += qMarks;
+        const candidateAns = answers[q.id];
+        if (candidateAns !== undefined && candidateAns !== null && candidateAns !== '') {
+          if (q.questionType === 'mcq' || q.questionType === 'true_false') {
+            if (candidateAns === q.correctOptionIndex) {
+              score += qMarks;
+              correctCount++;
+            } else {
+              incorrectCount++;
+              if (q.negativeMarks) {
+                score = Math.max(0, score - q.negativeMarks);
+              }
+            }
+          }
+        } else {
+          unansweredCount++;
+        }
+      });
+      if (calculatedTotal > 0) {
+        totalMarks = calculatedTotal;
+      }
+    }
+
+    const percentage = Number(((score / totalMarks) * 100).toFixed(1));
+    const passingMarks = compData?.passingMarks || 40;
+    const passed = score >= passingMarks;
+
+    let grade = 'Needs Improvement';
+    if (percentage >= 90) grade = 'A+ (Distinction)';
+    else if (percentage >= 75) grade = 'A (Excellent)';
+    else if (percentage >= 60) grade = 'B (Good)';
+    else if (percentage >= 40) grade = 'C (Pass)';
+
+    const autoAward = passed ? 'merit' : 'participation';
+    const shouldAutoPublish = compData?.autoPublishResults === true;
+
+    // Update Registration in Firestore
+    await updateDoc(regRef, cleanObject({
+      status: passed ? 'completed' : 'evaluated',
+      examAttemptStatus,
+      submissionReason,
+      submissionType,
+      marksObtained: score,
+      totalMarks,
+      percentage,
+      grade,
+      awardCategory: autoAward,
+      evaluatorRemarks: `${submissionReason}. Academic Evaluation System: Scored ${score}/${totalMarks} (${percentage}% - ${grade}).`,
+      evaluatedAt: nowIso,
+      submittedAnswers: answers,
+      submittedAt: nowIso,
+      timeTakenMinutes: Math.min(durationMinutes, Math.ceil(elapsedSeconds / 60)),
+      violations,
+      correctAnswersCount: correctCount,
+      incorrectAnswersCount: incorrectCount,
+      unansweredCount,
+      isResultPublished: shouldAutoPublish,
+      resultsPublishedAt: shouldAutoPublish ? nowIso : undefined,
+      updatedAt: nowIso
+    }));
+
+    // Record in exam_attempts collection
+    await setDoc(doc(db, 'exam_attempts', `att-${registrationId}`), cleanObject({
+      registrationId,
+      participantId: regData.participantId,
+      competitionId: compDocId,
+      competitionTitle: compData?.title || regData.competitionTitle,
+      participantUid: regData.participantUid,
+      participantName: regData.participantName || regData.candidateName,
+      submittedAt: nowIso,
+      timeSpentSeconds: Math.min(durationSeconds, elapsedSeconds),
+      selectedLanguage,
+      answers,
+      autoScore: score,
+      totalMarks,
+      percentage,
+      grade,
+      awardCategory: autoAward,
+      status: 'evaluated',
+      submissionType,
+      submissionReason,
+      isAutoExpired: isExpired,
+      correctAnswersCount: correctCount,
+      incorrectAnswersCount: incorrectCount,
+      unansweredCount,
+      isResultPublished: shouldAutoPublish,
+      violationsCount: violations.length,
+      violations
+    }));
+
+    res.json({
+      success: true,
+      examAttemptStatus,
+      submissionReason,
+      submissionType,
+      isAutoExpired: isExpired,
+      marksObtained: score,
+      totalMarks,
+      percentage,
+      grade,
+      status: passed ? 'Passed' : 'Completed'
+    });
+  } catch (err: any) {
+    console.error('Error submitting exam attempt:', err);
+    res.status(500).json({ error: err.message || 'Server error submitting exam attempt.' });
+  }
+});
+
+// Server-authoritative Real-Time Answer Persistence Endpoint
+app.post('/api/exam/save-answers', async (req: Request, res: Response) => {
+  try {
+    const { registrationId, answers = {}, timeSpentSeconds } = req.body;
+    if (!registrationId) {
+      res.status(400).json({ error: 'registrationId is required.' });
+      return;
+    }
+
+    const regRef = doc(db, 'competition_registrations', registrationId);
+    const regSnap = await getDoc(regRef);
+    if (!regSnap.exists()) {
+      res.status(404).json({ error: 'Registration record not found.' });
+      return;
+    }
+    const regData = regSnap.data();
+
+    // Authoritative Candidate Session Authentication Guard
+    const authCheck = await verifyCandidateOrAdmin(req, regData.participantUid);
+    if (!authCheck.authorized) {
+      res.status(401).json({ error: authCheck.reason || 'Authentication required to persist answers.' });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    await updateDoc(regRef, cleanObject({
+      submittedAnswers: answers,
+      lastAnsweredAt: nowIso,
+      updatedAt: nowIso,
+      ...(timeSpentSeconds !== undefined ? { timeSpentSeconds } : {})
+    }));
+
+    res.json({ success: true, savedAt: nowIso });
+  } catch (err: any) {
+    console.warn('Real-time save warning:', err);
+    res.status(500).json({ error: err.message || 'Failed to persist answers' });
+  }
+});
+
+// Server-authoritative Competition Deletion & Archival Guard (Super Admin Only)
+app.post('/api/competitions/delete', async (req: Request, res: Response) => {
+  try {
+    const { competitionId, adminUid, adminEmail, mode = 'archive' } = req.body;
+
+    if (!competitionId) {
+      res.status(400).json({ error: 'competitionId is required.' });
+      return;
+    }
+
+    // 1. Authoritative Super Admin Verification
+    let isSuperAdmin = false;
+    const normalizedEmail = (adminEmail || '').trim().toLowerCase();
+    if (normalizedEmail === 'fetkofficial@gmail.com') {
+      isSuperAdmin = true;
+    } else if (adminUid) {
+      const userSnap = await getDoc(doc(db, 'users', adminUid));
+      if (userSnap.exists()) {
+        const udata = userSnap.data();
+        if (
+          udata.role === 'super_admin' || 
+          udata.primaryRole === 'super_admin' || 
+          (Array.isArray(udata.roles) && udata.roles.includes('super_admin')) ||
+          (udata.email || '').toLowerCase() === 'fetkofficial@gmail.com'
+        ) {
+          isSuperAdmin = true;
+        }
+      }
+    }
+
+    if (!isSuperAdmin) {
+      res.status(403).json({ 
+        error: 'Permission Denied: ONLY Super Admin can delete or archive a competition. Exam Controllers do not possess deletion authority.' 
+      });
+      return;
+    }
+
+    const compRef = doc(db, 'competitions', competitionId);
+    const compSnap = await getDoc(compRef);
+    if (!compSnap.exists()) {
+      res.status(404).json({ error: 'Competition record not found.' });
+      return;
+    }
+
+    const compData = compSnap.data();
+    const nowIso = new Date().toISOString();
+
+    if (mode === 'permanent') {
+      // Permanent removal of the competition record from catalog
+      // NOTE: Historical registrations, payments, attempts, and certificates remain intact in Firestore
+      await deleteDoc(compRef);
+
+      // Record audit log
+      try {
+        await addDoc(collection(db, 'audit_logs'), cleanObject({
+          action: 'competition.permanently_deleted',
+          competitionId,
+          competitionTitle: compData.title,
+          competitionCode: compData.code,
+          performedByUid: adminUid,
+          performedByEmail: adminEmail,
+          timestamp: nowIso,
+          details: `Super Admin permanently deleted competition "${compData.title}". Historical registrations, attempts, and certificate records were preserved.`
+        }));
+      } catch (auditErr) {
+        console.warn('Audit log write error:', auditErr);
+      }
+
+      res.json({
+        success: true,
+        mode: 'permanent',
+        message: `Competition "${compData.title}" was permanently removed. Historical candidate and financial records are preserved.`
+      });
+      return;
+    }
+
+    // Default & Recommended: Soft-delete / Archive
+    await updateDoc(compRef, cleanObject({
+      isDeleted: true,
+      status: 'archived',
+      archivedAt: nowIso,
+      deletedAt: nowIso,
+      deletedByUid: adminUid,
+      deletedByEmail: adminEmail,
+      updatedAt: nowIso
+    }));
+
+    try {
+      await addDoc(collection(db, 'audit_logs'), cleanObject({
+        action: 'competition.archived',
+        competitionId,
+        competitionTitle: compData.title,
+        competitionCode: compData.code,
+        performedByUid: adminUid,
+        performedByEmail: adminEmail,
+        timestamp: nowIso,
+        details: `Super Admin soft-deleted/archived competition "${compData.title}". Candidate records remain secure.`
+      }));
+    } catch (auditErr) {
+      console.warn('Audit log write error:', auditErr);
+    }
+
+    res.json({
+      success: true,
+      mode: 'archived',
+      message: `Competition "${compData.title}" archived successfully. Historical candidate records remain protected.`
+    });
+  } catch (err: any) {
+    console.error('Error deleting/archiving competition:', err);
+    res.status(500).json({ error: err.message || 'Server error processing competition deletion.' });
   }
 });
 

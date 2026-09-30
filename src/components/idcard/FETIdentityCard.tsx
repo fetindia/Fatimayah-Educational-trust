@@ -3,7 +3,7 @@
  * Official FET India Identity Card Component (Front & Back)
  * Fatimyah Educational Trust India
  * Legal Name: Fatimyah Educational Trust
- * Regn. No. E-19842 (BOM) • Section 80G & 12A Certified
+ * Regd. in Jammu & Kashmir through SDM Office (1994) • DARPAN: JK/2026/1153821 • PAN: AABTF0015H
  *
  * Visual Reference Compliance (Step 29):
  * - General Member (Emerald Green Theme & Ribbon)
@@ -366,7 +366,7 @@ export const FETIdentityCard: React.FC<FETIdentityCardProps> = ({
             FATIMYAH EDUCATIONAL TRUST
           </span>
           <span className="block text-[6.5px] sm:text-[7.5px] font-mono tracking-[0.2em] uppercase text-emerald-950/[0.045] font-bold mt-0.5">
-            GOVT. REGN. NO. E-19842 (BOM) • VERIFIED CREDENTIAL
+            DARPAN: {config.nitiAayogId || config.darpanId || 'JK/2026/1153821'} • PAN: {config.panNumber || 'AABTF0015H'}
           </span>
         </div>
       </div>
@@ -622,13 +622,16 @@ export const FETIdentityCard: React.FC<FETIdentityCardProps> = ({
           <div className="border-t border-slate-200 pt-1.5 flex items-center justify-between text-[6.5px] sm:text-[7.5px] text-slate-600">
             <div className="space-y-0.5">
               <div className="flex items-center gap-1 font-semibold text-slate-800">
-                <span>🌐</span> <span>{config.websiteUrl || 'www.fetindia.com'}</span>
+                <span>🌐</span> <span>{config.websiteUrl || 'FETIndia.com'}</span>
               </div>
               <div className="flex items-center gap-1 text-slate-600">
-                <span>✉️</span> <span>{config.contactEmail || 'info@fetindia.com'}</span>
+                <span>✉️</span> <span>{config.contactEmail || 'contact@fetindia.com'}</span>
               </div>
               <div className="flex items-center gap-1 text-slate-600">
-                <span>📞</span> <span>{config.contactPhone || '+91 123 456 7890'}</span>
+                <span>📞</span> <span>{config.contactPhone || '+91 91494 14549'}</span>
+              </div>
+              <div className="flex items-center gap-1 text-[5.5px] sm:text-[6.5px] text-slate-500 font-mono">
+                <span>🏛️</span> <span>Reg: {config.registrationNumber || 'E 9822'} ({config.registrationJurisdiction || 'Jammu & Kashmir'}){config.registrationAct ? ` • ${config.registrationAct}` : ''} • DARPAN: {config.nitiAayogId || config.darpanId || 'JK/2026/1153821'} • PAN: {config.panNumber || 'AABTF0015H'}</span>
               </div>
             </div>
 

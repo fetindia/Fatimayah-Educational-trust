@@ -2,7 +2,7 @@
  * @license
  * Official FET India Digital Certificate & Document Public Verification Center
  * Fatimyah Educational Trust India
- * Regd. Public Trust • Bombay Public Trust Act 1950 (E-19842)
+ * Regd. Public Trust • Registration No. E 9822 (Jammu & Kashmir)
  */
 
 import React, { useState, useEffect } from 'react';

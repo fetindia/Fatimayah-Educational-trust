@@ -2,8 +2,8 @@
  * @license
  * Legal Terms of Trust and Privacy Policy Document Modal
  * Fatimyah Educational Trust India (FET India)
- * Organization Legal Name: Fatimyah Educational Trust
- * Established 1994 • Registration No: E-15344 (Mumbai)
+ * Organization Legal Name: FATIMYAH EDUCATIONAL TRUST
+ * Established 1994 • Registered in Jammu & Kashmir through SDM Office (1994)
  * Section 80G & 12A Certified • NITI Aayog NGO Darpan
  */
 
@@ -96,7 +96,7 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-300 mt-0.5">
-                {config.legalName} • Public Trust Reg: {config.registrationNumber}
+                {config.legalName} • Public Trust Reg: {config.registrationNumber || 'E 9822'} ({config.registrationJurisdiction || 'Jammu & Kashmir'}){config.registrationAct ? ` • ${config.registrationAct}` : ''}
               </p>
             </div>
           </div>
@@ -176,7 +176,7 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({
                 <div className="pt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-semibold text-emerald-800">
                   <span>Establishment: 1994</span>
                   <span>•</span>
-                  <span>Public Trust Reg: {config.registrationNumber}</span>
+                  <span>Public Trust Reg: {config.registrationNumber || 'E 9822'} ({config.registrationJurisdiction || 'Jammu & Kashmir'}){config.registrationAct ? ` • ${config.registrationAct}` : ''}</span>
                   <span>•</span>
                   <span>Section 80G Order: Unique Reg. Act 80G(5)(vi)</span>
                 </div>
@@ -277,7 +277,7 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({
                   6.1. These Terms and any disputes arising out of the use of the FET India platform shall be governed by and construed in accordance with the laws of India.
                 </p>
                 <p>
-                  6.2. The competent courts located in <strong>Mumbai, Maharashtra, India</strong> shall have exclusive jurisdiction over all claims, suits, or proceedings relating to this Trust and its digital systems.
+                  6.2. The competent courts having jurisdiction over <strong>Jammu & Kashmir, India</strong> shall have exclusive jurisdiction over all claims, suits, or proceedings relating to this Trust and its digital systems.
                 </p>
               </div>
 
@@ -403,9 +403,9 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({
                 </p>
                 <div className="p-3.5 rounded-2xl bg-slate-100 border border-slate-200 text-xs space-y-1">
                   <p><strong>Trust Secretariat Data Protection Cell:</strong> {config.legalName}</p>
-                  <p><strong>Official Email:</strong> {config.contactEmail || 'fetkofficial@gmail.com'}</p>
-                  <p><strong>Official Telephone:</strong> {config.contactPhone || '+91 98923 00000'}</p>
-                  <p><strong>Principal Address:</strong> {config.headOfficeAddress || 'Kausa, Mumbra, Thane, Maharashtra, India'}</p>
+                  <p><strong>Official Email:</strong> {config.contactEmail || 'contact@fetindia.com'}</p>
+                  <p><strong>Official Telephone:</strong> {config.contactPhone || '+91 91494 14549'}</p>
+                  <p><strong>Principal Address:</strong> {config.headOfficeAddress || 'FET House, Seminary Road, Jammu & Kashmir 194103, India'}</p>
                 </div>
               </div>
 

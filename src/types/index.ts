@@ -62,7 +62,17 @@ export type UserRole =
   | 'store_admin'
   | 'travel_admin'
   | 'reports_admin'
-  | 'student';
+  | 'student'
+  // Delegated Jurisdictional Roles (District, State/UT, National)
+  | 'district_admin'
+  | 'district_crowdfunding_admin'
+  | 'district_exam_admin'
+  | 'state_admin'
+  | 'state_crowdfunding_admin'
+  | 'state_exam_admin'
+  | 'national_admin'
+  | 'national_crowdfunding_admin'
+  | 'national_exam_admin';
 
 export type AppPermission =
   | 'users.view'
@@ -75,7 +85,56 @@ export type AppPermission =
   | 'settings.manage'
   | 'finance.manage'
   | 'exams.manage'
-  | 'exams.evaluate';
+  | 'exams.evaluate'
+  // Delegated Scoped Permissions
+  | 'cases.district_review'
+  | 'cases.state_review'
+  | 'cases.national_review'
+  | 'cases.recommend'
+  | 'cases.clarify'
+  | 'exams.district_manage'
+  | 'exams.state_manage'
+  | 'exams.national_manage'
+  | 'admin.delegation'
+  // Granular Media & Publishing Permissions
+  | 'blog.create'
+  | 'blog.edit'
+  | 'blog.publish'
+  | 'press.publish'
+  | 'news.publish'
+  | 'news.edit'
+  | 'trust.publish'
+  | 'trust.edit'
+  | 'bulletin.publish'
+  | 'bulletin.edit'
+  | 'content.publish';
+
+export type AdminScopeLevel = 'district' | 'state' | 'national';
+export type AdminModuleScope = 'crowdfunding' | 'examinations' | 'both';
+
+export interface DelegatedAdminScope {
+  id?: string;
+  uid: string;
+  email: string;
+  displayName?: string;
+  level: AdminScopeLevel; // 'district' | 'state' | 'national'
+  module: AdminModuleScope; // 'crowdfunding' | 'examinations' | 'both'
+  assignedState?: string; // e.g. "Jammu & Kashmir", "Maharashtra", or "All India"
+  assignedDistricts?: string[]; // e.g. ["Jammu", "Kathua"]
+  canRead: boolean;
+  canReview: boolean;
+  canRecommend: boolean;
+  canApprove: boolean; // only if Super Admin grants it
+  canEdit: boolean;
+  status: 'active' | 'suspended' | 'expired';
+  expiresAt?: string;
+  assignedByUid: string;
+  assignedByEmail: string;
+  assignedAt: string;
+  revokedAt?: string;
+  revokedByUid?: string;
+  notes?: string;
+}
 
 export interface PermissionDefinition {
   id: AppPermission;
@@ -186,6 +245,11 @@ export interface UserProfile {
   workLocation?: string;
   salaryGrade?: string;
   staffDocuments?: StaffDocumentRecord[];
+  // Delegated Jurisdictional Administration (District / State / National)
+  delegatedScopes?: DelegatedAdminScope[];
+  activeScopeLevel?: AdminScopeLevel;
+  assignedState?: string;
+  assignedDistricts?: string[];
 }
 
 export type StaffEmploymentStatus = 
@@ -331,7 +395,7 @@ export interface HeroSlide {
 
 export interface OrgConfig {
   // Protected Legal Property (Locked; cannot be changed via dynamic CMS)
-  readonly legalName: 'Fatimyah Educational Trust';
+  readonly legalName: 'FATIMYAH EDUCATIONAL TRUST' | 'Fatimyah Educational Trust' | string;
   
   // Dynamic Platform Branding
   displayName: string;
@@ -344,8 +408,15 @@ export interface OrgConfig {
   contactPhone: string;
   emergencyHotline?: string;
   headOfficeAddress: string;
+  trustName?: string;
   registrationNumber: string;
+  registrationJurisdiction?: string;
+  registrationAuthority?: string;
+  registrationAct?: string;
+  legalStatusDescription?: string;
   nitiAayogId?: string;
+  darpanId?: string;
+  panNumber?: string;
   fcraNumber?: string;
   section12ANumber?: string;
   section80GNumber?: string;
@@ -536,7 +607,11 @@ export interface AboutTrustContentConfig {
   }[];
 
   // 6. Legal & Tax Status
+  registrationNumber?: string;
+  registrationJurisdiction?: string;
   registrationAuthority?: string;
+  registrationAct?: string;
+  legalStatusDescription?: string;
   registrationDate?: string;
   panNumberPublic?: string;
   darpanNgoId?: string;
@@ -1041,6 +1116,16 @@ export interface CampaignSupportingImage {
   uploadedAt?: string;
 }
 
+export type CaseWorkflowStage = 
+  | 'draft' 
+  | 'district_review' 
+  | 'state_review' 
+  | 'national_review' 
+  | 'super_admin_approval' 
+  | 'approved' 
+  | 'rejected' 
+  | 'clarification_requested';
+
 export interface CampaignReviewHistoryEntry {
   id: string;
   action: string;
@@ -1051,6 +1136,10 @@ export interface CampaignReviewHistoryEntry {
   timestamp: string;
   internalNotes?: string;
   applicantFeedback?: string;
+  // Delegated Workflow Review Metadata
+  reviewerLevel?: AdminScopeLevel | 'super_admin';
+  assignedScope?: string; // e.g. "District: Kathua" or "State: Jammu & Kashmir"
+  recommendation?: 'recommend_approve' | 'recommend_reject' | 'request_clarification' | 'verified';
 }
 
 export interface CrowdfundingCampaign {
@@ -1125,6 +1214,36 @@ export interface CrowdfundingCampaign {
   closedAt?: string;
   closureReason?: string;
   reviewHistory?: CampaignReviewHistoryEntry[];
+
+  // Delegated Jurisdictional Workflow (District -> State -> National -> Super Admin)
+  workflowStage?: CaseWorkflowStage;
+  requiredReviewLevel?: 'district' | 'state' | 'national' | 'super_admin_only' | 'all';
+  districtReview?: {
+    reviewedByUid: string;
+    reviewedByEmail: string;
+    reviewerName?: string;
+    district: string;
+    recommendation: 'recommend_approve' | 'recommend_reject' | 'request_clarification' | 'verified';
+    notes: string;
+    reviewedAt: string;
+  };
+  stateReview?: {
+    reviewedByUid: string;
+    reviewedByEmail: string;
+    reviewerName?: string;
+    state: string;
+    recommendation: 'recommend_approve' | 'recommend_reject' | 'request_clarification' | 'verified';
+    notes: string;
+    reviewedAt: string;
+  };
+  nationalReview?: {
+    reviewedByUid: string;
+    reviewedByEmail: string;
+    reviewerName?: string;
+    recommendation: 'recommend_approve' | 'recommend_reject' | 'request_clarification' | 'verified';
+    notes: string;
+    reviewedAt: string;
+  };
 }
 
 export type CampaignDonationStatus = 'initiated' | 'pending_verification' | 'verified' | 'failed' | 'cancelled' | 'refunded';
@@ -1211,9 +1330,35 @@ export type CompetitionStatus =
   | 'under_evaluation'
   | 'result_pending'
   | 'published'
-  | 'completed';
+  | 'completed'
+  | 'archived';
 
-export type ExamLanguage = 'en' | 'ur' | 'hi' | 'ar' | 'fa';
+export type ExamLanguage = 
+  | 'en' 
+  | 'hi' 
+  | 'ur' 
+  | 'ks' 
+  | 'bn' 
+  | 'te' 
+  | 'ta' 
+  | 'mr' 
+  | 'gu' 
+  | 'kn' 
+  | 'ml' 
+  | 'pa' 
+  | 'or' 
+  | 'as' 
+  | 'ar' 
+  | 'fa' 
+  | string;
+
+export interface ExamSeries {
+  id: string; // e.g. "series-1"
+  seriesCode: string; // e.g. "Series 1", "Series 2", "Series 3", "Series 4", "Series 5"
+  seriesTitle?: string;
+  orderMode?: 'shuffled_questions' | 'custom_questions' | 'shuffled_options';
+  questions?: ExamQuestion[];
+}
 
 export type QuestionDifficulty = 'easy' | 'medium' | 'hard' | 'advanced';
 
@@ -1358,6 +1503,22 @@ export interface ExamStructureDetails {
   shuffleQuestions?: boolean;
   shuffleOptions?: boolean;
   integrityConfig?: ExamIntegrityConfig;
+
+  // Pre-Exam Instruction & Answer Policy Settings (Super Admin Controlled)
+  instructionDurationMinutes?: number; // Pre-exam instruction screen duration in minutes (e.g. 1, 2, 3...)
+  allowAnswerChanges?: boolean; // ON/OFF: Allow candidate to change an already answered question (default: true)
+  allowReviewQuestions?: boolean; // ON/OFF: Allow candidate to return to previously answered questions (default: true)
+
+  // Series 1 to 5 Architecture
+  seriesCount?: number; // 1 to 5
+  seriesList?: ExamSeries[];
+
+  // Scheduled Examination Window (IST / Asia/Kolkata default)
+  examScheduleDate?: string; // YYYY-MM-DD
+  openingTime?: string; // e.g. "09:00"
+  closingTime?: string; // e.g. "10:00"
+  timeZone?: string; // Default "Asia/Kolkata"
+  allowMultipleAttempts?: boolean; // Default false (1 candidate = 1 attempt)
 }
 
 export interface CompetitionPrizeTier {
@@ -1429,6 +1590,16 @@ export interface Competition {
   resultsPublishedAt?: string;
   resultsPublishedByUid?: string;
 
+  // Scheduled Examination & Series Management
+  examScheduleDate?: string; // YYYY-MM-DD
+  openingTime?: string; // HH:mm e.g. "09:00"
+  closingTime?: string; // HH:mm e.g. "10:00"
+  timeZone?: string; // Default "Asia/Kolkata"
+  seriesCount?: number; // 1 to 5
+  seriesList?: ExamSeries[];
+  allowMultipleAttempts?: boolean; // Default false
+  isDeleted?: boolean;
+
   // Metadata
   createdByUid: string;
   createdByEmail: string;
@@ -1476,7 +1647,10 @@ export interface CompetitionRegistration {
   violations?: CandidateViolationRecord[];
 
   // Online Exam Attempt Status
-  examAttemptStatus?: 'not_started' | 'in_progress' | 'submitted' | 'evaluated';
+  examAttemptStatus?: 'not_started' | 'in_progress' | 'submitted' | 'auto_submitted' | 'evaluated';
+  submissionReason?: string;
+  submissionType?: string;
+  assignedSeries?: string; // e.g. "Series 1", "Series 2", "Series 3", "Series 4", "Series 5"
   examStartedAt?: string;
   examSubmittedAt?: string;
   submittedAt?: string;
@@ -1558,6 +1732,7 @@ export interface ExamAttemptRecord {
   participantEmail?: string;
   schoolInstitution?: string;
   selectedLanguage?: ExamLanguage;
+  assignedSeries?: string; // e.g. "Series 1", "Series 2", "Series 3", "Series 4", "Series 5"
   startedAt: string;
   submittedAt?: string;
   timeSpentSeconds?: number;

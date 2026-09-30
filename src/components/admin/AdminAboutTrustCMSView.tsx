@@ -114,8 +114,14 @@ export const AdminAboutTrustCMSView: React.FC = () => {
         aboutTrust: formData,
         chairmanMessage: chairmanMsg,
         // Ensure statutory registrations stay in sync
-        registrationNumber: config.registrationNumber || 'E-19842 / Bombay Public Trust Act 1950',
-        nitiAayogId: formData.darpanNgoId || config.nitiAayogId || 'MH/2021/028914'
+        registrationNumber: formData.registrationNumber || config.registrationNumber || 'E 9822',
+        registrationJurisdiction: formData.registrationJurisdiction || config.registrationJurisdiction || 'Jammu & Kashmir',
+        registrationAuthority: formData.registrationAuthority || config.registrationAuthority || 'Sub-Divisional Magistrate (SDM) Office, Jammu & Kashmir',
+        registrationAct: formData.registrationAct || '',
+        legalStatusDescription: formData.legalStatusDescription || 'Registered in Jammu & Kashmir',
+        nitiAayogId: formData.darpanNgoId || config.nitiAayogId || 'JK/2026/1153821',
+        darpanId: formData.darpanNgoId || 'JK/2026/1153821',
+        panNumber: formData.panNumberPublic || 'AABTF0015H'
       }, authUser);
 
       setSaveStatus({
@@ -1087,20 +1093,78 @@ export const AdminAboutTrustCMSView: React.FC = () => {
           <div className="border-b border-slate-100 pb-4">
             <h3 className="text-lg font-black text-slate-900">Legal, 12A/80G & Statutory Tax Exemption Profile</h3>
             <p className="text-xs text-slate-500 mt-1">
-              Public statutory registrations, Charity Commissioner jurisdiction, PAN details, and 12A/80G orders.
+              Public statutory registrations, SDM Office Jammu & Kashmir jurisdiction, PAN details, and 12A/80G orders.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Registration Authority & Jurisdiction
+                Trust Registration Number
+              </label>
+              <input
+                type="text"
+                value={formData.registrationNumber || 'E 9822'}
+                onChange={e => setFormData(prev => ({ ...prev, registrationNumber: e.target.value }))}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-mono font-bold text-slate-900"
+                placeholder="E 9822"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                Official Trust registration number: E 9822.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Registration Jurisdiction
+              </label>
+              <input
+                type="text"
+                value={formData.registrationJurisdiction || 'Jammu & Kashmir'}
+                onChange={e => setFormData(prev => ({ ...prev, registrationJurisdiction: e.target.value }))}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900"
+                placeholder="Jammu & Kashmir"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Registration Authority
               </label>
               <input
                 type="text"
                 value={formData.registrationAuthority || ''}
                 onChange={e => setFormData(prev => ({ ...prev, registrationAuthority: e.target.value }))}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Applicable Registration Act <span className="text-[10px] text-slate-400 font-normal">(Optional)</span>
+              </label>
+              <input
+                type="text"
+                value={formData.registrationAct || ''}
+                onChange={e => setFormData(prev => ({ ...prev, registrationAct: e.target.value }))}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs"
+                placeholder="Leave blank unless verified in original deed"
+              />
+              <p className="text-[10px] text-amber-700 mt-1">
+                Do not invent or guess an Act name. Leave blank unless verified from Trust deed.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Safe Legal Status Wording
+              </label>
+              <input
+                type="text"
+                value={formData.legalStatusDescription || 'Registered in Jammu & Kashmir'}
+                onChange={e => setFormData(prev => ({ ...prev, legalStatusDescription: e.target.value }))}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs"
+                placeholder="Registered in Jammu & Kashmir"
               />
             </div>
 

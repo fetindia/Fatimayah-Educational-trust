@@ -352,7 +352,7 @@ export const MemberSettingsView: React.FC<MemberSettingsViewProps> = ({
 
         <div className="text-xs text-slate-600 space-y-2 leading-relaxed">
           <p>
-            Your member profile and educational grant records are maintained under strict confidentiality pursuant to the Bombay Public Trusts Act, 1950 and Section 80G statutory reporting compliance with the Income Tax Department.
+            Your member profile and educational grant records are maintained under strict confidentiality pursuant to applicable statutory regulations and Section 80G reporting compliance with the Income Tax Department.
           </p>
           <p className="text-[11px] text-slate-500">
             For account deactivation, data copy requests, or formal address changes on physical trust ledgers, please contact the Central Secretariat at <span className="font-semibold text-slate-700">fetkofficial@gmail.com</span>.

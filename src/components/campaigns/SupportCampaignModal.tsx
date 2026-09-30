@@ -118,7 +118,7 @@ export const SupportCampaignModal: React.FC<SupportCampaignModalProps> = ({
     accountNumber: config.bankDetails?.accountNumber || '389402019482',
     ifscCode: config.bankDetails?.ifscCode || 'SBIN0000300',
     bankName: config.bankDetails?.bankName || 'State Bank of India',
-    branch: config.bankDetails?.branch || 'Mumbai Main Branch',
+    branch: config.bankDetails?.branch || 'Main Branch',
     accountType: config.bankDetails?.accountType || 'Current Account',
     upiId: config.bankDetails?.upiId || 'fetindia@sbi',
     instructions: config.bankDetails?.instructions,

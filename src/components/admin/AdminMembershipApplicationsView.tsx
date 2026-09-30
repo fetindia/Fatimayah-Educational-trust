@@ -5,7 +5,7 @@
  * Module: Super Admin Membership Intake & Accreditation Pipeline
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   CreditCard, 
   Search, 
@@ -34,12 +34,54 @@ import {
   Vote,
   Sparkles,
   Info,
-  CheckSquare
+  CheckSquare,
+  Plus,
+  HeartHandshake,
+  BadgeDollarSign
 } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db, adminReviewMembershipApplication } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { MembershipApplication, MembershipApplicationStatus } from '../../types';
+import { MembershipApplicationForm } from '../dashboard/MembershipApplicationForm';
+
+export const getApplicationTypeLabel = (app: Partial<MembershipApplication> & Record<string, any>): string => {
+  const raw = app.membershipType || app.requestedTier || app.tier || (app as any).applicationType;
+  if (!raw) return 'General Member';
+  const str = String(raw).toLowerCase().replace(/[\s_-]+/g, '');
+  if (str.includes('life')) return 'Life Member';
+  if (str.includes('core')) return 'Core Member';
+  if (str.includes('volunteer')) return 'Volunteer';
+  if (str.includes('donor') || str.includes('patron')) return 'Donor';
+  if (str.includes('general')) return 'General Member';
+  return String(raw).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
+
+export const renderApplicationTypeBadge = (app: Partial<MembershipApplication> & Record<string, any>) => {
+  const typeLabel = getApplicationTypeLabel(app);
+  let colorCls = 'bg-emerald-100 text-emerald-800 border-emerald-300';
+  let IconComponent = User;
+  if (typeLabel === 'Life Member') {
+    colorCls = 'bg-amber-100 text-amber-900 border-amber-300';
+    IconComponent = Award;
+  } else if (typeLabel === 'Core Member') {
+    colorCls = 'bg-purple-100 text-purple-900 border-purple-300';
+    IconComponent = ShieldCheck;
+  } else if (typeLabel === 'Volunteer') {
+    colorCls = 'bg-teal-100 text-teal-900 border-teal-300';
+    IconComponent = HeartHandshake;
+  } else if (typeLabel === 'Donor') {
+    colorCls = 'bg-sky-100 text-sky-900 border-sky-300';
+    IconComponent = BadgeDollarSign;
+  }
+
+  return (
+    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black border ${colorCls}`}>
+      <IconComponent className="w-3 h-3" />
+      <span>{typeLabel}</span>
+    </span>
+  );
+};
 
 export const AdminMembershipApplicationsView: React.FC = () => {
   const { currentUser, userProfile, activeRole } = useAuth();
@@ -47,8 +89,10 @@ export const AdminMembershipApplicationsView: React.FC = () => {
   const [applications, setApplications] = useState<MembershipApplication[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [statusFilter, setStatusFilter] = useState<'all' | MembershipApplicationStatus>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'general' | 'life' | 'core' | 'volunteer' | 'donor'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedApp, setSelectedApp] = useState<MembershipApplication | null>(null);
+  const [showIntakeModal, setShowIntakeModal] = useState<boolean>(false);
   
   // Review Action Modal State
   const [reviewAction, setReviewAction] = useState<MembershipApplicationStatus | null>(null);
@@ -57,32 +101,105 @@ export const AdminMembershipApplicationsView: React.FC = () => {
   const [processingAppId, setProcessingAppId] = useState<string | null>(null);
   const [noticeMessage, setNoticeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Subscribe to all membership applications in real-time
+  // Subscribe to all membership applications in real-time (both canonical and legacy intake collections)
   useEffect(() => {
     setIsLoading(true);
 
-    const q = query(
-      collection(db, 'membershipApplications'),
-      orderBy('createdAt', 'desc')
-    );
+    let canonicalItems: MembershipApplication[] = [];
+    let legacyItems: MembershipApplication[] = [];
 
-    const unsubscribe = onSnapshot(
-      q,
+    const mergeAndSet = () => {
+      const seenIds = new Set<string>();
+      const combined: MembershipApplication[] = [];
+
+      canonicalItems.forEach((doc) => {
+        if (doc.id && !seenIds.has(doc.id)) {
+          seenIds.add(doc.id);
+          combined.push(doc);
+        }
+      });
+
+      legacyItems.forEach((doc) => {
+        if (doc.id && !seenIds.has(doc.id)) {
+          seenIds.add(doc.id);
+          combined.push(doc);
+        }
+      });
+
+      // Sort by createdAt descending
+      combined.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      setApplications(combined);
+      setIsLoading(false);
+    };
+
+    const unsubscribeCanonical = onSnapshot(
+      collection(db, 'membershipApplications'),
       (snapshot) => {
         const list: MembershipApplication[] = [];
         snapshot.forEach((doc) => {
           list.push({ id: doc.id, ...doc.data() } as MembershipApplication);
         });
-        setApplications(list);
-        setIsLoading(false);
+        canonicalItems = list;
+        mergeAndSet();
       },
       (err) => {
-        console.warn('Membership applications query error:', err);
+        console.warn('Membership applications query notice:', err);
         setIsLoading(false);
       }
     );
 
-    return () => unsubscribe();
+    // Also listen to legacy member_applications to ensure zero lost applications
+    let unsubscribeLegacy = () => {};
+    try {
+      unsubscribeLegacy = onSnapshot(
+        collection(db, 'member_applications'),
+        (snapshot) => {
+          const list: MembershipApplication[] = [];
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            const rawStatus = String(data.status || 'pending').toLowerCase();
+            const mappedStatus: MembershipApplicationStatus =
+              rawStatus.includes('app') ? 'approved' :
+              rawStatus.includes('rej') ? 'rejected' :
+              rawStatus.includes('review') ? 'under_review' : 'pending';
+
+            list.push({
+              id: doc.id,
+              applicantUid: data.userId || data.applicantUid || doc.id,
+              applicantEmail: data.email || data.applicantEmail || 'applicant@fetindia.org',
+              fullLegalName: data.fullName || data.fullLegalName || 'Applicant',
+              guardianName: data.guardianName,
+              mobileNumber: data.phone || data.mobileNumber || '',
+              country: 'India',
+              state: data.stateName || data.state || 'Jammu & Kashmir',
+              district: data.city || data.district || '',
+              fullAddress: data.fullAddress || `${data.city || ''}, ${data.stateName || ''}`.trim() || 'Address on file',
+              occupation: data.profession || data.occupation || '',
+              membershipType: data.tier === 'Life Member' ? 'life_member' : 'general_member',
+              requestedTier: data.tier === 'Life Member' ? 'life_member' : 'general_member',
+              tier: data.tier || 'General Member',
+              reasonForJoining: data.statement || data.reasonForJoining || '',
+              declarationAccepted: true,
+              termsAccepted: true,
+              status: mappedStatus,
+              createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : (data.createdAt || new Date().toISOString())
+            } as MembershipApplication);
+          });
+          legacyItems = list;
+          mergeAndSet();
+        },
+        (err) => {
+          console.warn('Legacy member_applications query notice:', err);
+        }
+      );
+    } catch {
+      // Ignored if collection not present
+    }
+
+    return () => {
+      unsubscribeCanonical();
+      unsubscribeLegacy();
+    };
   }, []);
 
   const notify = (type: 'success' | 'error', text: string) => {
@@ -143,7 +260,8 @@ export const AdminMembershipApplicationsView: React.FC = () => {
         } : null);
       }
 
-      notify('success', `General Membership approved for ${app.fullLegalName}. Role updated to General Member.`);
+      const typeLabel = getApplicationTypeLabel(app);
+      notify('success', `${typeLabel} approved for ${app.fullLegalName}. Membership activated.`);
     } catch (err: any) {
       console.error('Quick approve error:', err);
       notify('error', err?.message || 'Failed to approve application.');
@@ -181,6 +299,7 @@ export const AdminMembershipApplicationsView: React.FC = () => {
         ...item,
         status: reviewAction,
         reviewNotes,
+        rejectionReason: reviewAction === 'rejected' ? (reviewNotes || 'Application rejected') : undefined,
         approvedBy: reviewAction === 'approved' ? currentUser.uid : undefined,
         reviewedByUid: currentUser.uid,
         reviewedByEmail: adminUser.email,
@@ -192,6 +311,7 @@ export const AdminMembershipApplicationsView: React.FC = () => {
         ...prev,
         status: reviewAction,
         reviewNotes,
+        rejectionReason: reviewAction === 'rejected' ? (reviewNotes || 'Application rejected') : undefined,
         approvedBy: reviewAction === 'approved' ? currentUser.uid : undefined,
         reviewedByUid: currentUser.uid,
         reviewedByEmail: adminUser.email,
@@ -199,7 +319,7 @@ export const AdminMembershipApplicationsView: React.FC = () => {
         updatedAt: now
       } : null);
 
-      notify('success', `Membership Application status updated to: ${reviewAction.toUpperCase()}`);
+      notify('success', `Application status updated to: ${reviewAction.toUpperCase()}`);
       setReviewAction(null);
       setReviewNotes('');
     } catch (err: any) {
@@ -211,23 +331,51 @@ export const AdminMembershipApplicationsView: React.FC = () => {
   };
 
   // Filter & Search Logic
-  const filteredApplications = applications.filter((app) => {
-    const matchesStatus = statusFilter === 'all' || app.status === statusFilter;
-    const queryStr = searchQuery.toLowerCase().trim();
-    if (!queryStr) return matchesStatus;
+  const filteredApplications = useMemo(() => {
+    return applications.filter((app) => {
+      // 1. Status Filter
+      const matchesStatus = statusFilter === 'all' || app.status === statusFilter;
+      if (!matchesStatus) return false;
 
-    const matchesSearch =
-      app.fullLegalName?.toLowerCase().includes(queryStr) ||
-      app.applicantEmail?.toLowerCase().includes(queryStr) ||
-      app.district?.toLowerCase().includes(queryStr) ||
-      app.state?.toLowerCase().includes(queryStr) ||
-      app.occupation?.toLowerCase().includes(queryStr) ||
-      app.qualification?.toLowerCase().includes(queryStr) ||
-      app.mobileNumber?.toLowerCase().includes(queryStr) ||
-      (app.areasOfInterest && app.areasOfInterest.some(a => a.toLowerCase().includes(queryStr)));
+      // 2. Application Type Filter
+      const appType = getApplicationTypeLabel(app);
+      if (typeFilter !== 'all') {
+        if (typeFilter === 'general' && appType !== 'General Member') return false;
+        if (typeFilter === 'life' && appType !== 'Life Member') return false;
+        if (typeFilter === 'core' && appType !== 'Core Member') return false;
+        if (typeFilter === 'volunteer' && appType !== 'Volunteer') return false;
+        if (typeFilter === 'donor' && appType !== 'Donor') return false;
+      }
 
-    return matchesStatus && matchesSearch;
-  });
+      // 3. Search Matching
+      const queryStr = searchQuery.toLowerCase().trim();
+      if (!queryStr) return true;
+
+      const fullLegalName = (app.fullLegalName || (app as any).fullName || '').toLowerCase();
+      const email = (app.applicantEmail || (app as any).email || '').toLowerCase();
+      const mobile = (app.mobileNumber || (app as any).phone || '').toLowerCase();
+      const district = (app.district || (app as any).city || '').toLowerCase();
+      const state = (app.state || (app as any).stateName || '').toLowerCase();
+      const occupation = (app.occupation || (app as any).profession || '').toLowerCase();
+      const qual = (app.qualification || app.educationalQualification || '').toLowerCase();
+      const typeStr = appType.toLowerCase();
+      const reason = (app.reasonForJoining || (app as any).statement || '').toLowerCase();
+      const appNo = ((app as any).applicationNumber || app.id || '').toLowerCase();
+
+      return (
+        fullLegalName.includes(queryStr) ||
+        email.includes(queryStr) ||
+        mobile.includes(queryStr) ||
+        district.includes(queryStr) ||
+        state.includes(queryStr) ||
+        occupation.includes(queryStr) ||
+        qual.includes(queryStr) ||
+        typeStr.includes(queryStr) ||
+        reason.includes(queryStr) ||
+        appNo.includes(queryStr)
+      );
+    });
+  }, [applications, statusFilter, typeFilter, searchQuery]);
 
   // Metrics Count
   const counts = {
@@ -244,7 +392,7 @@ export const AdminMembershipApplicationsView: React.FC = () => {
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            Approved General Member
+            Approved
           </span>
         );
       case 'under_review':
@@ -308,18 +456,27 @@ export const AdminMembershipApplicationsView: React.FC = () => {
                 <CreditCard className="w-5 h-5" />
               </span>
               <h2 className="text-xl sm:text-2xl font-black text-slate-900">
-                Membership Applications Pipeline
+                Member Applications / Pending Applications
               </h2>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              Review and scrutinize Registered User applications for General Membership accreditation.
+              Centralized intake queue and approval pipeline across General Member, Life Member, Core Member, Volunteer, and Donor applications.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+          <div className="flex items-center gap-3">
+            <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
               Total Queue: {applications.length}
             </span>
+
+            <button
+              onClick={() => setShowIntakeModal(true)}
+              className="px-4 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+              id="admin-member-intake-btn"
+            >
+              <Plus className="w-4 h-4 text-amber-300" />
+              <span>Member Application Intake</span>
+            </button>
           </div>
         </div>
 
@@ -387,21 +544,72 @@ export const AdminMembershipApplicationsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="relative w-full sm:max-w-md">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Search by name, email, district, state, occupation, or interest..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-hidden"
-          />
+      {/* Filter and Search Bar */}
+      <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 shadow-xs space-y-4">
+        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+          
+          {/* Search Input */}
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search by name, email, mobile, district, state, type, occupation, qualification, remarks..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs focus:ring-2 focus:ring-emerald-600 focus:bg-white focus:outline-hidden transition-all"
+            />
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Application Type Selector */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+            <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1 shrink-0">
+              <Filter className="w-3.5 h-3.5" /> Type:
+            </span>
+            {[
+              { id: 'all', label: 'All Types' },
+              { id: 'general', label: 'General Member' },
+              { id: 'life', label: 'Life Member' },
+              { id: 'core', label: 'Core Member' },
+              { id: 'volunteer', label: 'Volunteer' },
+              { id: 'donor', label: 'Donor' }
+            ].map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTypeFilter(t.id as any)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+                  typeFilter === t.id
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 text-xs font-bold text-slate-500 self-end sm:self-center">
-          <span>Showing {filteredApplications.length} of {applications.length} applications</span>
+        <div className="flex items-center justify-between text-xs text-slate-500 pt-1 border-t border-slate-100">
+          <span>Showing <strong className="text-slate-800">{filteredApplications.length}</strong> of <strong className="text-slate-800">{applications.length}</strong> canonical application records</span>
+          {(searchQuery || statusFilter !== 'all' || typeFilter !== 'all') && (
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setStatusFilter('all');
+                setTypeFilter('all');
+              }}
+              className="text-emerald-700 hover:underline font-bold cursor-pointer"
+            >
+              Reset Filters
+            </button>
+          )}
         </div>
       </div>
 
@@ -416,11 +624,11 @@ export const AdminMembershipApplicationsView: React.FC = () => {
           <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center mx-auto text-slate-400">
             <CreditCard className="w-6 h-6" />
           </div>
-          <h4 className="text-sm font-bold text-slate-700">No applications match your criteria</h4>
+          <h4 className="text-sm font-bold text-slate-700">No applications match your filter criteria</h4>
           <p className="text-xs text-slate-400 max-w-sm mx-auto">
-            {searchQuery || statusFilter !== 'all'
-              ? 'Try changing your status filter or search keywords.'
-              : 'No membership applications submitted yet.'}
+            {searchQuery || statusFilter !== 'all' || typeFilter !== 'all'
+              ? 'Try adjusting your search terms or filters.'
+              : 'No applications submitted yet. Click "Member Application Intake" to submit an application.'}
           </p>
         </div>
       ) : (
@@ -430,10 +638,10 @@ export const AdminMembershipApplicationsView: React.FC = () => {
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider">
                 <tr>
                   <th className="py-3.5 px-4">Applicant</th>
-                  <th className="py-3.5 px-4">Tier</th>
+                  <th className="py-3.5 px-4">Application Type</th>
                   <th className="py-3.5 px-4">Location</th>
                   <th className="py-3.5 px-4">Occupation / Education</th>
-                  <th className="py-3.5 px-4">Submitted</th>
+                  <th className="py-3.5 px-4">Submission Date</th>
                   <th className="py-3.5 px-4">Status</th>
                   <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
@@ -444,24 +652,24 @@ export const AdminMembershipApplicationsView: React.FC = () => {
                     <td className="py-3.5 px-4">
                       <div className="font-bold text-slate-900">{app.fullLegalName}</div>
                       <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                        <Mail className="w-3 h-3 text-slate-400" />
+                        <Mail className="w-3 h-3 text-slate-400 shrink-0" />
                         <span className="truncate max-w-[160px]">{app.applicantEmail}</span>
                       </div>
                       {app.mobileNumber && (
                         <div className="text-[11px] text-slate-500 flex items-center gap-1">
-                          <Phone className="w-3 h-3 text-slate-400" />
+                          <Phone className="w-3 h-3 text-slate-400 shrink-0" />
                           <span>{app.mobileNumber}</span>
                         </div>
                       )}
                     </td>
 
-                    <td className="py-3.5 px-4 font-bold text-slate-800 capitalize">
-                      General Member
+                    <td className="py-3.5 px-4">
+                      {renderApplicationTypeBadge(app)}
                     </td>
 
                     <td className="py-3.5 px-4 text-slate-700">
-                      <div>{app.district}</div>
-                      <div className="text-[11px] text-slate-400">{app.state}</div>
+                      <div>{app.district || 'National'}</div>
+                      <div className="text-[11px] text-slate-400">{app.state || 'India'}</div>
                     </td>
 
                     <td className="py-3.5 px-4 text-slate-700">
@@ -470,11 +678,11 @@ export const AdminMembershipApplicationsView: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-4 text-slate-500 text-[11px]">
-                      {new Date(app.createdAt).toLocaleDateString('en-IN', {
+                      {app.createdAt ? new Date(app.createdAt).toLocaleDateString('en-IN', {
                         day: 'numeric',
                         month: 'short',
                         year: 'numeric'
-                      })}
+                      }) : 'N/A'}
                     </td>
 
                     <td className="py-3.5 px-4">
@@ -490,6 +698,7 @@ export const AdminMembershipApplicationsView: React.FC = () => {
                             setReviewNotes(app.reviewNotes || app.rejectionReason || '');
                           }}
                           className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                          title="View & Review Application"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           <span>Review</span>
@@ -500,6 +709,7 @@ export const AdminMembershipApplicationsView: React.FC = () => {
                             onClick={() => handleQuickApprove(app)}
                             disabled={processingAppId === app.id}
                             className="px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                            title="Quick 1-Click Approve"
                           >
                             {processingAppId === app.id ? (
                               <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -519,7 +729,28 @@ export const AdminMembershipApplicationsView: React.FC = () => {
         </div>
       )}
 
-      {/* Scrutiny / Review Detail Modal with all 11 fields */}
+      {/* Member Application Intake Modal */}
+      {showIntakeModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl my-8 max-h-[90vh] overflow-y-auto relative">
+            <button
+              onClick={() => setShowIntakeModal(false)}
+              className="absolute right-6 top-6 p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer z-10"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <MembershipApplicationForm
+              onClose={() => setShowIntakeModal(false)}
+              onSuccess={(msg) => {
+                setShowIntakeModal(false);
+                notify('success', msg || 'Application submitted successfully to canonical repository.');
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Scrutiny / Review Detail Modal with all fields */}
       {selectedApp && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white border border-slate-200 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl my-8 max-h-[90vh] overflow-y-auto">
@@ -533,7 +764,9 @@ export const AdminMembershipApplicationsView: React.FC = () => {
                   </span>
                   <div>
                     <h3 className="text-lg font-black text-slate-900">{selectedApp.fullLegalName}</h3>
-                    <p className="text-xs text-slate-500">General Membership Application Scrutiny & Determination</p>
+                    <p className="text-xs text-slate-500">
+                      Application Scrutiny & Accreditation Pipeline
+                    </p>
                   </div>
                 </div>
               </div>
@@ -552,11 +785,13 @@ export const AdminMembershipApplicationsView: React.FC = () => {
               <div>{renderStatusBadge(selectedApp.status)}</div>
             </div>
 
-            {/* Complete 11 Fields Particulars Grid */}
+            {/* Complete Fields Particulars Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
-                <span className="text-[10px] uppercase font-bold text-slate-400">Membership Tier</span>
-                <div className="font-bold text-slate-900 mt-0.5">General Member</div>
+                <span className="text-[10px] uppercase font-bold text-slate-400">Application Type / Tier</span>
+                <div className="mt-1">
+                  {renderApplicationTypeBadge(selectedApp)}
+                </div>
               </div>
 
               <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
@@ -570,24 +805,24 @@ export const AdminMembershipApplicationsView: React.FC = () => {
               </div>
 
               <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
-                <span className="text-[10px] uppercase font-bold text-slate-400">1. State & 2. District</span>
-                <div className="font-bold text-slate-900 mt-0.5">{selectedApp.district}, {selectedApp.state}</div>
+                <span className="text-[10px] uppercase font-bold text-slate-400">Location (District & State)</span>
+                <div className="font-bold text-slate-900 mt-0.5">{selectedApp.district || 'N/A'}, {selectedApp.state || 'India'}</div>
               </div>
 
               <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
-                <span className="text-[10px] uppercase font-bold text-slate-400">4. Date of Birth & 5. Gender</span>
+                <span className="text-[10px] uppercase font-bold text-slate-400">Date of Birth & Gender</span>
                 <div className="font-bold text-slate-900 mt-0.5">
                   {selectedApp.dateOfBirth || 'N/A'} • {selectedApp.gender || 'N/A'}
                 </div>
               </div>
 
               <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
-                <span className="text-[10px] uppercase font-bold text-slate-400">6. Qualification</span>
+                <span className="text-[10px] uppercase font-bold text-slate-400">Educational Qualification</span>
                 <div className="font-bold text-slate-900 mt-0.5">{selectedApp.qualification || selectedApp.educationalQualification || 'N/A'}</div>
               </div>
 
               <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
-                <span className="text-[10px] uppercase font-bold text-slate-400">7. Occupation</span>
+                <span className="text-[10px] uppercase font-bold text-slate-400">Occupation / Profession</span>
                 <div className="font-bold text-slate-900 mt-0.5">{selectedApp.occupation || 'N/A'}</div>
               </div>
 
@@ -596,14 +831,16 @@ export const AdminMembershipApplicationsView: React.FC = () => {
                 <div className="font-bold text-slate-900 mt-0.5">{selectedApp.country || 'India'}</div>
               </div>
 
-              <div className="sm:col-span-2 p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
-                <span className="text-[10px] uppercase font-bold text-slate-400">3. Full Residential Address</span>
-                <div className="font-medium text-slate-800 mt-0.5">{selectedApp.fullAddress}</div>
-              </div>
+              {selectedApp.fullAddress && (
+                <div className="sm:col-span-2 p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Full Residential Address</span>
+                  <div className="font-medium text-slate-800 mt-0.5">{selectedApp.fullAddress}</div>
+                </div>
+              )}
 
               {selectedApp.areasOfInterest && selectedApp.areasOfInterest.length > 0 && (
                 <div className="sm:col-span-2 p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">8. Areas of Interest</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Areas of Interest</span>
                   <div className="flex flex-wrap gap-1.5">
                     {selectedApp.areasOfInterest.map((area, idx) => (
                       <span key={idx} className="px-2.5 py-0.5 rounded-lg text-[11px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
@@ -616,7 +853,7 @@ export const AdminMembershipApplicationsView: React.FC = () => {
 
               {(selectedApp.reasonForJoining || selectedApp.motivationStatement) && (
                 <div className="sm:col-span-2 p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">9. Reason for Joining FET India</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Reason for Joining / Statement</span>
                   <div className="font-medium text-slate-800 mt-0.5 leading-relaxed">
                     {selectedApp.reasonForJoining || selectedApp.motivationStatement}
                   </div>
@@ -626,11 +863,11 @@ export const AdminMembershipApplicationsView: React.FC = () => {
               <div className="sm:col-span-2 p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-4">
                 <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700">
                   <CheckSquare className="w-4 h-4 text-emerald-600" />
-                  <span>10. Declaration Accepted</span>
+                  <span>Declaration Accepted</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700">
                   <CheckSquare className="w-4 h-4 text-emerald-600" />
-                  <span>11. Terms & Conditions Agreed</span>
+                  <span>Terms & Conditions Agreed</span>
                 </div>
               </div>
 
@@ -651,7 +888,7 @@ export const AdminMembershipApplicationsView: React.FC = () => {
                 Administrative Determination & Action
               </h4>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <button
                   type="button"
                   onClick={() => setReviewAction('approved')}
@@ -662,7 +899,7 @@ export const AdminMembershipApplicationsView: React.FC = () => {
                   }`}
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Approve Member</span>
+                  <span>Approve</span>
                 </button>
 
                 <button
@@ -690,11 +927,24 @@ export const AdminMembershipApplicationsView: React.FC = () => {
                   <XCircle className="w-3.5 h-3.5" />
                   <span>Reject</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setReviewAction('pending')}
+                  className={`py-2.5 px-3 rounded-xl border text-xs font-black cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
+                    reviewAction === 'pending'
+                      ? 'bg-sky-700 text-white border-sky-700 shadow-xs'
+                      : 'bg-sky-50/60 hover:bg-sky-100 text-sky-900 border-sky-200'
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Set Pending</span>
+                </button>
               </div>
 
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Secretariat Review Notes / Feedback:
+                  Secretariat Review Notes / Rejection Reason:
                 </label>
                 <textarea
                   rows={3}
@@ -740,3 +990,4 @@ export const AdminMembershipApplicationsView: React.FC = () => {
     </div>
   );
 };
+

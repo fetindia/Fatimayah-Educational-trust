@@ -89,7 +89,7 @@ type CMSTab =
 
 export const AdminCMSView: React.FC = () => {
   const { config, updateConfig, resetToDefaults } = useConfig();
-  const { currentUser, activeRole, isSuperAdmin } = useAuth();
+  const { currentUser, activeRole, isSuperAdmin, canPublishTrustContent } = useAuth();
 
   const [activeTab, setActiveTab] = useState<CMSTab>('branding');
   const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -143,14 +143,21 @@ export const AdminCMSView: React.FC = () => {
 
   // Main Form State
   const [formData, setFormData] = useState({
-    displayName: config.displayName || 'Fatimyah Educational Trust India',
+    displayName: config.displayName || 'FATIMYAH EDUCATIONAL TRUST India',
     shortBrand: config.shortBrand || 'FET India',
     tagline: config.tagline || 'Education • Service • Empowerment',
     websiteUrl: config.websiteUrl || 'FETIndia.com',
     contactEmail: config.contactEmail || 'contact@fetindia.com',
-    contactPhone: config.contactPhone || '+91 22 2876 5432',
-    emergencyHotline: config.emergencyHotline || '+91 98200 12345',
-    headOfficeAddress: config.headOfficeAddress || 'Fatimyah Educational Complex, Central Secretariat, Mumbai, Maharashtra 400001, India',
+    contactPhone: config.contactPhone || '+91 91494 14549',
+    emergencyHotline: config.emergencyHotline || '+91 91494 14549',
+    headOfficeAddress: config.headOfficeAddress || 'FET House, Seminary Road, Jammu & Kashmir 194103, India',
+    registrationNumber: config.registrationNumber || 'E 9822',
+    registrationJurisdiction: config.registrationJurisdiction || 'Jammu & Kashmir',
+    registrationAuthority: config.registrationAuthority || 'Sub-Divisional Magistrate (SDM) Office, Jammu & Kashmir',
+    registrationAct: config.registrationAct || '',
+    legalStatusDescription: config.legalStatusDescription || 'Registered in Jammu & Kashmir',
+    darpanId: config.darpanId || config.nitiAayogId || 'JK/2026/1153821',
+    panNumber: config.panNumber || 'AABTF0015H',
     
     // Census & Impact Metrics (Super Admin Configurable)
     establishedYear: config.establishedYear || 1994,
@@ -251,9 +258,16 @@ export const AdminCMSView: React.FC = () => {
         tagline: config.tagline || 'Education • Service • Empowerment',
         websiteUrl: config.websiteUrl || 'FETIndia.com',
         contactEmail: config.contactEmail || 'contact@fetindia.com',
-        contactPhone: config.contactPhone || '+91 22 2876 5432',
-        emergencyHotline: config.emergencyHotline || '+91 98200 12345',
-        headOfficeAddress: config.headOfficeAddress || 'Fatimyah Educational Complex, Central Secretariat, Mumbai, Maharashtra 400001, India',
+        contactPhone: config.contactPhone || '+91 91494 14549',
+        emergencyHotline: config.emergencyHotline || '+91 91494 14549',
+        headOfficeAddress: config.headOfficeAddress || 'FET House, Seminary Road, Jammu & Kashmir 194103, India',
+        registrationNumber: config.registrationNumber || 'E 9822',
+        registrationJurisdiction: config.registrationJurisdiction || 'Jammu & Kashmir',
+        registrationAuthority: config.registrationAuthority || 'Sub-Divisional Magistrate (SDM) Office, Jammu & Kashmir',
+        registrationAct: config.registrationAct || '',
+        legalStatusDescription: config.legalStatusDescription || 'Registered in Jammu & Kashmir',
+        darpanId: config.darpanId || config.nitiAayogId || 'JK/2026/1153821',
+        panNumber: config.panNumber || 'AABTF0015H',
         establishedYear: config.establishedYear || 1994,
         totalInstitutions: config.totalInstitutions || 14,
         totalStudentsBenefited: config.totalStudentsBenefited || 42500,
@@ -278,7 +292,7 @@ export const AdminCMSView: React.FC = () => {
         },
         volunteerCta: {
           heading: config.volunteerCta?.heading || 'Be the Change: Volunteer or Become an Official Trust Member',
-          description: config.volunteerCta?.description || 'Whether dedicating your professional expertise on the ground or joining the verified membership rolls of Fatimyah Educational Trust, your involvement empowers thousands.',
+          description: config.volunteerCta?.description || 'Whether dedicating your professional expertise on the ground or joining the verified membership rolls of FATIMYAH EDUCATIONAL TRUST, your involvement empowers thousands.',
           buttonText: config.volunteerCta?.buttonText || 'Join the Movement',
           destination: config.volunteerCta?.destination || '#volunteer',
           isVisible: config.volunteerCta?.isVisible ?? true
@@ -289,8 +303,8 @@ export const AdminCMSView: React.FC = () => {
           publicMessage: config.governanceSettings?.publicMessage || 'Governed by a dedicated Board of Trustees adhering to statutory transparency, audited accounts, and community empowerment since 1994.'
         },
         footerSettings: {
-          aboutSummary: config.footerSettings?.aboutSummary || 'Fatimyah Educational Trust is a registered public charitable and educational trust established in 1994, dedicated to educational empowerment, grassroots welfare, and transparent community stewardship.',
-          copyrightText: config.footerSettings?.copyrightText || 'Fatimyah Educational Trust. All rights reserved.',
+          aboutSummary: config.footerSettings?.aboutSummary || 'FATIMYAH EDUCATIONAL TRUST is a registered public charitable and educational trust established in 1994, registered in Jammu & Kashmir through the Sub-Divisional Magistrate (SDM) Office, dedicated to educational empowerment, grassroots welfare, and transparent community stewardship.',
+          copyrightText: config.footerSettings?.copyrightText || 'FATIMYAH EDUCATIONAL TRUST. All rights reserved.',
           showLegalShield: config.footerSettings?.showLegalShield ?? true,
           showSocialLinks: config.footerSettings?.showSocialLinks ?? true,
           showChapterRoadmap: config.footerSettings?.showChapterRoadmap ?? true,
@@ -574,10 +588,10 @@ export const AdminCMSView: React.FC = () => {
 
   // Save All Changes to Firestore
   const handleSave = async () => {
-    if (!isSuperAdmin) {
+    if (!isSuperAdmin && !canPublishTrustContent) {
       setSaveStatus({
         type: 'error',
-        message: 'Permission Denied: Only Super Administrators can publish homepage CMS modifications.'
+        message: 'Permission Denied: Super Administrator or authorized CMS clearance required.'
       });
       return;
     }
@@ -593,6 +607,16 @@ export const AdminCMSView: React.FC = () => {
       };
 
       await updateConfig({
+        legalName: 'FATIMYAH EDUCATIONAL TRUST',
+        trustName: 'FATIMYAH EDUCATIONAL TRUST',
+        registrationNumber: (formData.registrationNumber || 'E 9822').trim(),
+        registrationJurisdiction: (formData.registrationJurisdiction || 'Jammu & Kashmir').trim(),
+        registrationAuthority: (formData.registrationAuthority || 'Sub-Divisional Magistrate (SDM) Office, Jammu & Kashmir').trim(),
+        registrationAct: (formData.registrationAct || '').trim(),
+        legalStatusDescription: (formData.legalStatusDescription || 'Registered in Jammu & Kashmir').trim(),
+        darpanId: (formData.darpanId || 'JK/2026/1153821').trim(),
+        nitiAayogId: (formData.darpanId || 'JK/2026/1153821').trim(),
+        panNumber: (formData.panNumber || 'AABTF0015H').trim(),
         displayName: formData.displayName.trim(),
         shortBrand: formData.shortBrand.trim(),
         tagline: formData.tagline.trim(),
@@ -889,7 +913,7 @@ export const AdminCMSView: React.FC = () => {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <h3 className="text-sm font-bold text-slate-900">Protected Statutory Trust Entity</h3>
-                <p className="text-xs text-slate-500">Registered title under Public Trusts Registration Act</p>
+                <p className="text-xs text-slate-500">Registered in Jammu & Kashmir • Statutory Legal Entity</p>
               </div>
               <span className="text-[11px] font-bold text-amber-800 bg-amber-100 px-2.5 py-1 rounded-md flex items-center gap-1.5">
                 <Lock className="w-3.5 h-3.5" /> Immutable Legal Protection
@@ -950,6 +974,111 @@ export const AdminCMSView: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, tagline: e.target.value })}
                   className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                 />
+              </div>
+            </div>
+
+            {/* Statutory Identifiers (Super Admin Configurable) */}
+            <div className="pt-3 border-t border-slate-100">
+              <h4 className="text-xs font-black uppercase tracking-wider text-slate-600 mb-3">
+                Official Trust Registration & Identifiers
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Registration Number
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.registrationNumber}
+                    onChange={(e) => setFormData({ ...formData, registrationNumber: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                    placeholder="E 9822"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Verified registration number (E 9822) issued by SDM Office.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Registration Jurisdiction
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.registrationJurisdiction}
+                    onChange={(e) => setFormData({ ...formData, registrationJurisdiction: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                    placeholder="Jammu & Kashmir"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Registration Authority
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.registrationAuthority}
+                    onChange={(e) => setFormData({ ...formData, registrationAuthority: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                    placeholder="Sub-Divisional Magistrate (SDM) Office, Jammu & Kashmir"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Applicable Registration Act <span className="text-[10px] text-slate-400 font-normal">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.registrationAct}
+                    onChange={(e) => setFormData({ ...formData, registrationAct: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                    placeholder="Leave blank unless verified from Trust deed"
+                  />
+                  <p className="text-[10px] text-amber-700 mt-1">
+                    Do not guess or invent a statute. Leave blank unless verified.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Safe Legal Status Wording
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.legalStatusDescription}
+                    onChange={(e) => setFormData({ ...formData, legalStatusDescription: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                    placeholder="Registered in Jammu & Kashmir"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    NITI Aayog NGO DARPAN ID
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.darpanId}
+                    onChange={(e) => setFormData({ ...formData, darpanId: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                    placeholder="JK/2026/1153821"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Trust PAN Number
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.panNumber}
+                    onChange={(e) => setFormData({ ...formData, panNumber: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                    placeholder="AABTF0015H"
+                  />
+                </div>
               </div>
             </div>
           </div>

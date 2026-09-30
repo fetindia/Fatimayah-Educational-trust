@@ -20,7 +20,10 @@ import {
   ArrowRight,
   ShieldCheck,
   CreditCard,
-  Lock
+  Lock,
+  Download,
+  ExternalLink,
+  FileText
 } from 'lucide-react';
 import { Competition, CompetitionRegistration } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -63,6 +66,18 @@ export const CompetitionRegistrationModal: React.FC<CompetitionRegistrationModal
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successData, setSuccessData] = useState<{
+    participantId: string;
+    registrationDocId: string;
+    candidateName: string;
+    isPaid: boolean;
+    amount: number;
+    bookMaterialUrl?: string;
+    bookExternalUrl?: string;
+    bookTitle?: string;
+    bookAuthor?: string;
+    requiredChapters?: string;
+  } | null>(null);
 
   // Check deadline
   const isRegistrationClosed = competition.registrationEndDate 
@@ -192,6 +207,49 @@ export const CompetitionRegistrationModal: React.FC<CompetitionRegistrationModal
           timestamp: new Date().toISOString()
         })).catch(() => {});
 
+        // Resolve Book & Study Material
+        const bookUrl = competition.pdfReadingMaterialUrl || competition.bookDetails?.pdfReadingMaterialUrl;
+        const bookExt = competition.bookDetails?.pdfExternalUrl || (competition.pdfSourceType === 'external_url' ? competition.pdfReadingMaterialUrl : undefined);
+        const bookTitle = competition.bookDetails?.bookTitle || competition.title;
+        const bookAuthor = competition.bookDetails?.author;
+        const requiredChapters = competition.bookDetails?.requiredChapters;
+
+        // AUTOMATIC STUDY MATERIAL DELIVERY:
+        // For Paid: Immediately trigger automatic download of PDF where supported
+        if (isPaidExam && bookUrl) {
+          try {
+            const dlLink = document.createElement('a');
+            dlLink.href = bookUrl;
+            dlLink.download = `${(competition.code || 'FET').replace(/[^a-zA-Z0-9_-]/g, '_')}_Study_Material.pdf`;
+            dlLink.target = '_blank';
+            dlLink.rel = 'noopener noreferrer';
+            document.body.appendChild(dlLink);
+            dlLink.click();
+            document.body.removeChild(dlLink);
+          } catch (autoErr) {
+            console.warn('Browser prevented automated download trigger; manual button provided.', autoErr);
+          }
+        } else if (isPaidExam && bookExt) {
+          try {
+            window.open(bookExt, '_blank', 'noopener,noreferrer');
+          } catch (autoOpenErr) {
+            console.warn('Browser prevented automated link open; manual button provided.', autoOpenErr);
+          }
+        }
+
+        setSuccessData({
+          participantId,
+          registrationDocId,
+          candidateName: formData.participantName.trim(),
+          isPaid: isPaidExam,
+          amount: feeAmount,
+          bookMaterialUrl: bookUrl,
+          bookExternalUrl: bookExt,
+          bookTitle,
+          bookAuthor,
+          requiredChapters
+        });
+
         if (onSuccess) {
           onSuccess(registrationDocId);
         }
@@ -251,24 +309,211 @@ export const CompetitionRegistrationModal: React.FC<CompetitionRegistrationModal
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto" id="fet-competition-reg-modal">
       <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden my-auto border border-slate-200">
         
-        {/* Header */}
-        <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400">
-              <Award className="w-5 h-5" />
+        {successData ? (
+          <div className="p-6 sm:p-8 space-y-6 text-center">
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <CheckCircle2 className="w-10 h-10" />
             </div>
+
             <div>
-              <h3 className="text-sm sm:text-base font-bold text-white">Enroll in Competition / Examination</h3>
-              <p className="text-xs text-slate-400">Candidate Eligibility Verification & Entry Form</p>
+              <span className="inline-block px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold rounded-full mb-2 uppercase tracking-wide">
+                {successData.isPaid ? 'Payment & Enrollment Confirmed' : 'Free Registration Confirmed'}
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900">
+                Candidate Successfully Registered!
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-600 mt-1">
+                Your examination seat has been officially reserved for <span className="font-semibold text-slate-900">{competition.title}</span>.
+              </p>
+            </div>
+
+            {/* Candidate Roll Credentials Card */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 gap-2">
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Candidate Name</span>
+                  <div className="text-sm font-bold text-slate-900">{successData.candidateName}</div>
+                </div>
+                <div className="text-left sm:text-right">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Participant Roll Number</span>
+                  <div className="text-sm font-mono font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200 inline-block">
+                    {successData.participantId}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600">
+                <div>
+                  <span className="font-semibold text-slate-700">Category:</span> {competition.categoryLabel || competition.category}
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-700">Competition Date:</span> {competition.competitionDate || 'Scheduled Online'}
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-700">Participation Type:</span> {successData.isPaid ? `Paid Assessment (₹${successData.amount})` : 'Free Institutional Entry'}
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-700">Status:</span> Confirmed & Proctored Seat Assigned
+                </div>
+              </div>
+            </div>
+
+            {/* AUTOMATIC BOOK / STUDY MATERIAL DELIVERY CARD */}
+            {(successData.bookMaterialUrl || successData.bookExternalUrl || competition.bookDetails) && (
+              <div className="bg-gradient-to-br from-indigo-50 to-blue-50 border-2 border-indigo-200 rounded-2xl p-5 text-left space-y-3 shadow-sm">
+                <div className="flex items-center space-x-2.5 text-indigo-900">
+                  <BookOpen className="w-5 h-5 text-indigo-600 flex-shrink-0" />
+                  <div>
+                    <h3 className="text-sm font-black text-indigo-950">Prescribed Study Material & Syllabus Delivered</h3>
+                    <p className="text-xs text-indigo-700">
+                      {successData.bookTitle ? `Title: ${successData.bookTitle}` : 'Official Examination Preparation Literature'}
+                      {successData.bookAuthor ? ` • Author: ${successData.bookAuthor}` : ''}
+                    </p>
+                  </div>
+                </div>
+
+                {successData.requiredChapters && (
+                  <div className="text-xs text-slate-700 bg-white/80 p-2.5 rounded-xl border border-indigo-100">
+                    <span className="font-bold text-indigo-950">Curriculum Scope: </span>
+                    {successData.requiredChapters}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2.5 pt-1">
+                  {successData.bookMaterialUrl && (
+                    <a
+                      href={successData.bookMaterialUrl}
+                      download={`${(competition.code || 'FET').replace(/[^a-zA-Z0-9_-]/g, '_')}_Study_Material.pdf`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center space-x-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-200 transition cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Download Book / Study Material (PDF)</span>
+                    </a>
+                  )}
+
+                  {successData.bookExternalUrl && (
+                    <a
+                      href={successData.bookExternalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center space-x-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-indigo-700 border border-indigo-300 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>Open Prescribed Literature URL</span>
+                    </a>
+                  )}
+                </div>
+
+                {successData.isPaid && (
+                  <p className="text-[11px] text-emerald-800 bg-emerald-50/80 px-2.5 py-1.5 rounded-lg border border-emerald-200 font-medium">
+                    ✓ Immediate PDF download was dispatched automatically. If your browser blocked it, click the "Download Book" button above.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full sm:w-auto px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shadow cursor-pointer"
+              >
+                Return to Examination Center
+              </button>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        ) : !currentUser ? (
+          /* MANDATORY AUTHENTICATION GUARD */
+          <div>
+            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-white">Authentication Required to Apply</h3>
+                  <p className="text-xs text-slate-400">FET India Examination Bureau & Verification Guard</p>
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 sm:p-8 space-y-6 text-center">
+              <div className="w-16 h-16 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center mx-auto shadow-inner border border-amber-200">
+                <Lock className="w-8 h-8" />
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-xl font-black text-slate-900">
+                  Sign In or Register to Submit Application
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
+                  Under FET India Academic Regulations, all candidates must possess an authenticated account before applying for <strong className="text-slate-900">{competition.title}</strong>. This ensures verified participant rolls, secure proctored testing access, and official scorecard issuance.
+                </p>
+              </div>
+
+              {/* Target Competition Summary Card */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left text-xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold uppercase text-[10px] text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
+                    {competition.categoryLabel || competition.category}
+                  </span>
+                  <span className="font-mono text-slate-500">{competition.code}</span>
+                </div>
+                <div className="font-bold text-slate-900 text-sm">{competition.title}</div>
+                <div className="grid grid-cols-2 gap-2 text-slate-600 pt-1 border-t border-slate-200">
+                  <div>Assessment Date: <strong className="text-slate-800">{competition.competitionDate}</strong></div>
+                  <div>Registration Fee: <strong className="text-slate-800">{competition.isPaid ? `₹${competition.participationFee}` : 'Free'}</strong></div>
+                </div>
+              </div>
+
+              <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
+                {onOpenAuth && (
+                  <button
+                    type="button"
+                    onClick={onOpenAuth}
+                    className="w-full sm:w-auto px-7 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-md transition cursor-pointer"
+                  >
+                    Sign In / Register to Apply
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
+                >
+                  Cancel / Return
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Header */}
+            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400">
+                  <Award className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-white">Enroll in Competition / Examination</h3>
+                  <p className="text-xs text-slate-400">Candidate Eligibility Verification & Entry Form</p>
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
         {/* Public Visitor Notice */}
         {!currentUser && (
@@ -562,6 +807,8 @@ export const CompetitionRegistrationModal: React.FC<CompetitionRegistrationModal
           </div>
 
         </form>
+          </>
+        )}
 
       </div>
     </div>

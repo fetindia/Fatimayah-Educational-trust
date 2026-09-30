@@ -89,7 +89,7 @@ export const ChairmanMessageModal: React.FC<ChairmanMessageModalProps> = ({
                     {chairman.designation || 'Chairman, Board of Trustees'}
                   </span>
                   <h3 className="text-xl font-black text-slate-900">{chairman.name}</h3>
-                  <p className="text-xs text-slate-500">{config.legalName} • Mumbai, India</p>
+                  <p className="text-xs text-slate-500">{config.legalName}</p>
                 </div>
               </div>
 

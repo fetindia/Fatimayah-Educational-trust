@@ -4,7 +4,7 @@
  * Fatimyah Educational Trust India (FET India)
  * Organization Legal Name: Fatimyah Educational Trust
  * Public Brand: FET India
- * Regn. No. E-19842 (BOM) • Section 80G & 12A Certified
+ * Regd. in Jammu & Kashmir through SDM Office (1994) • DARPAN: JK/2026/1153821 • PAN: AABTF0015H
  */
 
 import React, { useState } from 'react';

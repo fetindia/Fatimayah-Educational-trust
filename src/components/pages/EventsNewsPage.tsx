@@ -186,12 +186,58 @@ The empirical findings demonstrate that targeted fee subsidies reduce tertiary e
     let isMounted = true;
     try {
       const unsub = onSnapshot(collection(db, 'news'), (snapshot) => {
+        if (!isMounted) return;
         if (!snapshot.empty) {
-          const list: NewsArticle[] = [];
+          const list: (NewsArticle & { _sortTimestamp?: number })[] = [];
+          const firestoreIds = new Set<string>();
+          const firestoreTitles = new Set<string>();
+
           snapshot.forEach((doc) => {
-            list.push({ id: doc.id, ...doc.data() } as NewsArticle);
+            const data = doc.data();
+            firestoreIds.add(doc.id);
+            if (data.title) firestoreTitles.add(data.title.toLowerCase().trim());
+
+            // Exclude drafts, unpublished, or deleted from public view
+            if (data.status === 'draft' || data.status === 'unpublished' || data.status === 'deleted' || data.isDeleted) {
+              return;
+            }
+
+            let sortTime = 0;
+            if (data.updatedAt?.toMillis) {
+              sortTime = data.updatedAt.toMillis();
+            } else if (data.updatedAt?.seconds) {
+              sortTime = data.updatedAt.seconds * 1000;
+            } else if (typeof data.updatedAt === 'string') {
+              sortTime = Date.parse(data.updatedAt) || 0;
+            } else if (data.date) {
+              const parsed = Date.parse(data.date);
+              if (!isNaN(parsed)) sortTime = parsed;
+            }
+
+            list.push({ 
+              id: doc.id, 
+              ...data,
+              _sortTimestamp: sortTime
+            } as any);
           });
-          if (isMounted) setArticles(list);
+
+          // Sort newest first
+          list.sort((a, b) => (b._sortTimestamp || 0) - (a._sortTimestamp || 0));
+
+          // Merge default articles if not shadowed or marked draft/unpublished/deleted
+          const merged: NewsArticle[] = [...list];
+          for (const def of defaultArticles) {
+            if (firestoreIds.has(def.id) || firestoreTitles.has(def.title.toLowerCase().trim())) {
+              continue;
+            }
+            if (!merged.some(m => m.id === def.id || m.title.toLowerCase() === def.title.toLowerCase())) {
+              merged.push(def);
+            }
+          }
+
+          setArticles(merged);
+        } else {
+          setArticles(defaultArticles);
         }
       }, (err) => {
         console.warn('Could not fetch news from Firestore, using default articles:', err);
@@ -206,6 +252,7 @@ The empirical findings demonstrate that targeted fee subsidies reduce tertiary e
   }, []);
 
   const filteredArticles = articles.filter((art) => {
+    if (art.status === 'draft' || art.status === 'unpublished') return false;
     if (activeTab === 'events') return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -509,7 +556,7 @@ The empirical findings demonstrate that targeted fee subsidies reduce tertiary e
               Accredited journalists, community publications, and academic researchers seeking press releases, high-resolution logos, or interview requests with Trust spokespersons can reach our Public Relations Secretariat.
             </p>
             <div className="text-xs font-mono text-slate-500">
-              Direct Press Desk: press@fetindia.com • +91 22 2876 5432
+              Direct Press Desk: press@fetindia.com • +91 91494 14549
             </div>
           </div>
 

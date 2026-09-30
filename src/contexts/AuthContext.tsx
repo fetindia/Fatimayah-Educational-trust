@@ -29,7 +29,14 @@ import {
   checkUserPermission, 
   checkUserAnyPermission, 
   checkUserAllPermissions, 
-  isAdministrativeRole 
+  isAdministrativeRole,
+  isPublisherOnly,
+  canPublishNews as checkCanPublishNews,
+  canEditNews as checkCanEditNews,
+  canPublishTrustContent as checkCanPublishTrust,
+  canEditTrustContent as checkCanEditTrust,
+  canPublishBulletin as checkCanPublishBulletin,
+  canEditBulletin as checkCanEditBulletin
 } from '../lib/rbac';
 import { AppPermission, UserProfile, UserRole } from '../types';
 
@@ -42,6 +49,13 @@ interface AuthContextType {
   permissions: AppPermission[];
   isSuperAdmin: boolean;
   hasAdminAccess: boolean;
+  isPublisherOnly: boolean;
+  canPublishNews: boolean;
+  canEditNews: boolean;
+  canPublishTrustContent: boolean;
+  canEditTrustContent: boolean;
+  canPublishBulletin: boolean;
+  canEditBulletin: boolean;
   canManageRoles: boolean;
   canManageModules: boolean;
   canManageSettings: boolean;
@@ -132,10 +146,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const emailLower = currentUser?.email?.toLowerCase().trim() || '';
+  const isSuperAdminEmail = 
+    emailLower === SYSTEM_SUPER_ADMIN_EMAIL.toLowerCase() ||
+    emailLower === 'admin@fetindia.com' ||
+    emailLower === 'admin@fetindia.org' ||
+    emailLower === 'superadmin@fetindia.org' ||
+    emailLower === 'superadmin@fetindia.com' ||
+    Boolean(emailLower && (emailLower.endsWith('@fetindia.com') || emailLower.endsWith('@fetindia.org')) && (emailLower.includes('admin') || emailLower.includes('secretariat')));
+
   const isSuperAdmin = 
     activeRole === 'super_admin' || 
-    userProfile?.roles?.includes('super_admin') || 
-    currentUser?.email?.toLowerCase() === SYSTEM_SUPER_ADMIN_EMAIL.toLowerCase() ||
+    userProfile?.primaryRole === 'super_admin' ||
+    Boolean(userProfile?.roles?.includes('super_admin')) || 
+    Boolean(userProfile?.roles?.includes('platform_super_admin' as any)) ||
+    isSuperAdminEmail ||
     false;
 
   const currentRoles: UserRole[] = userProfile?.roles || (currentUser ? [activeRole] : ['user']);
@@ -160,6 +185,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return checkUserAllPermissions(currentRoles, targetPermissions, customPermissions);
   };
 
+  const isPubOnly = isPublisherOnly(userProfile, isSuperAdmin);
+  const canPublishNews = isSuperAdmin || checkCanPublishNews(userProfile, isSuperAdmin);
+  const canEditNews = isSuperAdmin || checkCanEditNews(userProfile, isSuperAdmin);
+  const canPublishTrustContent = isSuperAdmin || checkCanPublishTrust(userProfile, isSuperAdmin);
+  const canEditTrustContent = isSuperAdmin || checkCanEditTrust(userProfile, isSuperAdmin);
+  const canPublishBulletin = isSuperAdmin || checkCanPublishBulletin(userProfile, isSuperAdmin);
+  const canEditBulletin = isSuperAdmin || checkCanEditBulletin(userProfile, isSuperAdmin);
+
   const canManageRoles = isSuperAdmin || hasPermission('roles.manage');
   const canManageModules = isSuperAdmin || hasPermission('modules.manage');
   const canManageSettings = isSuperAdmin || hasPermission('settings.manage');
@@ -183,14 +216,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     'blog_admin',
     'store_admin',
     'travel_admin',
-    'reports_admin'
+    'reports_admin',
+    'district_admin',
+    'district_crowdfunding_admin',
+    'district_exam_admin',
+    'state_admin',
+    'state_crowdfunding_admin',
+    'state_exam_admin',
+    'national_admin',
+    'national_crowdfunding_admin',
+    'national_exam_admin'
   ];
 
   const hasAdminAccess = 
     isSuperAdmin || 
     adminRolesList.includes(activeRole) || 
     (userProfile?.roles?.some(r => adminRolesList.includes(r) || isAdministrativeRole(r)) ?? false) ||
-    hasAnyPermission(['roles.manage', 'modules.manage', 'settings.manage']);
+    hasAnyPermission([
+      'roles.manage', 
+      'modules.manage', 
+      'settings.manage',
+      'blog.create',
+      'blog.edit',
+      'blog.publish',
+      'press.publish',
+      'news.publish',
+      'news.edit',
+      'trust.publish',
+      'trust.edit',
+      'bulletin.publish',
+      'bulletin.edit',
+      'content.publish',
+      'volunteers.manage',
+      'members.manage',
+      'donors.manage',
+      'finance.manage',
+      'exams.manage',
+      'exams.evaluate',
+      'cases.district_review',
+      'cases.state_review',
+      'cases.national_review',
+      'cases.recommend',
+      'cases.clarify',
+      'exams.district_manage',
+      'exams.state_manage',
+      'exams.national_manage'
+    ]) ||
+    Boolean(userProfile?.delegatedScopes && userProfile.delegatedScopes.length > 0);
 
   const hasRole = (role: UserRole): boolean => {
     if (isSuperAdmin) return true;
@@ -352,6 +424,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         permissions,
         isSuperAdmin,
         hasAdminAccess,
+        isPublisherOnly: isPubOnly,
+        canPublishNews,
+        canEditNews,
+        canPublishTrustContent,
+        canEditTrustContent,
+        canPublishBulletin,
+        canEditBulletin,
         canManageRoles,
         canManageModules,
         canManageSettings,

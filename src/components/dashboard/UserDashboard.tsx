@@ -57,6 +57,7 @@ import { DonorApplicationForm } from './DonorApplicationForm';
 import { DigitalDonorCard } from '../donor/DigitalDonorCard';
 import { DigitalVolunteerCard } from '../volunteer/DigitalVolunteerCard';
 import { DonorVerificationModal } from '../donor/DonorVerificationModal';
+import { MemberImpactView } from './MemberImpactView';
 
 export type MemberDashboardTab = 
   | 'dashboard'
@@ -65,6 +66,7 @@ export type MemberDashboardTab =
   | 'volunteer'
   | 'donor'
   | 'applications'
+  | 'impact'
   | 'membership'
   | 'donations'
   | 'campaigns'
@@ -106,6 +108,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
     'volunteer',
     'donor',
     'applications',
+    'impact',
     'membership',
     'donations',
     'campaigns',
@@ -427,6 +430,19 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
           >
             <FileText className="w-3.5 h-3.5" />
             <span>My Applications</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('impact')}
+            className={`py-2 px-3 rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              activeTab === 'impact'
+                ? 'bg-amber-400 text-slate-950 shadow-xs'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+            id="tab-my-impact"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>My Impact</span>
           </button>
 
           <button
@@ -1082,7 +1098,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                       </div>
 
                       <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[8px] text-slate-400">
-                        <span>BOM Regn: E-19842</span>
+                        <span>DARPAN: {config.nitiAayogId || 'JK/2026/1153821'} • PAN: {config.panNumber || 'AABTF0015H'}</span>
                         <span>AY 2026-27</span>
                       </div>
                     </div>
@@ -1405,6 +1421,19 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
               onOpenTab={(t) => setActiveTab(t as MemberDashboardTab)} 
               onOpenVolunteerForm={() => setActiveTab('volunteer')}
               onOpenDonorForm={() => setActiveTab('donor')}
+            />
+          </div>
+        )}
+
+        {/* ------------------------------------------------------------- */}
+        {/* TAB 3B: MY IMPACT (PERSONAL PARTICIPATION & SERVICE LEDGER)  */}
+        {/* ------------------------------------------------------------- */}
+        {activeTab === 'impact' && (
+          <div id="dashboard-my-impact-tab">
+            <MemberImpactView 
+              onOpenTab={(t) => setActiveTab(t as MemberDashboardTab)} 
+              onExploreCampaigns={() => setActiveTab('campaigns')}
+              onExploreCompetitions={() => setActiveTab('competitions')}
             />
           </div>
         )}

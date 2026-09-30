@@ -1947,7 +1947,7 @@ export const AdminFinanceAccountingView: React.FC = () => {
                   FATIMYAH EDUCATIONAL TRUST
                 </h2>
                 <p className="text-[11px] text-slate-500 font-medium">
-                  FET India • Reg. Under Indian Trusts Act • Section 80G & 12A Compliant
+                  FET India • Registration No. {config.registrationNumber || 'E 9822'} ({config.registrationJurisdiction || 'Jammu & Kashmir'}){config.registrationAct ? ` • ${config.registrationAct}` : ''} • Section 80G & 12A Compliant
                 </p>
               </div>
               <div className="text-right">

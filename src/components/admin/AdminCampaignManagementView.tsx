@@ -68,8 +68,15 @@ import { useAuth } from '../../contexts/AuthContext';
 import { CreateCampaignModal } from '../campaigns/CreateCampaignModal';
 
 export const AdminCampaignManagementView: React.FC = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, userProfile, isSuperAdmin } = useAuth();
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const delegatedScope = userProfile?.delegatedScopes?.find(s => s.status === 'active' && (s.module === 'crowdfunding' || s.module === 'both'));
+  const isDistrictAdmin = userProfile?.roles?.some(r => ['district_admin', 'district_crowdfunding_admin'].includes(r)) || delegatedScope?.level === 'district';
+  const isStateAdmin = userProfile?.roles?.some(r => ['state_admin', 'state_crowdfunding_admin'].includes(r)) || delegatedScope?.level === 'state';
+  const isNationalAdmin = userProfile?.roles?.some(r => ['national_admin', 'national_crowdfunding_admin'].includes(r)) || delegatedScope?.level === 'national';
+  const isDelegatedAdminUser = !isSuperAdmin && (isDistrictAdmin || isStateAdmin || isNationalAdmin);
+  const canApproveCases = isSuperAdmin || delegatedScope?.canApprove === true;
 
   const showSuccess = (text: string) => {
     setToastMessage({ type: 'success', text });
@@ -109,11 +116,11 @@ export const AdminCampaignManagementView: React.FC = () => {
   // Create Campaign Modal State
   const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false);
 
-  // Load All Admin Campaigns
+  // Load All Admin Campaigns with Jurisdictional Isolation
   const loadCampaigns = async () => {
     setLoading(true);
     try {
-      const list = await fetchAllCampaignsAdmin();
+      const list = await fetchAllCampaignsAdmin(userProfile);
       setCampaigns(list);
     } catch (err) {
       console.error('Error fetching admin campaigns:', err);
@@ -125,7 +132,7 @@ export const AdminCampaignManagementView: React.FC = () => {
 
   useEffect(() => {
     loadCampaigns();
-  }, []);
+  }, [userProfile]);
 
   // Open Review Inspector Workspace
   const openReviewModal = (camp: CrowdfundingCampaign) => {
@@ -199,11 +206,28 @@ export const AdminCampaignManagementView: React.FC = () => {
     }
   };
 
-  // Process Full Administrative Lifecycle Action
-  const handleAdminAction = async (action: 'approve' | 'activate' | 'pause' | 'resume' | 'complete' | 'reject' | 'request_correction' | 'start_review' | 'under_review' | 'close') => {
+  // Process Full Administrative Lifecycle or Delegated Recommendation Action
+  const handleAdminAction = async (action: 
+    | 'approve' 
+    | 'activate' 
+    | 'pause' 
+    | 'resume' 
+    | 'complete' 
+    | 'reject' 
+    | 'request_correction' 
+    | 'request_clarification'
+    | 'start_review' 
+    | 'under_review' 
+    | 'close'
+    | 'recommend_approve'
+    | 'recommend_reject'
+    | 'verify_docs'
+    | 'forward_to_state'
+    | 'forward_to_super_admin'
+  ) => {
     if (!reviewCampaign || !currentUser) return;
 
-    if ((action === 'reject' || action === 'request_correction') && !applicantFeedback.trim()) {
+    if ((action === 'reject' || action === 'request_correction' || action === 'request_clarification') && !applicantFeedback.trim()) {
       showError('Please provide applicant-facing feedback explaining what is required or why the appeal cannot be approved.');
       setActiveReviewTab('decision');
       return;
@@ -212,9 +236,20 @@ export const AdminCampaignManagementView: React.FC = () => {
     setActionProcessing(true);
 
     try {
+      const reviewerLevel = isDistrictAdmin ? 'district' : isStateAdmin ? 'state' : isNationalAdmin ? 'national' : 'super_admin';
+      const assignedScope = isDistrictAdmin 
+        ? `District: ${(userProfile?.assignedDistricts || [userProfile?.district || 'Assigned District']).join(', ')}`
+        : isStateAdmin 
+        ? `State: ${userProfile?.assignedState || userProfile?.state || 'Assigned State'}`
+        : 'National Office';
+
       await adminReviewCampaign(reviewCampaign.id || '', action, {
         adminUid: currentUser.uid,
         adminEmail: currentUser.email || 'admin@fetindia.org',
+        reviewerName: userProfile?.displayName || userProfile?.fullName || userProfile?.fullLegalName || 'FET Officer',
+        reviewerLevel,
+        assignedScope,
+        recommendation: action === 'recommend_approve' ? 'recommend_approve' : action === 'recommend_reject' ? 'recommend_reject' : undefined,
         internalNotes: internalNotes.trim(),
         applicantFeedback: applicantFeedback.trim(),
         supportingDocuments: editableDocs
@@ -225,7 +260,13 @@ export const AdminCampaignManagementView: React.FC = () => {
         under_review: 'MARKED UNDER REVIEW',
         start_review: 'MARKED UNDER REVIEW',
         request_correction: 'RETURNED TO APPLICANT FOR REVISION',
+        request_clarification: 'RETURNED FOR CLARIFICATION',
         reject: 'REJECTED WITH FEEDBACK',
+        recommend_approve: 'APPROVAL RECOMMENDATION SUBMITTED',
+        recommend_reject: 'REJECTION RECOMMENDATION SUBMITTED',
+        verify_docs: 'DOCUMENT VERIFICATION FINDINGS RECORDED',
+        forward_to_state: 'FORWARDED TO STATE REVIEW',
+        forward_to_super_admin: 'FORWARDED FOR SUPER ADMIN FINAL APPROVAL',
         pause: 'PAUSED',
         resume: 'RESUMED LIVE',
         complete: 'MARKED COMPLETED',
@@ -415,6 +456,30 @@ export const AdminCampaignManagementView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Delegated Jurisdiction Scope Alert Banner */}
+      {isDelegatedAdminUser && (
+        <div className="bg-emerald-950/80 border border-emerald-700/60 rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs text-white shadow-lg">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+              <MapPin className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-emerald-300 text-sm">
+                  Active Jurisdiction: {isDistrictAdmin ? `District Administrator (${userProfile?.assignedDistricts?.join(', ') || userProfile?.district || 'Assigned District'})` : isStateAdmin ? `State/UT Administrator (${userProfile?.assignedState || userProfile?.state || 'Assigned State'})` : 'National Administrator'}
+                </span>
+              </div>
+              <p className="text-slate-300 text-[11px] mt-0.5 leading-relaxed">
+                Appeals and applicant records are strictly isolated to your assigned regional jurisdiction. You may review submitted proofs, request clarification, and submit formal recommendations to Super Admin.
+              </p>
+            </div>
+          </div>
+          <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-900 text-emerald-200 border border-emerald-600 self-start sm:self-auto shrink-0">
+            {canApproveCases ? 'Approval Clearance Granted' : 'Recommendation Scope'}
+          </span>
+        </div>
+      )}
 
       {/* Toast Alert Banner */}
       {toastMessage && (

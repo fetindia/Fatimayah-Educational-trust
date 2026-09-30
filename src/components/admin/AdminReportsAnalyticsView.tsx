@@ -1343,7 +1343,11 @@ export const AdminReportsAnalyticsView: React.FC = () => {
         orgConfig={{
           legalName: config.legalName,
           registrationNumber: config.registrationNumber,
-          contactEmail: config.contactEmail
+          registrationJurisdiction: config.registrationJurisdiction,
+          registrationAct: config.registrationAct,
+          contactEmail: config.contactEmail,
+          nitiAayogId: config.nitiAayogId || config.darpanId,
+          panNumber: config.panNumber
         }}
       />
     </div>

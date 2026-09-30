@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { CompetitionCertificateRecord } from '../../types';
 import { FETLogo } from '../common/FETLogo';
+import { useConfig } from '../../contexts/ConfigContext';
 
 interface DigitalCertificateModalProps {
   certificate: CompetitionCertificateRecord;
@@ -74,6 +75,7 @@ export const DigitalCertificateModal: React.FC<DigitalCertificateModalProps> = (
   onClose,
   onOpenVerifyModal
 }) => {
+  const { config } = useConfig();
   const printRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
@@ -306,7 +308,7 @@ export const DigitalCertificateModal: React.FC<DigitalCertificateModalProps> = (
                 Fatimyah Educational Trust
               </h1>
               <p className="text-[11px] sm:text-xs font-semibold text-slate-600 uppercase tracking-widest">
-                Regd. Public Trust • Bombay Public Trust Act 1950 (E-19842) • NITI Aayog Verified
+                Regd. Public Trust • Reg No: {config.registrationNumber || 'E 9822'} ({config.registrationJurisdiction || 'Jammu & Kashmir'}){config.registrationAct ? ` • ${config.registrationAct}` : ''} • DARPAN: {config.nitiAayogId || config.darpanId || 'JK/2026/1153821'} • PAN: {config.panNumber || 'AABTF0015H'}
               </p>
               <p className="text-[10px] text-emerald-800 font-bold tracking-wider">
                 EDUCATION • SERVICE • EMPOWERMENT
