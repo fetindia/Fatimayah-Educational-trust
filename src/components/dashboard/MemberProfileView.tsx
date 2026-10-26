@@ -67,18 +67,21 @@ import {
   validateImageFile, 
   processAndOptimizeAvatarImage 
 } from '../../lib/storage';
+import { DonationImpactChart } from './DonationImpactChart';
 
-export type ProfileSubView = 'overview' | 'edit' | 'photo';
+export type ProfileSubView = 'overview' | 'impact' | 'edit' | 'photo';
 
 interface MemberProfileViewProps {
   onNotify?: (message: string) => void;
   onOpenMembershipCard?: () => void;
+  onExploreCampaigns?: () => void;
   initialSubView?: ProfileSubView;
 }
 
 export const MemberProfileView: React.FC<MemberProfileViewProps> = ({ 
   onNotify,
   onOpenMembershipCard,
+  onExploreCampaigns,
   initialSubView = 'overview'
 }) => {
   const { 
@@ -1032,6 +1035,23 @@ export const MemberProfileView: React.FC<MemberProfileViewProps> = ({
             </div>
           )}
 
+          {/* Donor Philanthropic Footprint & Impact Analytics */}
+          <DonationImpactChart 
+            userId={currentUser?.uid} 
+            onExploreCampaigns={onExploreCampaigns} 
+          />
+        </div>
+      )}
+
+      {/* ============================================================= */}
+      {/* SUB-VIEW: STANDALONE DONATION IMPACT ANALYTICS                 */}
+      {/* ============================================================= */}
+      {activeSubView === 'impact' && (
+        <div className="space-y-6 animate-in fade-in" id="profile-subview-impact">
+          <DonationImpactChart 
+            userId={currentUser?.uid} 
+            onExploreCampaigns={onExploreCampaigns} 
+          />
         </div>
       )}
 

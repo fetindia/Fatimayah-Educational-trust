@@ -45,7 +45,7 @@ import { useConfig } from '../../contexts/ConfigContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { ADMIN_ROLE_DEFINITIONS } from '../../data/initialData';
 import { SYSTEM_SUPER_ADMIN_EMAIL } from '../../lib/firebase';
-import { MemberProfileView } from './MemberProfileView';
+import { MemberProfileView, ProfileSubView } from './MemberProfileView';
 import { MemberApplicationsView } from './MemberApplicationsView';
 import { MemberMembershipView } from './MemberMembershipView';
 import { MemberDonationsView } from './MemberDonationsView';
@@ -132,7 +132,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
   };
 
   const [activeTab, setActiveTab] = useState<MemberDashboardTab>(() => sanitizeTab(initialTab));
-  const [profileSubView, setProfileSubView] = useState<'overview' | 'edit' | 'photo'>('overview');
+  const [profileSubView, setProfileSubView] = useState<ProfileSubView>('overview');
 
   useEffect(() => {
     setActiveTab(sanitizeTab(initialTab));
@@ -1229,6 +1229,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
             <MemberProfileView 
               onNotify={notify} 
               onOpenMembershipCard={() => setActiveTab('membership')}
+              onExploreCampaigns={() => setActiveTab('campaigns')}
               initialSubView={profileSubView}
             />
           </div>

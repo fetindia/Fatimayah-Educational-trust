@@ -1331,6 +1331,7 @@ export interface CampaignDonation {
   paymentMethod?: string;
   isAnonymous: boolean;
   message?: string;
+  category?: string;
   // Razorpay Gateway fields
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
