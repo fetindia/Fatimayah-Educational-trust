@@ -35,8 +35,10 @@ import {
   ShoppingBag,
   Plane,
   LineChart,
-  Building2
+  Building2,
+  Boxes
 } from 'lucide-react';
+import { AdminExternalPlatformsView } from './integration/AdminExternalPlatformsView';
 import { FETLogo } from '../common/FETLogo';
 import { SuperAdminDashboard } from './SuperAdminDashboard';
 import { AdminCMSView } from './AdminCMSView';
@@ -48,7 +50,7 @@ import { AdminNotificationsView } from './AdminNotificationsView';
 import { AdminSpecializedConsoles } from './AdminSpecializedConsoles';
 import { AdminPeopleDemographicsView } from './AdminPeopleDemographicsView';
 import { PublishingDashboard } from './PublishingDashboard';
-import { isPublisherOnly, isDelegatedPublisher } from '../../lib/rbac';
+import { isPublisherOnly, isDelegatedPublisher, isStorePersonnelOnly, canManageStore } from '../../lib/rbac';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db, SYSTEM_SUPER_ADMIN_EMAIL } from '../../lib/firebase';
 import { UserProfile, UserRole } from '../../types';
@@ -80,9 +82,11 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
   const isExamPersonnelOnly = !isSuperAdmin && Boolean(isExamPersonnel) && !userProfile?.roles?.some(r => ['super_admin', 'platform_super_admin'].includes(r));
 
   const isPublisherUser = isPublisherOnly(userProfile, isSuperAdmin);
+  const isStorePersonnel = isStorePersonnelOnly(userProfile, isSuperAdmin);
 
   const effectiveInitialView = 
     isPublisherUser ? 'publishing' :
+    isStorePersonnel ? 'store' :
     (isExamPersonnelOnly && (initialView === 'dashboard' || initialView === 'super_admin')) ? 'exams' : 
     initialView;
 
@@ -147,6 +151,13 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
       setCurrentView('publishing');
     }
   }, [isPublisherUser, currentView]);
+
+  // Security enforcement: lock Store Managers strictly to store view
+  React.useEffect(() => {
+    if (isStorePersonnel && currentView !== 'store') {
+      setCurrentView('store');
+    }
+  }, [isStorePersonnel, currentView]);
 
   // 1. Loading State
   if (isLoading) {
@@ -265,6 +276,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
     { id: 'cms', label: 'Branding & Dynamic CMS', icon: Palette, description: 'Display name, 3 colors, hero sliders (Legal name locked)', requiresSuper: true },
     { id: 'modules', label: '27-Chapter Lifecycle Matrix', icon: Layers, description: '5-Stage state machine (Draft, Testing, Ready, Published, Disabled)', requiresSuper: true },
     { id: 'roles', label: 'RBAC Multi-Role Governance', icon: ShieldCheck, description: 'Super & 13 Administrator scopes', requiresSuper: true },
+    { id: 'integrations', label: 'External Platform Connections', icon: Boxes, description: 'FET School ERP, FET Madrasa ERP & Multilingual platform connection controls', requiresSuper: true },
     { id: 'audit', label: 'Audit & Activity Logs', icon: FileText, description: 'Immutable transaction records' },
     { id: 'notifications', label: 'Broadcast Center', icon: Bell, description: 'Global and role announcements' }
   ];
@@ -277,13 +289,13 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
     { id: 'donors', label: 'Donations & 80G Receipts', icon: BadgeDollarSign, role: 'donor_admin' },
     { id: 'crowdfunding', label: 'Crowdfunding & Appeals', icon: HeartHandshake, role: 'crowdfunding_admin' },
     { id: 'exams', label: 'Competitions & Exams', icon: Award, role: 'exam_admin' },
-    { id: 'school', label: 'School ERP', icon: GraduationCap, role: 'school_admin' },
-    { id: 'madrasa', label: 'Madrasa ERP', icon: BookOpen, role: 'madrasa_admin' },
+    { id: 'school', label: 'School ERP Connection', icon: GraduationCap, role: 'school_admin' },
+    { id: 'madrasa', label: 'Madrasa ERP Connection', icon: BookOpen, role: 'madrasa_admin' },
     { id: 'finance', label: 'Finance & Accounting', icon: Landmark, role: 'finance_admin' },
     { id: 'hrms', label: 'HRMS & Staff', icon: UserCog, role: 'hr_admin' },
     { id: 'publishing', label: 'Publishing Control Center', icon: Newspaper, role: 'content_admin' },
     { id: 'blog', label: 'Blog, Press & News', icon: Newspaper, role: 'blog_admin' },
-    { id: 'store', label: 'FET Store (Pre-Launch)', icon: ShoppingBag, role: 'store_admin', badge: 'Pre-Architected' },
+    { id: 'store', label: 'FET Store Management', icon: ShoppingBag, role: 'store_admin', badge: 'Active' },
     { id: 'travel', label: 'FET Travel (Pre-Launch)', icon: Plane, role: 'travel_admin', badge: 'Pre-Architected' },
     { id: 'reports', label: 'Reports & Analytics', icon: LineChart, role: 'reports_admin' }
   ];
@@ -296,6 +308,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
     }
     if (item.id === 'exams' && (isExamPersonnel || activeRole === 'exam_admin' || userProfile?.roles?.includes('exam_admin'))) return true;
     if (item.id === 'publishing' && isDelegatedPublisher(userProfile)) return true;
+    if (item.id === 'store' && (activeRole === 'store_manager' || userProfile?.roles?.includes('store_manager'))) return true;
     return activeRole === item.role || userProfile?.roles?.includes(item.role as any);
   });
 
@@ -343,6 +356,11 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
                   Publishing
                 </span>
               )}
+              {isStorePersonnel && (
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-emerald-600 text-white">
+                  Store Manager
+                </span>
+              )}
             </div>
 
             <button
@@ -378,7 +396,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
               className="flex-1 px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 cursor-pointer"
               id="admin-mobile-view-select"
             >
-              {!isExamPersonnelOnly && !isPublisherUser && (
+              {!isExamPersonnelOnly && !isPublisherUser && !isStorePersonnel && (
                 <optgroup label="Super Admin Governance">
                   {coreAdminItems.map((item) => (
                     <option 
@@ -391,7 +409,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
                   ))}
                 </optgroup>
               )}
-              <optgroup label={isPublisherUser ? "Authorized Publishing Console" : isExamPersonnelOnly ? "Examination Authority" : "Specialized Consoles"}>
+              <optgroup label={isPublisherUser ? "Authorized Publishing Console" : isStorePersonnel ? "Store Management Workspace" : isExamPersonnelOnly ? "Examination Authority" : "Specialized Consoles"}>
                 {allowedSpecializedItems.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.label}
@@ -406,7 +424,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
         <aside className="hidden lg:block lg:col-span-3 space-y-4">
           
           {/* Master Super Admin Menu */}
-          {!isExamPersonnelOnly && !isPublisherUser && (
+          {!isExamPersonnelOnly && !isPublisherUser && !isStorePersonnel && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-3 space-y-1">
               <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
                 Super Admin Control
@@ -443,7 +461,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
           {/* Specialized Portfolios Menu */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-3 space-y-1 max-h-[380px] overflow-y-auto">
             <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-              {isPublisherUser ? "Publishing Workspace" : `Specialized Consoles (${allowedSpecializedItems.length})`}
+              {isPublisherUser ? "Publishing Workspace" : isStorePersonnel ? "Store Workspace" : `Specialized Consoles (${allowedSpecializedItems.length})`}
             </div>
             {allowedSpecializedItems.map((item) => {
               const Icon = item.icon;
@@ -627,6 +645,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
           {currentView === 'cms' && <AdminCMSView />}
           {currentView === 'modules' && <AdminModulesView />}
           {currentView === 'roles' && <AdminRolesView />}
+          {currentView === 'integrations' && <AdminExternalPlatformsView />}
           {currentView === 'audit' && <AdminAuditView />}
           {currentView === 'notifications' && <AdminNotificationsView />}
           {currentView === 'publishing' && (

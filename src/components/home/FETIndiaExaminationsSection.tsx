@@ -91,15 +91,18 @@ export const FETIndiaExaminationsSection: React.FC<FETIndiaExaminationsSectionPr
     }
   }, []);
 
+  // Filter competitions: separate test from live candidates
+  const liveCompetitions = competitions.filter(c => !c.isTestCompetition && c.environment !== 'test');
+
   // Filter competitions: check which are open for application
   const todayStr = new Date().toISOString().split('T')[0];
-  const openCompetitions = competitions.filter(c => {
+  const openCompetitions = liveCompetitions.filter(c => {
     if (!c.registrationEndDate) return true;
     return c.registrationEndDate >= todayStr;
   });
 
   // Selected or first active competition
-  const activeCompetition = competitions.find(c => c.id === selectedCompId) || openCompetitions[0] || competitions[0] || null;
+  const activeCompetition = liveCompetitions.find(c => c.id === selectedCompId) || openCompetitions[0] || liveCompetitions[0] || null;
 
   const isRegistrationClosed = activeCompetition?.registrationEndDate 
     ? activeCompetition.registrationEndDate < todayStr 
@@ -325,13 +328,13 @@ export const FETIndiaExaminationsSection: React.FC<FETIndiaExaminationsSectionPr
             <div className="lg:col-span-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                  Available Examinations ({competitions.length})
+                  Available Examinations ({liveCompetitions.length})
                 </h4>
                 <span className="text-[11px] text-slate-500">Session 2026-27</span>
               </div>
 
               <div className="space-y-2.5">
-                {competitions.map((comp) => {
+                {liveCompetitions.map((comp) => {
                   const isSelected = comp.id === selectedCompId;
                   return (
                     <div

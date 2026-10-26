@@ -36,7 +36,10 @@ import {
   canPublishTrustContent as checkCanPublishTrust,
   canEditTrustContent as checkCanEditTrust,
   canPublishBulletin as checkCanPublishBulletin,
-  canEditBulletin as checkCanEditBulletin
+  canEditBulletin as checkCanEditBulletin,
+  canViewFinance as checkCanViewFinance,
+  canManageFinance as checkCanManageFinance,
+  canApproveFinance as checkCanApproveFinance
 } from '../lib/rbac';
 import { AppPermission, UserProfile, UserRole } from '../types';
 
@@ -56,6 +59,9 @@ interface AuthContextType {
   canEditTrustContent: boolean;
   canPublishBulletin: boolean;
   canEditBulletin: boolean;
+  canViewFinance: boolean;
+  canManageFinance: boolean;
+  canApproveFinance: boolean;
   canManageRoles: boolean;
   canManageModules: boolean;
   canManageSettings: boolean;
@@ -192,6 +198,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const canEditTrustContent = isSuperAdmin || checkCanEditTrust(userProfile, isSuperAdmin);
   const canPublishBulletin = isSuperAdmin || checkCanPublishBulletin(userProfile, isSuperAdmin);
   const canEditBulletin = isSuperAdmin || checkCanEditBulletin(userProfile, isSuperAdmin);
+  const canViewFinance = isSuperAdmin || checkCanViewFinance(userProfile, isSuperAdmin);
+  const canManageFinance = isSuperAdmin || checkCanManageFinance(userProfile, isSuperAdmin);
+  const canApproveFinance = isSuperAdmin || checkCanApproveFinance(userProfile, isSuperAdmin);
 
   const canManageRoles = isSuperAdmin || hasPermission('roles.manage');
   const canManageModules = isSuperAdmin || hasPermission('modules.manage');
@@ -251,6 +260,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       'members.manage',
       'donors.manage',
       'finance.manage',
+      'finance.view',
+      'finance.income',
+      'finance.expense',
+      'finance.ledger',
+      'finance.budget',
+      'finance.accounts',
+      'finance.reconciliation',
+      'finance.reports',
+      'finance.approve',
       'exams.manage',
       'exams.evaluate',
       'cases.district_review',
@@ -431,6 +449,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         canEditTrustContent,
         canPublishBulletin,
         canEditBulletin,
+        canViewFinance,
+        canManageFinance,
+        canApproveFinance,
         canManageRoles,
         canManageModules,
         canManageSettings,

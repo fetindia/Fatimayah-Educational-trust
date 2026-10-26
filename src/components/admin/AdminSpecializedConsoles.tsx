@@ -53,10 +53,12 @@ import { AdminVolunteerApplicationsView } from './AdminVolunteerApplicationsView
 import { AdminMembershipApplicationsView } from './AdminMembershipApplicationsView';
 import { AdminCoreMembersView } from './AdminCoreMembersView';
 import { AdminReportsAnalyticsView } from './AdminReportsAnalyticsView';
+import { ExternalERPConnectionControl } from './integration/ExternalERPConnectionControl';
 import { AdminDonorsManagementView } from './AdminDonorsManagementView';
 import { AdminFinanceAccountingView } from './AdminFinanceAccountingView';
 import { AdminStaffHRMSView } from './AdminStaffHRMSView';
 import { BlogPressAdminConsole } from './BlogPressAdminConsole';
+import { AdminStoreManagementView } from './store/AdminStoreManagementView';
 
 interface SpecializedConsolesProps {
   currentTab: string;
@@ -183,73 +185,23 @@ export const AdminSpecializedConsoles: React.FC<SpecializedConsolesProps> = ({ c
   }
 
   // -------------------------------------------------------------
-  // 6. SCHOOL ERP ADMINISTRATOR CONSOLE
+  // 6. SCHOOL ERP EXTERNAL CONNECTION CONTROL
   // -------------------------------------------------------------
   if (currentTab === 'school') {
     return (
       <div className="space-y-6" id="admin-school-console">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <GraduationCap className="w-5 h-5 text-blue-600" />
-              <h2 className="text-xl font-extrabold text-slate-900">School ERP Administrator Console</h2>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Manage academic student admissions, class timetables, fee tracking, and teacher allocations.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-            <span className="text-xs text-slate-500 font-medium">Affiliated Trust Schools</span>
-            <p className="text-xl font-black text-slate-900 mt-1">14 Institutions</p>
-          </div>
-          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-            <span className="text-xs text-slate-500 font-medium">Total Enrolled Students</span>
-            <p className="text-xl font-black text-blue-700 mt-1">8,450</p>
-          </div>
-          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-            <span className="text-xs text-slate-500 font-medium">Fee Concessions Disbursed</span>
-            <p className="text-xl font-black text-emerald-700 mt-1">₹42.5 Lakhs</p>
-          </div>
-        </div>
+        <ExternalERPConnectionControl erpType="school" />
       </div>
     );
   }
 
   // -------------------------------------------------------------
-  // 7. MADRASA ERP ADMINISTRATOR CONSOLE
+  // 7. MADRASA ERP EXTERNAL CONNECTION CONTROL
   // -------------------------------------------------------------
   if (currentTab === 'madrasa') {
     return (
       <div className="space-y-6" id="admin-madrasa-console">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-teal-600" />
-              <h2 className="text-xl font-extrabold text-slate-900">Madrasa ERP Administrator Console</h2>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Specialized management for affiliated madrasas: Hifz, Tajweed, Alim courses, and student boarding.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-            <span className="text-xs text-slate-500 font-medium">Affiliated Madrasas</span>
-            <p className="text-xl font-black text-slate-900 mt-1">8 Centers</p>
-          </div>
-          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-            <span className="text-xs text-slate-500 font-medium">Hifz Students</span>
-            <p className="text-xl font-black text-teal-700 mt-1">420</p>
-          </div>
-          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-            <span className="text-xs text-slate-500 font-medium">Boarding Capacity</span>
-            <p className="text-xl font-black text-slate-900 mt-1">600 Beds</p>
-          </div>
-        </div>
+        <ExternalERPConnectionControl erpType="madrasa" />
       </div>
     );
   }
@@ -276,66 +228,10 @@ export const AdminSpecializedConsoles: React.FC<SpecializedConsolesProps> = ({ c
   }
 
   // -------------------------------------------------------------
-  // 11. PRE-ARCHITECTED FET STORE CONSOLE
+  // 11. FET STORE MANAGEMENT CONSOLE
   // -------------------------------------------------------------
   if (currentTab === 'store') {
-    return (
-      <div className="space-y-6" id="admin-store-console">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <ShoppingBag className="w-5 h-5 text-amber-600" />
-              <h2 className="text-xl font-extrabold text-slate-900">Official FET Store Console (Pre-Architected)</h2>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Pre-architected catalog initially supporting: Garments, Islamic Garments, Perfumes, and Books. Module safely isolated in <span className="font-mono text-amber-700">DISABLED</span> lifecycle state.
-            </p>
-          </div>
-          <span className="px-3 py-1 bg-amber-100 text-amber-900 border border-amber-300 rounded-full text-xs font-bold">
-            Series 3 Launch Pipeline
-          </span>
-        </div>
-
-        {/* 4 Core Initial Categories Showcase */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-4 rounded-xl border border-slate-200 bg-white">
-            <span className="px-2 py-0.5 bg-slate-100 text-slate-800 rounded text-[10px] font-bold">
-              Category 1
-            </span>
-            <h3 className="text-sm font-extrabold text-slate-900 mt-2">Garments</h3>
-            <p className="text-xs text-slate-500 mt-1">General daily modest attire and ethical clothing lines.</p>
-            <div className="mt-3 text-[11px] font-bold text-slate-600">Schema Ready • 0 Published</div>
-          </div>
-
-          <div className="p-4 rounded-xl border border-slate-200 bg-white">
-            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded text-[10px] font-bold">
-              Category 2
-            </span>
-            <h3 className="text-sm font-extrabold text-slate-900 mt-2">Islamic Garments</h3>
-            <p className="text-xs text-slate-500 mt-1">Abayas, Thobes, Hijabs, Kurtas, Prayer caps, and scarves.</p>
-            <div className="mt-3 text-[11px] font-bold text-slate-600">Schema Ready • 0 Published</div>
-          </div>
-
-          <div className="p-4 rounded-xl border border-slate-200 bg-white">
-            <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-[10px] font-bold">
-              Category 3
-            </span>
-            <h3 className="text-sm font-extrabold text-slate-900 mt-2">Perfumes (Attars)</h3>
-            <p className="text-xs text-slate-500 mt-1">Non-alcoholic fragrances, traditional pure oudh, and attars.</p>
-            <div className="mt-3 text-[11px] font-bold text-slate-600">Schema Ready • 0 Published</div>
-          </div>
-
-          <div className="p-4 rounded-xl border border-slate-200 bg-white">
-            <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-[10px] font-bold">
-              Category 4
-            </span>
-            <h3 className="text-sm font-extrabold text-slate-900 mt-2">Books & Literature</h3>
-            <p className="text-xs text-slate-500 mt-1">Islamic literature, academic textbooks, ethics guides, and FET publications.</p>
-            <div className="mt-3 text-[11px] font-bold text-slate-600">Schema Ready • 0 Published</div>
-          </div>
-        </div>
-      </div>
-    );
+    return <AdminStoreManagementView onNotify={showNotification} />;
   }
 
   // -------------------------------------------------------------

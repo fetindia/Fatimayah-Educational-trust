@@ -155,6 +155,9 @@ export const ExaminationPage: React.FC<ExaminationPageProps> = ({
   // Filtered competitions
   const filteredCompetitions = useMemo(() => {
     return competitions.filter((comp) => {
+      // Quarantined Test vs Live Separation: Exclude test competitions from public candidate portal
+      if (comp.isTestCompetition || comp.environment === 'test') return false;
+
       // Category filter
       if (activeCategory === 'book_reading' && comp.category !== 'book_reading') return false;
       if (activeCategory === 'competitive_exam' && comp.category === 'book_reading') return false;
@@ -431,9 +434,9 @@ export const ExaminationPage: React.FC<ExaminationPageProps> = ({
                     </div>
                   </div>
 
-                  {directCompetition.bookDetails.pdfReadingMaterialUrl && (
+                  {(directCompetition.pdfReadingMaterialUrl || directCompetition.bookDetails?.pdfReadingMaterialUrl) && (
                     <a
-                      href={directCompetition.bookDetails.pdfReadingMaterialUrl}
+                      href={directCompetition.pdfReadingMaterialUrl || directCompetition.bookDetails?.pdfReadingMaterialUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/20 transition flex items-center justify-center gap-1.5 flex-shrink-0"
@@ -640,9 +643,9 @@ export const ExaminationPage: React.FC<ExaminationPageProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {competition.bookDetails?.pdfReadingMaterialUrl && (
+                      {(competition.pdfReadingMaterialUrl || competition.bookDetails?.pdfReadingMaterialUrl) && (
                         <a
-                          href={competition.bookDetails.pdfReadingMaterialUrl}
+                          href={competition.pdfReadingMaterialUrl || competition.bookDetails?.pdfReadingMaterialUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="px-3 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold transition-colors flex items-center gap-1"

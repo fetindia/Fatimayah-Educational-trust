@@ -21,16 +21,21 @@ import {
   ExternalLink,
   ChevronRight,
   Printer,
-  AlertCircle
+  AlertCircle,
+  QrCode,
+  X,
+  CreditCard
 } from 'lucide-react';
 import { Competition, CompetitionRegistration, CompetitionCertificateRecord } from '../../types';
 import { INITIAL_COMPETITIONS } from '../../data/initialCompetitions';
 import { useAuth } from '../../contexts/AuthContext';
 import { db } from '../../lib/firebase';
-import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDocs, doc, getDoc } from 'firebase/firestore';
+import { QRCodeSVG } from 'qrcode.react';
 import { CompetitionRegistrationModal } from '../competitions/CompetitionRegistrationModal';
 import { OnlineExamModal } from '../competitions/OnlineExamModal';
 import { DigitalCertificateModal } from '../competitions/DigitalCertificateModal';
+import { HallTicketModal } from '../competitions/HallTicketModal';
 import { getExamScheduleStatus } from '../../utils/examSchedule';
 
 interface MemberCompetitionsViewProps {
@@ -51,11 +56,141 @@ export const MemberCompetitionsView: React.FC<MemberCompetitionsViewProps> = ({ 
   const [registeringComp, setRegisteringComp] = useState<Competition | null>(null);
   const [takingExamData, setTakingExamData] = useState<{ comp: Competition; reg: CompetitionRegistration } | null>(null);
   const [viewingCertificate, setViewingCertificate] = useState<CompetitionCertificateRecord | null>(null);
+  const [viewingHallTicket, setViewingHallTicket] = useState<{ comp: Competition; reg: CompetitionRegistration } | null>(null);
   const [notificationMsg, setNotificationMsg] = useState<string | null>(null);
+  const [downloadingCompId, setDownloadingCompId] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<{ compId: string; message: string } | null>(null);
 
   const showNotification = (msg: string) => {
     setNotificationMsg(msg);
     setTimeout(() => setNotificationMsg(null), 4000);
+  };
+
+  const handleDownloadPdfMaterial = async (comp: Competition, reg?: CompetitionRegistration) => {
+    if (!comp.id) return;
+
+    if (!currentUser) {
+      if (onOpenAuth) onOpenAuth();
+      return;
+    }
+
+    const userReg = reg || getRegistrationForComp(comp.id);
+    if (!userReg) {
+      setDownloadError({
+        compId: comp.id,
+        message: 'Active enrollment is required to download official study material.'
+      });
+      return;
+    }
+
+    if (comp.isPaid && (!userReg.isPaid || userReg.paymentStatus !== 'paid')) {
+      setDownloadError({
+        compId: comp.id,
+        message: 'Payment verification is required before downloading paid study material.'
+      });
+      return;
+    }
+
+    const rawPdfUrl = comp.pdfReadingMaterialUrl || comp.bookDetails?.pdfReadingMaterialUrl || comp.pdfExternalUrl || comp.bookDetails?.pdfExternalUrl;
+    
+    if (!rawPdfUrl) {
+      setDownloadError({
+        compId: comp.id,
+        message: 'Official study material will be uploaded soon by the Examination Board.'
+      });
+      return;
+    }
+
+    setDownloadingCompId(comp.id);
+    setDownloadError(null);
+
+    try {
+      const filename = comp.pdfFileName || comp.bookDetails?.pdfFileName || `${comp.code || 'FET'}_Study_Material.pdf`;
+      const safeFileName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const regDocId = userReg?.id || userReg?.registrationId || `reg-${comp.id}-${currentUser.uid}`;
+      const prtId = userReg?.participantId || '';
+      const payStatus = userReg?.paymentStatus || (userReg?.isPaid ? 'paid' : (comp.isPaid ? 'pending' : 'free'));
+      
+      // 1. Call authoritative server download endpoint with candidate verification
+      const secureEndpoint = `/api/competitions/${comp.id}/material?uid=${encodeURIComponent(currentUser.uid)}&regId=${encodeURIComponent(regDocId)}&prtId=${encodeURIComponent(prtId)}&payStatus=${encodeURIComponent(payStatus)}`;
+      let downloadBlob: Blob | null = null;
+
+      try {
+        const resp = await fetch(secureEndpoint, {
+          headers: {
+            'x-user-uid': currentUser.uid,
+            'x-registration-id': regDocId,
+            'x-participant-id': prtId,
+            'x-payment-status': payStatus
+          }
+        });
+        if (resp.ok) {
+          const contentType = resp.headers.get('content-type') || '';
+          if (contentType.includes('application/pdf') || contentType.includes('application/octet-stream')) {
+            downloadBlob = await resp.blob();
+          } else {
+            const errJson = await resp.json().catch(() => null);
+            if (errJson?.error) {
+              throw new Error(errJson.error);
+            }
+          }
+        } else if (resp.status === 403) {
+          const errJson = await resp.json().catch(() => null);
+          throw new Error(errJson?.error || 'Candidate registration verification required to download study material.');
+        } else if (!resp.ok) {
+          const errJson = await resp.json().catch(() => null);
+          throw new Error(errJson?.error || 'Official study material is being prepared by the Examination Board.');
+        }
+      } catch (endpointErr: any) {
+        if (endpointErr?.message && endpointErr.message.includes('verification')) {
+          throw endpointErr;
+        }
+        console.warn('Server download endpoint notice, attempting direct stream fallback:', endpointErr);
+      }
+
+      // 2. Direct fetch fallback if endpoint not responding with blob and external URL is available
+      if (!downloadBlob && rawPdfUrl && (rawPdfUrl.startsWith('http://') || rawPdfUrl.startsWith('https://')) && !rawPdfUrl.includes('/api/competitions/')) {
+        try {
+          const directResp = await fetch(rawPdfUrl);
+          if (directResp.ok) {
+            downloadBlob = await directResp.blob();
+          }
+        } catch (directErr) {
+          // Handled below
+        }
+      }
+
+      // 3. Initiate browser save
+      if (downloadBlob) {
+        const blobUrl = window.URL.createObjectURL(downloadBlob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = safeFileName.endsWith('.pdf') ? safeFileName : `${safeFileName}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1500);
+        showNotification(`Official study material downloaded: ${safeFileName}`);
+      } else if (rawPdfUrl && rawPdfUrl.startsWith('data:application/pdf;base64,')) {
+        const link = document.createElement('a');
+        link.href = rawPdfUrl;
+        link.download = safeFileName.endsWith('.pdf') ? safeFileName : `${safeFileName}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showNotification(`Official study material downloaded: ${safeFileName}`);
+      } else {
+        throw new Error('Official study material is being finalized by the Examination Board. Please try again shortly or contact your coordinator.');
+      }
+    } catch (err: any) {
+      console.error('Error downloading competition PDF:', err);
+      setDownloadError({
+        compId: comp.id,
+        message: err?.message || 'Failed to download PDF. Please try again or open study material link.'
+      });
+    } finally {
+      setDownloadingCompId(null);
+    }
   };
 
   // 1. Fetch live competitions
@@ -79,27 +214,71 @@ export const MemberCompetitionsView: React.FC<MemberCompetitionsViewProps> = ({ 
     return () => unsubscribe();
   }, []);
 
-  // 2. Fetch current user's registrations
+  // 2. Fetch current user's registrations (backward-compatible with UID aliases & direct docs)
   useEffect(() => {
     if (!currentUser) return;
+
+    // Normalizer to ensure consistent fields regardless of legacy schema variations
+    const normalizeRegistration = (data: any, docId: string): CompetitionRegistration => {
+      const regId = data.registrationId || data.id || docId;
+      const partUid = data.participantUid || data.userId || data.candidateUid || data.uid || currentUser.uid;
+      const partId = data.participantId || data.rollNumber || `FET-PRT-${docId.slice(-6)}`;
+      const status = data.status || (data.verificationStatus === 'pending' ? 'pending_review' : 'registered');
+      return {
+        ...data,
+        id: docId,
+        registrationId: regId,
+        participantUid: partUid,
+        participantId: partId,
+        status: status,
+        isPaid: Boolean(data.isPaid || data.paymentStatus === 'paid')
+      };
+    };
 
     const regQuery = query(
       collection(db, 'competition_registrations'),
       where('participantUid', '==', currentUser.uid)
     );
 
-    const unsubscribe = onSnapshot(regQuery, (snapshot) => {
-      const loadedRegs: CompetitionRegistration[] = [];
-      snapshot.forEach((doc) => {
-        loadedRegs.push({ id: doc.id, ...doc.data() } as CompetitionRegistration);
+    const unsubscribe = onSnapshot(regQuery, async (snapshot) => {
+      const loadedMap = new Map<string, CompetitionRegistration>();
+      
+      snapshot.forEach((docSnap) => {
+        const normalized = normalizeRegistration(docSnap.data(), docSnap.id);
+        loadedMap.set(normalized.competitionId, normalized);
       });
-      setRegistrations(loadedRegs);
+
+      // Also check direct document references for all competitions to recover registrations
+      // saved under alternative key names (userId, candidateUid) or created before composite query
+      for (const comp of competitions) {
+        if (!loadedMap.has(comp.id)) {
+          try {
+            const directDocId = `reg-${comp.id}-${currentUser.uid}`;
+            const docSnap = await getDoc(doc(db, 'competition_registrations', directDocId));
+            if (docSnap.exists()) {
+              const normalized = normalizeRegistration(docSnap.data(), docSnap.id);
+              loadedMap.set(comp.id, normalized);
+            } else if (comp.code) {
+              const codeDocId = `reg-${comp.code}-${currentUser.uid}`;
+              const codeSnap = await getDoc(doc(db, 'competition_registrations', codeDocId));
+              if (codeSnap.exists()) {
+                const normalized = normalizeRegistration(codeSnap.data(), codeSnap.id);
+                loadedMap.set(comp.id, normalized);
+              }
+            }
+          } catch (e) {
+            // direct get catch
+          }
+        }
+      }
+
+      setRegistrations(Array.from(loadedMap.values()));
     }, (err) => {
       console.warn('Could not query competition_registrations:', err);
     });
 
     return () => unsubscribe();
-  }, [currentUser]);
+  }, [currentUser, competitions]);
 
   // 3. Fetch certificates
   useEffect(() => {
@@ -412,19 +591,46 @@ export const MemberCompetitionsView: React.FC<MemberCompetitionsViewProps> = ({ 
                     {/* Action Button */}
                     <div className="pt-3 border-t border-slate-100">
                       {isEnrolled ? (
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="text-[11px] text-emerald-800 font-bold flex items-center gap-1">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                            <span>Enrolled ({userReg?.participantId})</span>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-[11px] text-emerald-800 font-bold flex items-center gap-1">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                              <span>Enrolled ({userReg?.participantId})</span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                if (userReg) {
+                                  setViewingHallTicket({ comp, reg: userReg });
+                                } else {
+                                  setActiveSubTab('my_exams');
+                                }
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer flex items-center gap-1.5"
+                            >
+                              <QrCode className="w-3.5 h-3.5 text-amber-400" />
+                              <span>View Hall Ticket</span>
+                            </button>
                           </div>
-                          <button
-                            onClick={() => {
-                              setActiveSubTab('my_exams');
-                            }}
-                            className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer"
-                          >
-                            View Hall Ticket
-                          </button>
+                          {(comp.pdfReadingMaterialUrl || comp.bookDetails?.pdfReadingMaterialUrl || comp.pdfExternalUrl || comp.bookDetails?.pdfExternalUrl) && (
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadPdfMaterial(comp, userReg)}
+                              disabled={downloadingCompId === comp.id}
+                              className="w-full py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              {downloadingCompId === comp.id ? (
+                                <>
+                                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                                  <span>Downloading PDF Book...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Download className="w-3.5 h-3.5" />
+                                  <span>Download PDF Book</span>
+                                </>
+                              )}
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <button
@@ -514,6 +720,24 @@ export const MemberCompetitionsView: React.FC<MemberCompetitionsViewProps> = ({ 
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
                           {reg.competitionCategory}
                         </span>
+
+                        {/* Registration Verification Status Badge */}
+                        {reg.status === 'pending_review' || reg.status === 'pending' ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-amber-700" />
+                            Academic Review Pending
+                          </span>
+                        ) : comp.isPaid && (!reg.isPaid || reg.paymentStatus === 'pending') ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1">
+                            <CreditCard className="w-3 h-3 text-rose-600" />
+                            Fee Verification Pending
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                            <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                            Registration Verified & Confirmed
+                          </span>
+                        )}
                         {hasCompletedExam ? (
                           isAutoSubmitted ? (
                             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
@@ -570,6 +794,32 @@ export const MemberCompetitionsView: React.FC<MemberCompetitionsViewProps> = ({ 
                         </div>
                       </div>
 
+                      {/* Academic Review Pending Banner */}
+                      {(reg.status === 'pending_review' || reg.status === 'pending') && (
+                        <div className="p-3 rounded-2xl bg-amber-50/90 border border-amber-200 text-xs font-medium text-amber-900 flex items-start gap-2.5">
+                          <Clock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                          <div className="space-y-0.5">
+                            <p className="font-extrabold text-amber-950">Academic Verification In Progress</p>
+                            <p className="text-[11px] text-amber-800 leading-relaxed">
+                              Your candidate registration has been recorded and is currently being verified by the FET Examination Board. Your official Hall Ticket and Admit Card remain fully viewable below.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Payment Verification Pending Banner */}
+                      {comp.isPaid && (!reg.isPaid || reg.paymentStatus === 'pending') && (
+                        <div className="p-3 rounded-2xl bg-rose-50/90 border border-rose-200 text-xs font-medium text-rose-900 flex items-start gap-2.5">
+                          <CreditCard className="w-4 h-4 text-rose-700 shrink-0 mt-0.5" />
+                          <div className="space-y-0.5">
+                            <p className="font-extrabold text-rose-950">Fee Payment Verification Required</p>
+                            <p className="text-[11px] text-rose-800 leading-relaxed">
+                              Participation fee confirmation is required before accessing the assessment and official study material.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
                       {!hasCompletedExam && scheduleStatus.status !== 'open' && (
                         <div className={`p-2.5 rounded-xl border text-xs font-medium flex items-center gap-2 ${
                           scheduleStatus.status === 'upcoming' 
@@ -580,10 +830,81 @@ export const MemberCompetitionsView: React.FC<MemberCompetitionsViewProps> = ({ 
                           <span>{scheduleStatus.message}</span>
                         </div>
                       )}
+
+                      {/* Prescribed Study Material & Syllabus PDF Download */}
+                      <div className="mt-2 p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5 text-amber-900 font-bold text-xs">
+                            <BookOpen className="w-3.5 h-3.5 text-amber-700" />
+                            <span>Prescribed Curriculum & Study Material</span>
+                          </div>
+                          <p className="text-xs font-semibold text-slate-800">
+                            {comp.bookDetails?.bookTitle || comp.title}
+                            {comp.bookDetails?.author ? ` • Author: ${comp.bookDetails.author}` : ''}
+                          </p>
+                          {(comp.pdfFileName || comp.bookDetails?.pdfFileName) && (
+                            <p className="text-[11px] text-slate-500 font-mono">
+                              File: {comp.pdfFileName || comp.bookDetails?.pdfFileName}
+                              {(comp.pdfFileSizeBytes || comp.bookDetails?.pdfFileSizeBytes) ? ` (${((comp.pdfFileSizeBytes || comp.bookDetails?.pdfFileSizeBytes || 0) / (1024 * 1024)).toFixed(2)} MB)` : ''}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="shrink-0 flex items-center gap-2">
+                          {(comp.pdfReadingMaterialUrl || comp.bookDetails?.pdfReadingMaterialUrl || comp.pdfExternalUrl || comp.bookDetails?.pdfExternalUrl) ? (
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadPdfMaterial(comp, reg)}
+                              disabled={downloadingCompId === comp.id}
+                              className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              {downloadingCompId === comp.id ? (
+                                <>
+                                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                                  <span>Downloading PDF Book...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Download className="w-3.5 h-3.5" />
+                                  <span>Download PDF Book</span>
+                                </>
+                              )}
+                            </button>
+                          ) : (
+                            <span className="text-[11px] font-semibold text-amber-800 bg-amber-100/80 px-2.5 py-1.5 rounded-lg border border-amber-200">
+                              Material uploading soon by Board
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {downloadError && downloadError.compId === comp.id && (
+                        <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                            <span>{downloadError.message}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setDownloadError(null)}
+                            className="text-rose-600 hover:text-rose-900 font-bold text-xs"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Action Controls */}
                     <div className="flex flex-col sm:flex-row lg:flex-col gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setViewingHallTicket({ comp, reg })}
+                        className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <QrCode className="w-4 h-4 text-amber-400" />
+                        <span>View Hall Ticket</span>
+                      </button>
                       {!hasCompletedExam ? (
                         scheduleStatus.status === 'open' ? (
                           <button
@@ -760,6 +1081,17 @@ export const MemberCompetitionsView: React.FC<MemberCompetitionsViewProps> = ({ 
         <DigitalCertificateModal
           certificate={viewingCertificate}
           onClose={() => setViewingCertificate(null)}
+        />
+      )}
+
+      {/* Hall Ticket / Admit Card Modal */}
+      {viewingHallTicket && (
+        <HallTicketModal
+          competition={viewingHallTicket.comp}
+          registration={viewingHallTicket.reg}
+          onClose={() => setViewingHallTicket(null)}
+          onDownloadPdfBook={() => handleDownloadPdfMaterial(viewingHallTicket.comp, viewingHallTicket.reg)}
+          isDownloadingPdf={downloadingCompId === viewingHallTicket.comp.id}
         />
       )}
 

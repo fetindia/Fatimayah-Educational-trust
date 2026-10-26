@@ -11,13 +11,17 @@ import {
   BookOpen, 
   HeartHandshake, 
   Calendar, 
+  ShoppingBag,
   Menu,
-  X
+  X,
+  Award
 } from 'lucide-react';
 import { triggerHapticFeedback } from '../../lib/appBridge';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useConfig } from '../../contexts/ConfigContext';
+import { useCart } from '../../contexts/CartContext';
+import { useModuleControls } from '../../contexts/ModuleControlsContext';
 
 interface MobileBottomNavProps {
   activeSection: string;
@@ -36,6 +40,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   onToggleMobileMenu
 }) => {
   const { unreadCount } = useNotifications();
+  const { cart, openCartDrawer } = useCart();
+  const { isModuleEnabled } = useModuleControls();
   const { config } = useConfig();
 
   const primaryGreen = config.primaryGreen || '#0D6E42';
@@ -48,6 +54,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     setActiveSection(section);
   };
 
+  const isStoreOn = isModuleEnabled('store');
+
   const navItems = [
     {
       id: 'home',
@@ -56,12 +64,25 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       isActive: !isMobileMenuOpen && (activeSection === 'home' || activeSection === ''),
       onClick: () => handleShortcutClick('home')
     },
-    {
-      id: 'programs',
-      label: 'Programs',
-      icon: BookOpen,
-      isActive: !isMobileMenuOpen && activeSection === 'programs',
-      onClick: () => handleShortcutClick('programs')
+    isStoreOn ? {
+      id: 'store',
+      label: 'Store',
+      icon: ShoppingBag,
+      badge: cart.totalItems > 0 ? cart.totalItems : undefined,
+      isActive: !isMobileMenuOpen && activeSection === 'store',
+      onClick: () => {
+        if (activeSection === 'store') {
+          openCartDrawer();
+        } else {
+          handleShortcutClick('store');
+        }
+      }
+    } : {
+      id: 'examinations',
+      label: 'Exams',
+      icon: Award,
+      isActive: !isMobileMenuOpen && (activeSection === 'examinations' || activeSection === 'examination'),
+      onClick: () => handleShortcutClick('examinations')
     },
     {
       id: 'donate',
@@ -71,11 +92,11 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       onClick: () => handleShortcutClick('donate')
     },
     {
-      id: 'events',
-      label: 'Events',
-      icon: Calendar,
-      isActive: !isMobileMenuOpen && (activeSection === 'events_blog' || activeSection === 'events'),
-      onClick: () => handleShortcutClick('events_blog')
+      id: 'programs',
+      label: 'Programs',
+      icon: BookOpen,
+      isActive: !isMobileMenuOpen && activeSection === 'programs',
+      onClick: () => handleShortcutClick('programs')
     },
     {
       id: 'menu',

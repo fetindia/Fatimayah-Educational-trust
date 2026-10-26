@@ -41,7 +41,8 @@ import {
   Trophy,
   CreditCard,
   Paperclip,
-  Upload
+  Upload,
+  Languages
 } from 'lucide-react';
 import { uploadExamPdfMaterial } from '../../lib/storage';
 import { 
@@ -52,14 +53,17 @@ import {
   ParticipantAward,
   CompetitionCertificateRecord,
   ExamQuestion,
-  CompetitionPrizeTier
+  CompetitionPrizeTier,
+  MultilingualDocumentReference
 } from '../../types';
+import { MultilingualReaderModal } from './integration/MultilingualReaderModal';
 import { INITIAL_COMPETITIONS } from '../../data/initialCompetitions';
 import { useAuth } from '../../contexts/AuthContext';
-import { db, revokeCertificate, reinstateCertificate, syncPublicCertificateRecord } from '../../lib/firebase';
+import { db, cleanFirestoreData, revokeCertificate, reinstateCertificate, syncPublicCertificateRecord } from '../../lib/firebase';
 import { 
   collection, 
   doc, 
+  getDoc,
   setDoc, 
   updateDoc, 
   deleteDoc, 
@@ -82,6 +86,7 @@ export const AdminCompetitionsExamsView: React.FC = () => {
   const [certificates, setCertificates] = useState<CompetitionCertificateRecord[]>([]);
   const [selectedCompId, setSelectedCompId] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [envFilter, setEnvFilter] = useState<'all' | 'live' | 'test'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeAdminTab, setActiveAdminTab] = useState<'catalog' | 'banks' | 'participants' | 'evaluations' | 'results' | 'certificates'>('catalog');
   const [managingPrizesComp, setManagingPrizesComp] = useState<Competition | null>(null);
@@ -175,6 +180,12 @@ export const AdminCompetitionsExamsView: React.FC = () => {
   // Filtered Competitions
   const filteredCompetitions = competitions.filter((c) => {
     if (c.isDeleted || c.status === 'archived') return false;
+    
+    // Environment filter (live vs test separation)
+    const isTestComp = Boolean(c.isTestCompetition || c.environment === 'test');
+    if (envFilter === 'live' && isTestComp) return false;
+    if (envFilter === 'test' && !isTestComp) return false;
+
     const matchCat = selectedCategory === 'all' || c.category === selectedCategory;
     const matchSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase()) || c.code.toLowerCase().includes(searchQuery.toLowerCase());
     return matchCat && matchSearch;
@@ -183,6 +194,13 @@ export const AdminCompetitionsExamsView: React.FC = () => {
   // Filtered Registrations
   const filteredRegistrations = registrations.filter((r) => {
     const matchComp = selectedCompId === 'all' || r.competitionId === selectedCompId;
+    
+    // Environment filter (live vs test candidates)
+    const parentComp = competitions.find(c => c.id === r.competitionId);
+    const isTestReg = Boolean(r.isTestRegistration || r.environment === 'test' || parentComp?.isTestCompetition || parentComp?.environment === 'test');
+    if (envFilter === 'live' && isTestReg) return false;
+    if (envFilter === 'test' && !isTestReg) return false;
+
     const matchSearch = 
       r.participantName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       r.participantId.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -192,6 +210,8 @@ export const AdminCompetitionsExamsView: React.FC = () => {
 
   // Key Statistics
   const totalCompetitions = competitions.filter(c => !c.isDeleted && c.status !== 'archived').length;
+  const liveCompetitionsCount = competitions.filter(c => !c.isDeleted && c.status !== 'archived' && !c.isTestCompetition && c.environment !== 'test').length;
+  const testCompetitionsCount = competitions.filter(c => !c.isDeleted && c.status !== 'archived' && (c.isTestCompetition || c.environment === 'test')).length;
   const activeRegistrationsCount = competitions.filter((c) => !c.isDeleted && c.status !== 'archived' && c.status === 'registration_open').length;
   const totalCandidates = registrations.length;
   const pendingEvaluations = registrations.filter((r) => r.status === 'attended' && r.marksObtained === undefined).length;
@@ -556,23 +576,86 @@ export const AdminCompetitionsExamsView: React.FC = () => {
       {activeAdminTab === 'catalog' && (
         <div className="space-y-4">
           
+          {/* Environment Filter Selector: All vs Live vs Test */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-white rounded-2xl border border-slate-200">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Environment:</span>
+              <div className="inline-flex p-1 rounded-xl bg-slate-100 border border-slate-200 gap-1">
+                <button
+                  type="button"
+                  onClick={() => setEnvFilter('all')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    envFilter === 'all'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  All ({competitions.filter(c => !c.isDeleted && c.status !== 'archived').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEnvFilter('live')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    envFilter === 'live'
+                      ? 'bg-emerald-800 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  Live ({liveCompetitionsCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEnvFilter('test')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    envFilter === 'test'
+                      ? 'bg-amber-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                  Test & Sandbox ({testCompetitionsCount})
+                </button>
+              </div>
+            </div>
+
+            <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span>Live examinations visible to candidate portal. Test examinations quarantined.</span>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredCompetitions.map((comp) => {
               const compRegistrations = registrations.filter((r) => r.competitionId === comp.id);
               const scoredCount = compRegistrations.filter((r) => r.marksObtained !== undefined).length;
+              const isTestComp = Boolean(comp.isTestCompetition || comp.environment === 'test');
 
               return (
                 <div 
                   key={comp.id || comp.code}
-                  className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden flex flex-col justify-between"
+                  className={`bg-white rounded-3xl border shadow-xs overflow-hidden flex flex-col justify-between ${
+                    isTestComp ? 'border-amber-300 ring-2 ring-amber-100' : 'border-slate-200'
+                  }`}
                 >
                   <div className="p-5 space-y-4">
                     
                     {/* Top Row: Code & Status Menu */}
                     <div className="flex items-center justify-between gap-2">
-                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-mono font-black bg-slate-900 text-amber-400">
-                        {comp.code}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-mono font-black bg-slate-900 text-amber-400">
+                          {comp.code}
+                        </span>
+                        {isTestComp ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-500 text-white uppercase tracking-wide">
+                            TEST MODE
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 uppercase tracking-wide">
+                            LIVE
+                          </span>
+                        )}
+                      </div>
                       
                       <select
                         value={comp.status}
@@ -822,13 +905,29 @@ export const AdminCompetitionsExamsView: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredRegistrations.map((reg) => (
+                  filteredRegistrations.map((reg) => {
+                    const regParentComp = competitions.find(c => c.id === reg.competitionId);
+                    const isTestCandidate = Boolean(reg.isTestRegistration || reg.environment === 'test' || regParentComp?.isTestCompetition || regParentComp?.environment === 'test');
+
+                    return (
                     <tr key={reg.registrationId} className="hover:bg-slate-50 transition-colors">
                       <td className="py-3 px-4 font-mono font-bold text-slate-900">
-                        {reg.participantId}
+                        <span>{reg.participantId}</span>
+                        {isTestCandidate && (
+                          <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-500 text-white uppercase tracking-wider inline-block">
+                            TEST
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4">
-                        <div className="font-bold text-slate-900">{reg.participantName}</div>
+                        <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                          <span>{reg.participantName}</span>
+                          {isTestCandidate && (
+                            <span className="text-[10px] text-amber-700 font-bold bg-amber-100 px-1 rounded">
+                              Sandbox Candidate
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[10px] text-slate-400">{reg.mobileNumber}</div>
                       </td>
                       <td className="py-3 px-4">
@@ -862,7 +961,8 @@ export const AdminCompetitionsExamsView: React.FC = () => {
                         </button>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -1679,6 +1779,7 @@ const CompetitionOverviewModal: React.FC<CompetitionOverviewModalProps> = ({
   isSuperAdmin,
   canEdit
 }) => {
+  const { currentUser } = useAuth();
   const exam = competition.examDetails;
   const book = competition.bookDetails;
   const scheduleDate = competition.examScheduleDate || exam?.examScheduleDate || competition.competitionDate;
@@ -1770,7 +1871,11 @@ const CompetitionOverviewModal: React.FC<CompetitionOverviewModalProps> = ({
                 {(competition.pdfReadingMaterialUrl || book.pdfReadingMaterialUrl) && (
                   <div className="pt-1.5 flex items-center gap-2">
                     <a
-                      href={competition.pdfReadingMaterialUrl || book.pdfReadingMaterialUrl}
+                      href={
+                        (competition.pdfReadingMaterialUrl || book.pdfReadingMaterialUrl)?.startsWith('/api/')
+                          ? `${competition.pdfReadingMaterialUrl || book.pdfReadingMaterialUrl}?uid=${encodeURIComponent(currentUser?.uid || 'super_admin')}`
+                          : (competition.pdfReadingMaterialUrl || book.pdfReadingMaterialUrl)
+                      }
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 px-3 py-1 bg-amber-600 text-white rounded-lg text-[11px] font-bold hover:bg-amber-700"
@@ -2155,8 +2260,12 @@ interface CreateCompetitionModalProps {
 }
 
 const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initialCompetition, onClose, onSuccess, onDelete }) => {
-  const { currentUser, isSuperAdmin } = useAuth();
+  const { currentUser, isSuperAdmin, userProfile } = useAuth();
   const isEditing = Boolean(initialCompetition);
+
+  // Stable draft competition ID so PDF upload and Firestore document record are always locked to the identical ID
+  const [draftCompId] = useState<string>(() => initialCompetition?.id || `cmp-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     code: initialCompetition?.code || `FET-CMP-2026-00${Math.floor(10 + Math.random() * 90)}`,
@@ -2201,44 +2310,102 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
     pdfFileName: initialCompetition?.pdfFileName || initialCompetition?.bookDetails?.pdfFileName || '',
     pdfFileSizeBytes: initialCompetition?.pdfFileSizeBytes || initialCompetition?.bookDetails?.pdfFileSizeBytes || 0,
     pdfSourceType: (initialCompetition?.pdfSourceType || initialCompetition?.bookDetails?.pdfSourceType || 'upload') as 'upload' | 'external_url',
-    pdfExternalUrl: initialCompetition?.bookDetails?.pdfExternalUrl || (initialCompetition?.pdfSourceType === 'external_url' ? initialCompetition?.pdfReadingMaterialUrl : '') || ''
+    pdfExternalUrl: initialCompetition?.bookDetails?.pdfExternalUrl || (initialCompetition?.pdfSourceType === 'external_url' ? initialCompetition?.pdfReadingMaterialUrl : '') || '',
+    pdfStoragePath: initialCompetition?.pdfStoragePath || initialCompetition?.bookDetails?.pdfStoragePath || '',
+    // Test vs Live environment separation
+    isTestCompetition: initialCompetition?.isTestCompetition ?? (initialCompetition?.environment === 'test') ?? false,
+    environment: (initialCompetition?.environment || (initialCompetition?.isTestCompetition ? 'test' : 'live')) as 'live' | 'test'
   });
 
+  const [selectedPdfFile, setSelectedPdfFile] = useState<File | null>(null);
+  const [uploadStage, setUploadStage] = useState<'idle' | 'selected' | 'uploading' | 'finalizing' | 'completed' | 'error'>(() => {
+    return (initialCompetition?.pdfReadingMaterialUrl || initialCompetition?.bookDetails?.pdfReadingMaterialUrl) ? 'completed' : 'idle';
+  });
   const [isUploadingPdf, setIsUploadingPdf] = useState(false);
   const [pdfUploadProgress, setPdfUploadProgress] = useState(0);
   const [pdfUploadError, setPdfUploadError] = useState<string | null>(null);
   const pdfFileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const handlePdfFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePdfFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
-      setPdfUploadError('Please select a valid PDF file.');
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    if (!isPdf) {
+      setPdfUploadError('Invalid format: Only official PDF files (.pdf) are accepted.');
+      setSelectedPdfFile(null);
+      setUploadStage('error');
       return;
     }
 
     if (file.size > 25 * 1024 * 1024) {
-      setPdfUploadError('PDF exceeds 25 MB limit.');
+      setPdfUploadError(`File exceeds 25 MB limit (Selected file is ${(file.size / (1024 * 1024)).toFixed(2)} MB). Please select a file under 25 MB.`);
+      setSelectedPdfFile(null);
+      setUploadStage('error');
       return;
     }
 
+    setPdfUploadError(null);
+    setSelectedPdfFile(file);
+    setUploadStage('selected');
+  };
+
+  const handleStartPdfUpload = async () => {
+    if (!selectedPdfFile) return;
+
     setIsUploadingPdf(true);
+    setUploadStage('uploading');
     setPdfUploadProgress(10);
     setPdfUploadError(null);
 
     try {
-      const examId = initialCompetition?.id || `cmp-${Date.now()}`;
-      const res = await uploadExamPdfMaterial(file, examId, (pct) => setPdfUploadProgress(pct));
+      const res = await uploadExamPdfMaterial(selectedPdfFile, draftCompId, (pct) => {
+        setPdfUploadProgress(pct);
+        if (pct >= 88) setUploadStage('finalizing');
+      });
+
+      if (!res || !res.url) {
+        throw new Error('Upload succeeded without valid file reference.');
+      }
+
+      const storagePath = res.storagePath || `examination_materials/${draftCompId}/${res.fileName}`;
+
       setFormData(prev => ({
         ...prev,
         pdfReadingMaterialUrl: res.url,
         pdfFileName: res.fileName,
         pdfFileSizeBytes: res.sizeBytes,
-        pdfSourceType: 'upload'
+        pdfSourceType: 'upload',
+        pdfStoragePath: storagePath
       }));
+
+      // If editing an existing competition, immediately update the record in Firestore
+      if (isEditing && initialCompetition?.id) {
+        try {
+          await updateDoc(doc(db, 'competitions', initialCompetition.id), {
+            pdfReadingMaterialUrl: res.url,
+            pdfFileName: res.fileName,
+            pdfFileSizeBytes: res.sizeBytes,
+            pdfSourceType: 'upload',
+            pdfStoragePath: storagePath,
+            'bookDetails.pdfReadingMaterialUrl': res.url,
+            'bookDetails.pdfFileName': res.fileName,
+            'bookDetails.pdfFileSizeBytes': res.sizeBytes,
+            'bookDetails.pdfSourceType': 'upload',
+            'bookDetails.pdfStoragePath': storagePath,
+            updatedAt: new Date().toISOString()
+          });
+        } catch (dbErr) {
+          console.warn('Notice saving immediate PDF reference to Firestore:', dbErr);
+        }
+      }
+
+      setUploadStage('completed');
+      setSelectedPdfFile(null);
+      setSubmitError(null);
     } catch (err: any) {
       setPdfUploadError(err?.message || 'Failed to upload PDF.');
+      setUploadStage('error');
     } finally {
       setIsUploadingPdf(false);
     }
@@ -2310,25 +2477,87 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.title.trim()) return;
+    if (isSubmitting || isUploadingPdf) return;
+    setSubmitError(null);
 
-    // RBAC Security Check: Super Admin can edit ANY competition schedule.
-    // An Exam Controller can only edit their own created examination schedule.
+    if (!formData.title.trim()) {
+      setSubmitError('Competition title is required.');
+      return;
+    }
+
+    if (!formData.description.trim()) {
+      setSubmitError('Competition description is required.');
+      return;
+    }
+
+    if (!formData.examScheduleDate) {
+      setSubmitError('Official examination date is required.');
+      return;
+    }
+
+    // RBAC Security Check: Super Admin and Exam Controllers have management authority
     const isCreator = Boolean(initialCompetition?.createdByUid && currentUser?.uid && initialCompetition.createdByUid === currentUser.uid);
-    if (isEditing && !isSuperAdmin && !isCreator) {
-      alert('RBAC Access Denied: You do not have permission to modify another controller\'s examination schedule.');
+    const hasControllerAuthority = isSuperAdmin || 
+      userProfile?.role === 'exam_controller' || 
+      userProfile?.role === 'exam_admin' || 
+      userProfile?.roles?.includes('exam_controller') || 
+      userProfile?.roles?.includes('exam_admin') || 
+      userProfile?.primaryRole === 'exam_controller';
+
+    if (isEditing && !isSuperAdmin && !isCreator && !hasControllerAuthority) {
+      setSubmitError('RBAC Access Denied: You do not have permission to modify another controller\'s examination schedule.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const compId = initialCompetition?.id || `cmp-${Date.now()}`;
+      const compId = draftCompId;
+
+      let resolvedPdfUrl = formData.pdfSourceType === 'external_url' ? formData.pdfExternalUrl.trim() : formData.pdfReadingMaterialUrl;
+      let resolvedFileName = formData.pdfFileName;
+      let resolvedSizeBytes = formData.pdfFileSizeBytes;
+      let resolvedStoragePath = formData.pdfStoragePath;
+
+      // Auto-upload selected PDF file if user clicked submit without clicking 'Start Official Upload' separately
+      if (selectedPdfFile && formData.pdfSourceType === 'upload' && (!resolvedPdfUrl || uploadStage === 'selected')) {
+        setIsUploadingPdf(true);
+        setUploadStage('uploading');
+        setPdfUploadProgress(15);
+        try {
+          const res = await uploadExamPdfMaterial(selectedPdfFile, compId, (pct) => {
+            setPdfUploadProgress(pct);
+            if (pct >= 88) setUploadStage('finalizing');
+          });
+          resolvedPdfUrl = res.url;
+          resolvedFileName = res.fileName;
+          resolvedSizeBytes = res.sizeBytes;
+          resolvedStoragePath = res.storagePath;
+          setFormData(prev => ({
+            ...prev,
+            pdfReadingMaterialUrl: res.url,
+            pdfFileName: res.fileName,
+            pdfFileSizeBytes: res.sizeBytes,
+            pdfStoragePath: res.storagePath
+          }));
+          setUploadStage('completed');
+          setSelectedPdfFile(null);
+        } catch (uploadErr: any) {
+          setIsUploadingPdf(false);
+          setUploadStage('error');
+          setPdfUploadError(uploadErr?.message || 'Failed to upload examination PDF.');
+          setSubmitError(uploadErr?.message || 'Failed to upload examination PDF.');
+          return;
+        } finally {
+          setIsUploadingPdf(false);
+        }
+      }
+
       const prizesList = formData.prizesSummary.split(',').map(s => s.trim()).filter(Boolean);
 
       const compData: Competition = {
         ...(initialCompetition || {}),
         id: compId,
-        code: formData.code,
+        code: formData.code.trim(),
         title: formData.title.trim(),
         category: formData.category,
         categoryLabel: formData.category === 'book_reading' ? 'Book Reading Competition' : formData.category === 'stem_olympiad' ? 'STEM & Science Olympiad' : 'Academic Assessment',
@@ -2362,20 +2591,22 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
           'All answers must be the original, independent work of the candidate.'
         ],
         coverImageUrl: formData.coverImageUrl,
-        bookDetails: (formData.category === 'book_reading' || Boolean(formData.pdfReadingMaterialUrl || formData.pdfExternalUrl || formData.bookTitle)) ? {
-          bookTitle: formData.bookTitle,
-          author: formData.author,
-          requiredChapters: formData.requiredChapters,
-          pdfReadingMaterialUrl: formData.pdfSourceType === 'external_url' ? formData.pdfExternalUrl : formData.pdfReadingMaterialUrl,
-          pdfFileName: formData.pdfFileName,
-          pdfFileSizeBytes: formData.pdfFileSizeBytes,
+        bookDetails: (formData.category === 'book_reading' || Boolean(resolvedPdfUrl || formData.bookTitle)) ? {
+          bookTitle: formData.bookTitle.trim(),
+          author: formData.author.trim(),
+          requiredChapters: formData.requiredChapters.trim(),
+          pdfReadingMaterialUrl: resolvedPdfUrl,
+          pdfFileName: resolvedFileName || formData.pdfFileName,
+          pdfFileSizeBytes: resolvedSizeBytes || formData.pdfFileSizeBytes,
           pdfSourceType: formData.pdfSourceType,
-          pdfExternalUrl: formData.pdfExternalUrl
+          pdfExternalUrl: formData.pdfExternalUrl.trim(),
+          pdfStoragePath: resolvedStoragePath || formData.pdfStoragePath
         } : undefined,
-        pdfReadingMaterialUrl: formData.pdfSourceType === 'external_url' ? formData.pdfExternalUrl : formData.pdfReadingMaterialUrl,
-        pdfFileName: formData.pdfFileName,
-        pdfFileSizeBytes: formData.pdfFileSizeBytes,
+        pdfReadingMaterialUrl: resolvedPdfUrl,
+        pdfFileName: resolvedFileName || formData.pdfFileName,
+        pdfFileSizeBytes: resolvedSizeBytes || formData.pdfFileSizeBytes,
         pdfSourceType: formData.pdfSourceType,
+        pdfStoragePath: resolvedStoragePath || formData.pdfStoragePath,
         examDetails: {
           ...(initialCompetition?.examDetails || {}),
           isOnlineExam: formData.isOnlineExam,
@@ -2407,23 +2638,38 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
         createdByUid: initialCompetition?.createdByUid || currentUser?.uid || 'admin',
         createdByEmail: initialCompetition?.createdByEmail || currentUser?.email || 'admin@fetindia.com',
         createdAt: initialCompetition?.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        // Test vs Live environment separation
+        isTestCompetition: Boolean(formData.isTestCompetition),
+        environment: formData.isTestCompetition ? 'test' : 'live'
       };
 
-      await setDoc(doc(db, 'competitions', compId), compData, { merge: true });
+      const cleanedComp = cleanFirestoreData(compData);
+      await setDoc(doc(db, 'competitions', compId), cleanedComp, { merge: true });
 
-      // Audit Log
-      await addDoc(collection(db, 'audit_logs'), {
-        action: isEditing ? 'COMPETITION_UPDATED' : 'COMPETITION_CREATED',
-        userId: currentUser?.uid || 'admin',
-        userEmail: currentUser?.email || 'admin@fetindia.com',
-        details: `${isEditing ? 'Updated' : 'Created'} competition: ${compData.title} (${compData.code})`,
-        timestamp: new Date().toISOString()
-      });
+      // Confirm that the saved competition record can be retrieved
+      const verifySnap = await getDoc(doc(db, 'competitions', compId));
+      if (!verifySnap.exists()) {
+        throw new Error('Verification failed: Saved competition record could not be confirmed in the database.');
+      }
+
+      // Non-blocking audit log
+      try {
+        await addDoc(collection(db, 'audit_logs'), cleanFirestoreData({
+          action: isEditing ? 'COMPETITION_UPDATED' : 'COMPETITION_CREATED',
+          userId: currentUser?.uid || 'admin',
+          userEmail: currentUser?.email || 'admin@fetindia.com',
+          details: `${isEditing ? 'Updated' : 'Created'} competition: ${compData.title} (${compData.code})`,
+          timestamp: new Date().toISOString()
+        }));
+      } catch (auditErr) {
+        console.warn('Non-blocking audit log notice:', auditErr);
+      }
 
       onSuccess(compData);
     } catch (err: any) {
       console.error('Error saving competition:', err);
+      setSubmitError(err?.message || 'Failed to save competition. Please verify inputs and permissions, and try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -2574,26 +2820,129 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
                 </div>
 
                 {formData.pdfSourceType === 'upload' ? (
-                  <div>
+                  <div className="space-y-2.5">
                     <input
                       ref={pdfFileInputRef}
                       type="file"
                       accept=".pdf,application/pdf"
-                      onChange={handlePdfFileUpload}
+                      onChange={handlePdfFileSelected}
                       className="hidden"
                     />
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => pdfFileInputRef.current?.click()}
-                        disabled={isUploadingPdf}
-                        className="px-3 py-2 bg-white hover:bg-amber-100 border border-amber-300 rounded-xl text-xs font-bold text-amber-900 flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
-                      >
-                        <Paperclip className="w-3.5 h-3.5" />
-                        <span>{isUploadingPdf ? `Uploading (${pdfUploadProgress}%)...` : 'Select PDF to Upload'}</span>
-                      </button>
-                      <span className="text-[11px] text-slate-500">PDF up to 25 MB supported</span>
-                    </div>
+
+                    {/* Stage 1: Selected File Preview prior to upload */}
+                    {uploadStage === 'selected' && selectedPdfFile && (
+                      <div className="p-3 bg-amber-50 rounded-2xl border border-amber-300 space-y-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <FileText className="w-4 h-4 text-amber-700 shrink-0" />
+                            <div className="truncate">
+                              <span className="font-bold text-slate-900 block truncate text-xs">
+                                {selectedPdfFile.name}
+                              </span>
+                              <span className="text-[10px] text-amber-800 font-semibold">
+                                Size: {(selectedPdfFile.size / (1024 * 1024)).toFixed(2)} MB • PDF Validated
+                              </span>
+                            </div>
+                          </div>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-200 text-amber-900 shrink-0">
+                            Ready to Upload
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 pt-1 border-t border-amber-200/80">
+                          <button
+                            type="button"
+                            onClick={handleStartPdfUpload}
+                            disabled={isUploadingPdf}
+                            className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                          >
+                            <Paperclip className="w-3.5 h-3.5" />
+                            <span>Start Official Upload</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedPdfFile(null);
+                              setUploadStage(formData.pdfReadingMaterialUrl ? 'completed' : 'idle');
+                              if (pdfFileInputRef.current) pdfFileInputRef.current.value = '';
+                            }}
+                            className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-semibold cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Stage 2 & 3: Uploading or Finalizing Progress Bar */}
+                    {(uploadStage === 'uploading' || uploadStage === 'finalizing') && (
+                      <div className="p-3 bg-amber-50/90 rounded-2xl border border-amber-300 space-y-2">
+                        <div className="flex items-center justify-between text-xs font-bold text-amber-950">
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-3.5 h-3.5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin"></span>
+                            <span>{uploadStage === 'finalizing' ? 'Finalizing & Verifying File Reference...' : `Uploading Official Document (${pdfUploadProgress}%)...`}</span>
+                          </span>
+                          <span>{pdfUploadProgress}%</span>
+                        </div>
+                        <div className="w-full bg-amber-200/80 rounded-full h-2 overflow-hidden">
+                          <div 
+                            className="bg-amber-600 h-2 rounded-full transition-all duration-200 ease-out"
+                            style={{ width: `${pdfUploadProgress}%` }}
+                          ></div>
+                        </div>
+                        <p className="text-[10px] text-amber-800">
+                          Streaming directly to secure storage. Do not close this modal.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Stage 4: Idle State with File Chooser */}
+                    {uploadStage === 'idle' && !formData.pdfReadingMaterialUrl && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => pdfFileInputRef.current?.click()}
+                          disabled={isUploadingPdf}
+                          className="px-3 py-2 bg-white hover:bg-amber-100 border border-amber-300 rounded-xl text-xs font-bold text-amber-900 flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                        >
+                          <Paperclip className="w-3.5 h-3.5" />
+                          <span>Select Official PDF / Book</span>
+                        </button>
+                        <span className="text-[11px] text-slate-500">Official PDF up to 25 MB supported</span>
+                      </div>
+                    )}
+
+                    {/* Stage 5: Error State with Immediate Retry */}
+                    {uploadStage === 'error' && (
+                      <div className="p-3 bg-rose-50 rounded-2xl border border-rose-300 space-y-2">
+                        <div className="flex items-center gap-1.5 text-xs text-rose-700 font-bold">
+                          <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                          <span>{pdfUploadError || 'Failed to upload official PDF document.'}</span>
+                        </div>
+                        <div className="flex items-center gap-2 pt-1 border-t border-rose-200">
+                          {selectedPdfFile && (
+                            <button
+                              type="button"
+                              onClick={handleStartPdfUpload}
+                              className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-xs"
+                            >
+                              <span>Retry Upload</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedPdfFile(null);
+                              setPdfUploadError(null);
+                              setUploadStage(formData.pdfReadingMaterialUrl ? 'completed' : 'idle');
+                              pdfFileInputRef.current?.click();
+                            }}
+                            className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-semibold cursor-pointer"
+                          >
+                            Choose Different File
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div>
@@ -2612,54 +2961,80 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
                   </div>
                 )}
 
-                {/* Attached PDF Display */}
+                {/* Attached & Verified PDF Display (Supports Retaining or Replacing during edits) */}
                 {(formData.pdfReadingMaterialUrl || formData.pdfExternalUrl) && (
-                  <div className="p-2.5 bg-white rounded-xl border border-emerald-300 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <FileText className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <div className="p-3 bg-emerald-50/90 rounded-2xl border border-emerald-300 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                        <FileText className="w-4 h-4" />
+                      </div>
                       <div className="truncate">
                         <span className="font-bold text-slate-900 block truncate">
                           {formData.pdfFileName || 'Attached_Curriculum_Material.pdf'}
                         </span>
-                        <span className="text-[10px] text-emerald-700 font-semibold">
-                          {formData.pdfFileSizeBytes ? `${(formData.pdfFileSizeBytes / (1024 * 1024)).toFixed(2)} MB • ` : ''}
-                          {formData.pdfSourceType === 'external_url' ? 'External PDF Link' : 'Cloud Storage Verified'}
-                        </span>
+                        <div className="flex items-center gap-2 text-[10px] text-emerald-800 font-semibold">
+                          <span>✓ Verified Official Document</span>
+                          {formData.pdfFileSizeBytes ? (
+                            <span>• {(formData.pdfFileSizeBytes / (1024 * 1024)).toFixed(2)} MB</span>
+                          ) : null}
+                          <span>• {formData.pdfSourceType === 'external_url' ? 'External URL' : 'Storage Linked'}</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <a
-                        href={formData.pdfSourceType === 'external_url' ? formData.pdfExternalUrl : formData.pdfReadingMaterialUrl}
+                        href={
+                          formData.pdfSourceType === 'external_url'
+                            ? formData.pdfExternalUrl
+                            : (formData.pdfReadingMaterialUrl?.startsWith('/api/')
+                                ? `${formData.pdfReadingMaterialUrl}?uid=${encodeURIComponent(currentUser?.uid || 'super_admin')}`
+                                : formData.pdfReadingMaterialUrl)
+                        }
                         target="_blank"
                         rel="noreferrer"
-                        className="p-1.5 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg"
-                        title="Preview PDF"
+                        className="px-2.5 py-1.5 text-emerald-800 hover:text-emerald-950 hover:bg-emerald-100 rounded-xl font-bold flex items-center gap-1 transition"
+                        title="Preview PDF Document"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Preview</span>
                       </a>
+                      {formData.pdfSourceType === 'upload' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (pdfFileInputRef.current) {
+                              pdfFileInputRef.current.value = '';
+                              pdfFileInputRef.current.click();
+                            }
+                          }}
+                          className="px-2.5 py-1.5 text-amber-800 hover:text-amber-950 hover:bg-amber-100 rounded-xl font-bold flex items-center gap-1 transition cursor-pointer"
+                          title="Replace Document"
+                        >
+                          <Paperclip className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Replace</span>
+                        </button>
+                      )}
                       <button
                         type="button"
-                        onClick={() => setFormData({
-                          ...formData,
-                          pdfReadingMaterialUrl: '',
-                          pdfFileName: '',
-                          pdfFileSizeBytes: 0,
-                          pdfExternalUrl: ''
-                        })}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            pdfReadingMaterialUrl: '',
+                            pdfFileName: '',
+                            pdfFileSizeBytes: 0,
+                            pdfExternalUrl: '',
+                            pdfStoragePath: ''
+                          });
+                          setUploadStage('idle');
+                          setSelectedPdfFile(null);
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl cursor-pointer"
                         title="Remove Attached PDF"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
-                )}
-
-                {pdfUploadError && (
-                  <p className="text-xs text-rose-600 font-semibold flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5" />
-                    <span>{pdfUploadError}</span>
-                  </p>
                 )}
               </div>
             </div>
@@ -2976,7 +3351,50 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
               </div>
             </div>
 
+            {/* Test vs Live Sandbox Separation */}
+            <div className="sm:col-span-2 p-3.5 bg-amber-50/60 rounded-2xl border border-amber-200 space-y-2">
+              <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700 select-none">
+                <input
+                  type="checkbox"
+                  checked={Boolean(formData.isTestCompetition)}
+                  onChange={(e) => setFormData({ 
+                    ...formData, 
+                    isTestCompetition: e.target.checked,
+                    environment: e.target.checked ? 'test' : 'live'
+                  })}
+                  className="mt-0.5 w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300"
+                />
+                <div>
+                  <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                    <span>Mark as Test / Sandbox Examination</span>
+                    <span className="px-2 py-0.2 rounded text-[10px] font-black bg-amber-500 text-white uppercase tracking-wider">
+                      Sandbox
+                    </span>
+                  </span>
+                  <span className="text-[11px] text-slate-600 block mt-0.5">
+                    Quarantines this examination from public candidate registration and keeps sample test candidate filings, attempts, and certificates strictly separate from official live examination records.
+                  </span>
+                </div>
+              </label>
+            </div>
+
           </div>
+
+          {submitError && (
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span className="font-semibold">{submitError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSubmitError(null)}
+                className="text-rose-600 hover:text-rose-900 font-bold text-xs"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           <div className="flex justify-between items-center pt-4 border-t border-slate-200 flex-wrap gap-2">
             <div>
@@ -3002,10 +3420,24 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="px-5 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl font-bold cursor-pointer text-xs shadow-xs"
+                disabled={isSubmitting || isUploadingPdf}
+                className="px-5 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl font-bold cursor-pointer text-xs shadow-xs disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                {isSubmitting ? 'Saving Program...' : isEditing ? 'Save Changes & Prizes' : 'Create Competition'}
+                {isSubmitting ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    <span>Saving Program...</span>
+                  </>
+                ) : isUploadingPdf ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    <span>Uploading PDF...</span>
+                  </>
+                ) : isEditing ? (
+                  'Save Changes & Prizes'
+                ) : (
+                  'Create Competition'
+                )}
               </button>
             </div>
           </div>

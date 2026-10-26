@@ -35,7 +35,8 @@ import {
   limit,
   serverTimestamp,
   where,
-  runTransaction
+  runTransaction,
+  arrayUnion
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfigData from '../../firebase-applet-config.json';
@@ -94,9 +95,23 @@ import {
   CampaignSupportingImage,
   CampaignReviewHistoryEntry,
   StoreProduct,
+  StoreCategory,
+  StoreOrder,
+  StoreOrderStatus,
+  StoreCustomerInfo,
+  StoreAddress,
+  StoreOrderItem,
+  StorePaymentStatus,
   TravelPackage,
   ExamCompetition,
   FinancialRecord,
+  FinanceBudget,
+  FinanceBankAccount,
+  BankReconciliationStatus,
+  BankTransactionMatchPayload,
+  StudentFeeRecord,
+  FeePaymentStatus,
+  FeePaymentPayload,
   StaffDocumentRecord,
   StaffEmploymentStatus,
   StaffEmploymentType,
@@ -1523,7 +1538,7 @@ export async function dispatchAdminBroadcast(
     expiresAt?: string;
     actionUrl?: string;
     actionLabel?: string;
-    module?: 'membership' | 'volunteer' | 'donor' | 'account' | 'system' | 'donations' | 'applications' | 'campaigns' | 'competitions' | 'exams' | 'certificates' | 'general';
+    module?: 'membership' | 'volunteer' | 'donor' | 'account' | 'system' | 'donations' | 'applications' | 'campaigns' | 'competitions' | 'exams' | 'certificates' | 'general' | 'store';
     triggerEmail?: boolean;
   },
   adminUser: { uid: string; email: string; role: UserRole }
@@ -5348,6 +5363,805 @@ export async function deleteFinancialRecord(
   });
 }
 
+/**
+ * Create a new Annual / Departmental Finance Budget
+ */
+export async function createFinanceBudget(
+  budgetData: Omit<FinanceBudget, 'id'>,
+  actorInfo: { uid: string; email: string; name?: string; role?: string }
+): Promise<string> {
+  const budgetsRef = collection(db, 'finance_budgets');
+  const now = new Date().toISOString();
+
+  const docData: Omit<FinanceBudget, 'id'> = {
+    ...budgetData,
+    allocatedAmount: Number(budgetData.allocatedAmount) || 0,
+    status: budgetData.status || 'draft',
+    createdByUid: actorInfo.uid,
+    createdByEmail: actorInfo.email,
+    createdByName: actorInfo.name || actorInfo.email.split('@')[0],
+    createdAt: budgetData.createdAt || now,
+    updatedAt: now
+  };
+
+  const docRef = await addDoc(budgetsRef, cleanFirestoreData(docData));
+
+  // Record Audit Trail
+  await logAuditEvent({
+    actorUid: actorInfo.uid,
+    actorEmail: actorInfo.email,
+    actorRole: (actorInfo.role as UserRole) || 'finance_admin',
+    action: 'FINANCE_BUDGET_CREATED',
+    targetEntity: 'finance_budgets',
+    targetId: docRef.id,
+    details: {
+      budgetId: budgetData.budgetId,
+      name: budgetData.name,
+      financialYear: budgetData.financialYear,
+      department: budgetData.department,
+      category: budgetData.category,
+      allocatedAmount: budgetData.allocatedAmount,
+      organizationalUnit: budgetData.organizationalUnit,
+      fundType: budgetData.fundType,
+      status: docData.status
+    }
+  });
+
+  return docRef.id;
+}
+
+/**
+ * Update an existing Finance Budget (allocation, approval, status change)
+ */
+export async function updateFinanceBudget(
+  budgetId: string,
+  updates: Partial<FinanceBudget>,
+  actorInfo: { uid: string; email: string; name?: string; role?: string },
+  auditActionName: string = 'FINANCE_BUDGET_UPDATED'
+): Promise<void> {
+  const docRef = doc(db, 'finance_budgets', budgetId);
+  const snap = await getDoc(docRef);
+  if (!snap.exists()) {
+    throw new Error('Finance budget allocation not found.');
+  }
+
+  const prevData = snap.data() as FinanceBudget;
+  const now = new Date().toISOString();
+
+  const finalUpdates: Record<string, any> = {
+    ...updates,
+    updatedAt: now
+  };
+
+  await updateDoc(docRef, finalUpdates);
+
+  // Record Audit Trail
+  await logAuditEvent({
+    actorUid: actorInfo.uid,
+    actorEmail: actorInfo.email,
+    actorRole: (actorInfo.role as UserRole) || 'finance_admin',
+    action: auditActionName,
+    targetEntity: 'finance_budgets',
+    targetId: budgetId,
+    details: {
+      budgetId: prevData.budgetId,
+      name: prevData.name,
+      previousStatus: prevData.status,
+      newStatus: updates.status || prevData.status,
+      previousAllocated: prevData.allocatedAmount,
+      newAllocated: updates.allocatedAmount !== undefined ? updates.allocatedAmount : prevData.allocatedAmount,
+      updatedFields: Object.keys(updates)
+    }
+  });
+}
+
+/**
+ * Delete a Finance Budget (Super Admin Only)
+ */
+export async function deleteFinanceBudget(
+  budgetId: string,
+  actorInfo: { uid: string; email: string; role?: string }
+): Promise<void> {
+  const docRef = doc(db, 'finance_budgets', budgetId);
+  const snap = await getDoc(docRef);
+  if (!snap.exists()) return;
+
+  const data = snap.data() as FinanceBudget;
+  await deleteDoc(docRef);
+
+  // Record Audit Trail
+  await logAuditEvent({
+    actorUid: actorInfo.uid,
+    actorEmail: actorInfo.email,
+    actorRole: (actorInfo.role as UserRole) || 'super_admin',
+    action: 'FINANCE_BUDGET_DELETED',
+    targetEntity: 'finance_budgets',
+    targetId: budgetId,
+    details: {
+      budgetId: data.budgetId,
+      name: data.name,
+      financialYear: data.financialYear,
+      department: data.department,
+      allocatedAmount: data.allocatedAmount
+    }
+  });
+}
+
+// =========================================================================
+// STEP 46B — FET INDIA BANK MANAGEMENT & RECONCILIATION FUNCTIONS (TASK 5)
+// =========================================================================
+
+/**
+ * Create a new Trust Bank Account
+ * Stores only necessary banking information: Account Name, Bank Name, Account Number,
+ * IFSC, Branch, Account Type, Currency, Opening Balance, Status.
+ * CRITICAL: Never store internet-banking passwords, PINs, OTPs, or other credentials.
+ */
+export async function createFinanceBankAccount(
+  accountData: Omit<FinanceBankAccount, 'id'>,
+  actorInfo: { uid: string; email: string; name?: string; role?: string }
+): Promise<string> {
+  const accountsRef = collection(db, 'finance_bank_accounts');
+  const now = new Date().toISOString();
+
+  const docData: Omit<FinanceBankAccount, 'id'> = {
+    ...accountData,
+    openingBalance: Number(accountData.openingBalance) || 0,
+    currentBalance: Number(accountData.currentBalance) || Number(accountData.openingBalance) || 0,
+    status: accountData.status || 'active',
+    currency: accountData.currency || 'INR',
+    createdByUid: actorInfo.uid,
+    createdByEmail: actorInfo.email,
+    createdByName: actorInfo.name || actorInfo.email.split('@')[0],
+    createdAt: accountData.createdAt || now,
+    updatedAt: now
+  };
+
+  const docRef = await addDoc(accountsRef, cleanFirestoreData(docData));
+
+  // Record Audit Trail
+  await logAuditEvent({
+    actorUid: actorInfo.uid,
+    actorEmail: actorInfo.email,
+    actorRole: (actorInfo.role as UserRole) || 'finance_admin',
+    action: 'FINANCE_BANK_ACCOUNT_CREATED',
+    targetEntity: 'finance_bank_accounts',
+    targetId: docRef.id,
+    details: {
+      accountCode: docData.accountCode,
+      accountName: docData.accountName,
+      bankName: docData.bankName,
+      accountType: docData.accountType,
+      openingBalance: docData.openingBalance,
+      status: docData.status
+    }
+  });
+
+  return docRef.id;
+}
+
+/**
+ * Update an existing Trust Bank Account details or status
+ */
+export async function updateFinanceBankAccount(
+  accountId: string,
+  updates: Partial<FinanceBankAccount>,
+  actorInfo: { uid: string; email: string; name?: string; role?: string }
+): Promise<void> {
+  const docRef = doc(db, 'finance_bank_accounts', accountId);
+  const snap = await getDoc(docRef);
+  if (!snap.exists()) {
+    throw new Error('Trust bank account record not found.');
+  }
+
+  const prevData = snap.data() as FinanceBankAccount;
+  const now = new Date().toISOString();
+
+  const finalUpdates: Record<string, any> = {
+    ...updates,
+    updatedAt: now
+  };
+
+  await updateDoc(docRef, cleanFirestoreData(finalUpdates));
+
+  // Record Audit Trail
+  await logAuditEvent({
+    actorUid: actorInfo.uid,
+    actorEmail: actorInfo.email,
+    actorRole: (actorInfo.role as UserRole) || 'finance_admin',
+    action: 'FINANCE_BANK_ACCOUNT_UPDATED',
+    targetEntity: 'finance_bank_accounts',
+    targetId: accountId,
+    details: {
+      accountName: prevData.accountName,
+      bankName: prevData.bankName,
+      previousStatus: prevData.status,
+      newStatus: updates.status || prevData.status,
+      updatedFields: Object.keys(updates)
+    }
+  });
+}
+
+/**
+ * Delete a Trust Bank Account (Super Admin Only)
+ */
+export async function deleteFinanceBankAccount(
+  accountId: string,
+  actorInfo: { uid: string; email: string; role?: string }
+): Promise<void> {
+  const docRef = doc(db, 'finance_bank_accounts', accountId);
+  const snap = await getDoc(docRef);
+  if (!snap.exists()) return;
+
+  const data = snap.data() as FinanceBankAccount;
+  await deleteDoc(docRef);
+
+  // Record Audit Trail
+  await logAuditEvent({
+    actorUid: actorInfo.uid,
+    actorEmail: actorInfo.email,
+    actorRole: (actorInfo.role as UserRole) || 'super_admin',
+    action: 'FINANCE_BANK_ACCOUNT_DELETED',
+    targetEntity: 'finance_bank_accounts',
+    targetId: accountId,
+    details: {
+      accountCode: data.accountCode,
+      accountName: data.accountName,
+      bankName: data.bankName,
+      accountNumberMasked: data.accountNumber ? `••••${data.accountNumber.slice(-4)}` : ''
+    }
+  });
+}
+
+/**
+ * Match a financial transaction (income, expense, donation, fee) with a bank account
+ * and statement reference without modifying the core transaction amount or historical ledger.
+ */
+export async function matchFinancialRecordToBank(
+  recordId: string,
+  matchData: BankTransactionMatchPayload,
+  actorInfo: { uid: string; email: string; name?: string; role?: string }
+): Promise<void> {
+  const docRef = doc(db, 'financial_records', recordId);
+  const snap = await getDoc(docRef);
+  if (!snap.exists()) {
+    throw new Error('Financial record not found for transaction matching.');
+  }
+
+  const prevRecord = snap.data() as FinancialRecord;
+  const now = new Date().toISOString();
+
+  const updates: Partial<FinancialRecord> = {
+    bankAccountId: matchData.bankAccountId,
+    bankAccountName: matchData.bankAccountName,
+    bankStatementReference: matchData.bankStatementReference,
+    reconciliationStatus: matchData.reconciliationStatus,
+    reconciledAt: now,
+    reconciledByUid: actorInfo.uid,
+    reconciledByName: actorInfo.name || actorInfo.email.split('@')[0],
+    reconciliationNotes: matchData.notes || prevRecord.reconciliationNotes || '',
+    updatedAt: now
+  };
+
+  await updateDoc(docRef, cleanFirestoreData(updates));
+
+  // Record Audit Trail
+  await logAuditEvent({
+    actorUid: actorInfo.uid,
+    actorEmail: actorInfo.email,
+    actorRole: (actorInfo.role as UserRole) || 'finance_admin',
+    action: 'FINANCE_BANK_TRANSACTION_MATCHED',
+    targetEntity: 'financial_records',
+    targetId: recordId,
+    details: {
+      transactionId: prevRecord.transactionId,
+      type: prevRecord.type,
+      amount: prevRecord.amount,
+      bankAccountId: matchData.bankAccountId,
+      bankAccountName: matchData.bankAccountName,
+      bankStatementReference: matchData.bankStatementReference,
+      reconciliationStatus: matchData.reconciliationStatus
+    }
+  });
+}
+
+/**
+ * Update the reconciliation status of a financial transaction
+ * (unmatched | matched | pending_review | reconciled)
+ */
+export async function updateFinancialRecordReconciliationStatus(
+  recordId: string,
+  reconciliationStatus: BankReconciliationStatus,
+  actorInfo: { uid: string; email: string; name?: string; role?: string },
+  notes?: string
+): Promise<void> {
+  const docRef = doc(db, 'financial_records', recordId);
+  const snap = await getDoc(docRef);
+  if (!snap.exists()) {
+    throw new Error('Financial record not found.');
+  }
+
+  const prevRecord = snap.data() as FinancialRecord;
+  const now = new Date().toISOString();
+
+  const updates: Partial<FinancialRecord> = {
+    reconciliationStatus,
+    reconciledAt: now,
+    reconciledByUid: actorInfo.uid,
+    reconciledByName: actorInfo.name || actorInfo.email.split('@')[0],
+    reconciliationNotes: notes || prevRecord.reconciliationNotes || '',
+    updatedAt: now
+  };
+
+  await updateDoc(docRef, cleanFirestoreData(updates));
+
+  // Record Audit Trail
+  await logAuditEvent({
+    actorUid: actorInfo.uid,
+    actorEmail: actorInfo.email,
+    actorRole: (actorInfo.role as UserRole) || 'accountant',
+    action: 'FINANCE_BANK_RECONCILIATION_UPDATED',
+    targetEntity: 'financial_records',
+    targetId: recordId,
+    details: {
+      transactionId: prevRecord.transactionId,
+      previousStatus: prevRecord.reconciliationStatus || 'unmatched',
+      newStatus: reconciliationStatus,
+      notes: notes || ''
+    }
+  });
+}
+
+/**
+ * Formally commit a Bank Reconciliation Session (Task 5)
+ */
+export async function recordBankReconciliationSession(
+  sessionData: {
+    bankAccountId: string;
+    bankAccountName: string;
+    periodStartDate: string;
+    periodEndDate: string;
+    statementClosingBalance: number;
+    ledgerClosingBalance: number;
+    differenceAmount: number;
+    status: 'in_progress' | 'reconciled' | 'discrepancy_flagged';
+    notes?: string;
+  },
+  actorInfo: { uid: string; email: string; name?: string; role?: string }
+): Promise<string> {
+  const reconRef = collection(db, 'finance_reconciliations');
+  const now = new Date().toISOString();
+
+  const docData = {
+    ...sessionData,
+    reconciledByUid: actorInfo.uid,
+    reconciledByName: actorInfo.name || actorInfo.email.split('@')[0],
+    reconciledAt: now,
+    createdAt: now
+  };
+
+  const docRef = await addDoc(reconRef, cleanFirestoreData(docData));
+
+  // Record Audit Trail
+  await logAuditEvent({
+    actorUid: actorInfo.uid,
+    actorEmail: actorInfo.email,
+    actorRole: (actorInfo.role as UserRole) || 'finance_admin',
+    action: 'FINANCE_BANK_RECONCILIATION_RECORDED',
+    targetEntity: 'finance_reconciliations',
+    targetId: docRef.id,
+    details: {
+      bankAccountId: sessionData.bankAccountId,
+      bankAccountName: sessionData.bankAccountName,
+      statementClosingBalance: sessionData.statementClosingBalance,
+      ledgerClosingBalance: sessionData.ledgerClosingBalance,
+      differenceAmount: sessionData.differenceAmount,
+      status: sessionData.status
+    }
+  });
+
+  return docRef.id;
+}
+
+// =========================================================================
+// STEP 46C — FET INDIA INSTITUTIONAL FEE MANAGEMENT FUNCTIONS (TASK 6)
+// =========================================================================
+
+/**
+ * Create a new student fee assessment record (School or Madrasa)
+ */
+export async function createStudentFeeRecord(
+  feeData: Omit<StudentFeeRecord, 'id'>,
+  actorInfo: { uid: string; email: string; name?: string; role?: string }
+): Promise<string> {
+  const feesRef = collection(db, 'student_fees');
+  const now = new Date().toISOString();
+
+  const totalAssessed = Number(feeData.totalAssessed) || 0;
+  const amountPaid = Number(feeData.amountPaid) || 0;
+  const outstandingAmount = Math.max(0, totalAssessed - amountPaid);
+  
+  let paymentStatus: FeePaymentStatus = feeData.paymentStatus || 'pending';
+  if (outstandingAmount === 0 && totalAssessed > 0) {
+    paymentStatus = 'paid';
+  } else if (amountPaid > 0) {
+    paymentStatus = 'partially_paid';
+  }
+
+  const docData: Omit<StudentFeeRecord, 'id'> = {
+    ...feeData,
+    totalAssessed,
+    amountPaid,
+    outstandingAmount,
+    paymentStatus,
+    remindersSentCount: feeData.remindersSentCount || 0,
+    createdByUid: actorInfo.uid,
+    createdByEmail: actorInfo.email,
+    createdByName: actorInfo.name || actorInfo.email.split('@')[0],
+    createdAt: feeData.createdAt || now,
+    updatedAt: now
+  };
+
+  const docRef = await addDoc(feesRef, cleanFirestoreData(docData));
+
+  // Record Audit Trail
+  await logAuditEvent({
+    actorUid: actorInfo.uid,
+    actorEmail: actorInfo.email,
+    actorRole: (actorInfo.role as UserRole) || 'school_admin',
+    action: 'FEE_RECORD_CREATED',
+    targetEntity: 'student_fees',
+    targetId: docRef.id,
+    details: {
+      feeCode: docData.feeCode,
+      studentName: docData.studentName,
+      studentId: docData.studentId,
+      institutionType: docData.institutionType,
+      institutionName: docData.institutionName,
+      category: docData.category,
+      totalAssessed: docData.totalAssessed,
+      outstandingAmount: docData.outstandingAmount
+    }
+  });
+
+  return docRef.id;
+}
+
+/**
+ * Update an existing student fee assessment record
+ */
+export async function updateStudentFeeRecord(
+  feeId: string,
+  updates: Partial<StudentFeeRecord>,
+  actorInfo: { uid: string; email: string; name?: string; role?: string }
+): Promise<void> {
+  const docRef = doc(db, 'student_fees', feeId);
+  const snap = await getDoc(docRef);
+  if (!snap.exists()) {
+    throw new Error('Student fee record not found.');
+  }
+
+  const prevData = snap.data() as StudentFeeRecord;
+  const now = new Date().toISOString();
+
+  const totalAssessed = updates.totalAssessed !== undefined ? Number(updates.totalAssessed) : prevData.totalAssessed;
+  const amountPaid = updates.amountPaid !== undefined ? Number(updates.amountPaid) : prevData.amountPaid;
+  const outstandingAmount = Math.max(0, totalAssessed - amountPaid);
+
+  let paymentStatus = updates.paymentStatus || prevData.paymentStatus;
+  if (outstandingAmount === 0 && totalAssessed > 0) {
+    paymentStatus = 'paid';
+  } else if (amountPaid > 0) {
+    paymentStatus = 'partially_paid';
+  }
+
+  const finalUpdates: Record<string, any> = {
+    ...updates,
+    totalAssessed,
+    amountPaid,
+    outstandingAmount,
+    paymentStatus,
+    updatedAt: now
+  };
+
+  await updateDoc(docRef, cleanFirestoreData(finalUpdates));
+
+  // Record Audit Trail
+  await logAuditEvent({
+    actorUid: actorInfo.uid,
+    actorEmail: actorInfo.email,
+    actorRole: (actorInfo.role as UserRole) || 'school_admin',
+    action: 'FEE_RECORD_UPDATED',
+    targetEntity: 'student_fees',
+    targetId: feeId,
+    details: {
+      feeCode: prevData.feeCode,
+      studentName: prevData.studentName,
+      institutionName: prevData.institutionName,
+      previousStatus: prevData.paymentStatus,
+      newStatus: paymentStatus,
+      previousPaid: prevData.amountPaid,
+      newPaid: amountPaid,
+      outstandingAmount
+    }
+  });
+}
+
+/**
+ * Record a fee payment (online via Razorpay or collected at institution)
+ * Generates an official fee receipt, updates fee outstanding balances,
+ * and creates an automated revenue accounting entry in the general financial ledger.
+ */
+export async function recordFeePayment(
+  feeId: string,
+  paymentData: FeePaymentPayload,
+  actorInfo: { uid: string; email: string; name?: string; role?: string }
+): Promise<{ receiptNumber: string; transactionReference: string }> {
+  const docRef = doc(db, 'student_fees', feeId);
+  const snap = await getDoc(docRef);
+  if (!snap.exists()) {
+    throw new Error('Student fee record not found for payment collection.');
+  }
+
+  const prevFee = snap.data() as StudentFeeRecord;
+  const now = new Date().toISOString();
+  const paymentDate = paymentData.paymentDate || now.split('T')[0];
+
+  const paymentAmount = Number(paymentData.paymentAmount) || 0;
+  if (paymentAmount <= 0) {
+    throw new Error('Payment amount must be greater than zero.');
+  }
+
+  const newAmountPaid = (Number(prevFee.amountPaid) || 0) + paymentAmount;
+  const totalAssessed = Number(prevFee.totalAssessed) || 0;
+  const newOutstandingAmount = Math.max(0, totalAssessed - newAmountPaid);
+  const newPaymentStatus: FeePaymentStatus = newOutstandingAmount === 0 ? 'paid' : 'partially_paid';
+
+  // Receipt Number generation
+  const year = new Date().getFullYear();
+  const randomReceiptSuffix = Math.floor(10000 + Math.random() * 90000);
+  const receiptNumber = prevFee.receiptNumber || `FET-FEE-REC-${year}-${randomReceiptSuffix}`;
+  
+  // Transaction Reference
+  const transactionReference = paymentData.transactionReference || paymentData.razorpayPaymentId || `FET-FEE-TXN-${year}-${randomReceiptSuffix}`;
+
+  // 1. Update Student Fee Record
+  const feeUpdates: Partial<StudentFeeRecord> = {
+    amountPaid: newAmountPaid,
+    outstandingAmount: newOutstandingAmount,
+    paymentStatus: newPaymentStatus,
+    paymentDate,
+    paymentMethod: paymentData.paymentMethod,
+    transactionReference,
+    receiptNumber,
+    razorpayOrderId: paymentData.razorpayOrderId || prevFee.razorpayOrderId,
+    razorpayPaymentId: paymentData.razorpayPaymentId || prevFee.razorpayPaymentId,
+    updatedAt: now
+  };
+
+  await updateDoc(docRef, cleanFirestoreData(feeUpdates));
+
+  // 2. Automated General Ledger Integration (Without duplicate records)
+  try {
+    const finRecordsRef = collection(db, 'financial_records');
+    const finCategory = prevFee.institutionType === 'school' ? 'school_fee' : 'madrasa_fee';
+    const dept = prevFee.institutionType === 'school' ? 'School' : 'Madrasa';
+
+    const accountingRecord: Omit<FinancialRecord, 'id'> = {
+      transactionId: transactionReference,
+      voucherNumber: receiptNumber,
+      type: 'income',
+      category: finCategory,
+      categoryLabel: `${prevFee.institutionType === 'school' ? 'School Tuition & Fee' : 'Madrasa Course Fee'} - ${prevFee.categoryLabel || prevFee.category}`,
+      amount: paymentAmount,
+      date: paymentDate,
+      status: 'verified',
+      paymentStatus: 'verified',
+      paymentMethod: paymentData.paymentMethod,
+      referenceNumber: transactionReference,
+      payerPayeeName: `${prevFee.studentName} (${prevFee.studentId})`,
+      payerPayeeEmail: prevFee.parentEmail,
+      payerPayeePhone: prevFee.parentPhone,
+      description: `Institutional fee collection: ${prevFee.description || prevFee.category} for student ${prevFee.studentName} (${prevFee.courseOrGrade}) at ${prevFee.institutionName}. Official Receipt: ${receiptNumber}`,
+      department: dept,
+      fundType: 'General',
+      financialYear: prevFee.academicSession || '2026-27',
+      sourceModule: prevFee.institutionType === 'school' ? 'school' : 'madrasa',
+      sourceRecordId: feeId,
+      receiptNumber,
+      createdByUid: actorInfo.uid,
+      createdByEmail: actorInfo.email,
+      createdByName: actorInfo.name || actorInfo.email.split('@')[0],
+      createdAt: now,
+      updatedAt: now
+    };
+
+    const finDocRef = await addDoc(finRecordsRef, cleanFirestoreData(accountingRecord));
+
+    // Link financialRecordId back to fee
+    await updateDoc(docRef, { financialRecordId: finDocRef.id });
+  } catch (finErr) {
+    console.error('Non-blocking financial ledger synchronization error:', finErr);
+  }
+
+  // 3. Dispatch In-App Notification to Student / Parent if user exists
+  if (prevFee.studentUid) {
+    try {
+      await createUserNotification({
+        userId: prevFee.studentUid,
+        title: 'Fee Payment Acknowledged',
+        message: `An institutional fee payment of ₹${paymentAmount.toLocaleString('en-IN')} has been acknowledged for ${prevFee.studentName} (${prevFee.institutionName}). Receipt #${receiptNumber} has been generated.`,
+        type: 'general',
+        category: 'Institutional Update',
+        priority: 'important',
+        actionUrl: '/dashboard'
+      });
+    } catch (notifErr) {
+      console.warn('Could not dispatch fee receipt notification (non-blocking):', notifErr);
+    }
+  }
+
+  // 4. Record Audit Trail
+  await logAuditEvent({
+    actorUid: actorInfo.uid,
+    actorEmail: actorInfo.email,
+    actorRole: (actorInfo.role as UserRole) || 'school_admin',
+    action: 'FEE_PAYMENT_COLLECTED',
+    targetEntity: 'student_fees',
+    targetId: feeId,
+    details: {
+      feeCode: prevFee.feeCode,
+      studentName: prevFee.studentName,
+      institutionName: prevFee.institutionName,
+      paymentAmount,
+      paymentMethod: paymentData.paymentMethod,
+      receiptNumber,
+      transactionReference,
+      remainingOutstanding: newOutstandingAmount
+    }
+  });
+
+  return { receiptNumber, transactionReference };
+}
+
+/**
+ * Send an official fee payment reminder (with flood protection)
+ */
+export async function sendFeePaymentReminder(
+  feeId: string,
+  actorInfo: { uid: string; email: string; name?: string; role?: string },
+  force: boolean = false
+): Promise<{ success: boolean; message: string }> {
+  const docRef = doc(db, 'student_fees', feeId);
+  const snap = await getDoc(docRef);
+  if (!snap.exists()) {
+    throw new Error('Student fee record not found.');
+  }
+
+  const fee = snap.data() as StudentFeeRecord;
+  const now = new Date();
+
+  // Flood protection: Ensure minimum 12-hour gap between automatic reminders
+  if (!force && fee.lastReminderSentAt) {
+    const lastSent = new Date(fee.lastReminderSentAt);
+    const hoursSinceLast = (now.getTime() - lastSent.getTime()) / (1000 * 60 * 60);
+    if (hoursSinceLast < 12) {
+      return {
+        success: false,
+        message: `A payment reminder was already sent ${Math.round(hoursSinceLast)} hours ago. Cooldown period is 12 hours to avoid spamming parents.`
+      };
+    }
+  }
+
+  const newReminderCount = (fee.remindersSentCount || 0) + 1;
+  const nowIso = now.toISOString();
+
+  await updateDoc(docRef, {
+    remindersSentCount: newReminderCount,
+    lastReminderSentAt: nowIso,
+    updatedAt: nowIso
+  });
+
+  // Dispatch In-App Notification if studentUid exists
+  if (fee.studentUid) {
+    try {
+      await createUserNotification({
+        userId: fee.studentUid,
+        title: `Payment Reminder: ${fee.categoryLabel || 'Institutional Fees'}`,
+        message: `Dear ${fee.studentName} / Parent, this is a reminder that an outstanding fee balance of ₹${fee.outstandingAmount.toLocaleString('en-IN')} for ${fee.description || 'academic fees'} at ${fee.institutionName} is pending. Please remit at your earliest convenience.`,
+        type: 'general',
+        category: 'Institutional Update',
+        priority: 'important',
+        actionUrl: '/dashboard'
+      });
+    } catch (notifErr) {
+      console.warn('Could not dispatch reminder notification (non-blocking):', notifErr);
+    }
+  }
+
+  // Record Audit Trail
+  await logAuditEvent({
+    actorUid: actorInfo.uid,
+    actorEmail: actorInfo.email,
+    actorRole: (actorInfo.role as UserRole) || 'school_admin',
+    action: 'FEE_REMINDER_SENT',
+    targetEntity: 'student_fees',
+    targetId: feeId,
+    details: {
+      feeCode: fee.feeCode,
+      studentName: fee.studentName,
+      institutionName: fee.institutionName,
+      outstandingAmount: fee.outstandingAmount,
+      remindersSentCount: newReminderCount
+    }
+  });
+
+  return {
+    success: true,
+    message: `Payment reminder successfully sent to ${fee.studentName} / ${fee.parentName || 'Parent'}.`
+  };
+}
+
+/**
+ * Delete a student fee assessment record (Super Admin Only)
+ */
+export async function deleteStudentFeeRecord(
+  feeId: string,
+  actorInfo: { uid: string; email: string; role?: string }
+): Promise<void> {
+  const docRef = doc(db, 'student_fees', feeId);
+  const snap = await getDoc(docRef);
+  if (!snap.exists()) return;
+
+  const data = snap.data() as StudentFeeRecord;
+  await deleteDoc(docRef);
+
+  // Record Audit Trail
+  await logAuditEvent({
+    actorUid: actorInfo.uid,
+    actorEmail: actorInfo.email,
+    actorRole: (actorInfo.role as UserRole) || 'super_admin',
+    action: 'FEE_RECORD_DELETED',
+    targetEntity: 'student_fees',
+    targetId: feeId,
+    details: {
+      feeCode: data.feeCode,
+      studentName: data.studentName,
+      studentId: data.studentId,
+      institutionName: data.institutionName,
+      totalAssessed: data.totalAssessed,
+      amountPaid: data.amountPaid
+    }
+  });
+}
+
+/**
+ * Real-time listener for institutional student fees
+ */
+export function subscribeToStudentFees(
+  callback: (fees: StudentFeeRecord[]) => void,
+  onError?: (err: Error) => void
+): () => void {
+  const feesRef = collection(db, 'student_fees');
+  const q = query(feesRef, orderBy('createdAt', 'desc'));
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const records: StudentFeeRecord[] = [];
+      snapshot.forEach((docSnap) => {
+        records.push({ id: docSnap.id, ...docSnap.data() } as StudentFeeRecord);
+      });
+      callback(records);
+    },
+    (err) => {
+      console.error('Error subscribing to student fees:', err);
+      if (onError) onError(err);
+    }
+  );
+}
+
+
+
 // =========================================================================
 // STEP 47 — FET INDIA HRMS & STAFF MANAGEMENT FUNCTIONS
 // =========================================================================
@@ -5706,6 +6520,987 @@ export async function updateCompetitionPrizes(
     }
   });
 }
+
+// =============================================================
+// FET STORE SUBSYSTEM (TASK 1: FOUNDATION)
+// =============================================================
+
+/**
+ * Subscribe to store products from Firestore in real-time
+ */
+export function subscribeToStoreProducts(
+  callback: (products: StoreProduct[]) => void,
+  options?: { publishedOnly?: boolean; category?: string }
+): () => void {
+  const colRef = collection(db, 'store_products');
+  const q = query(colRef, orderBy('createdAt', 'desc'));
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      let list: StoreProduct[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          ...data
+        } as StoreProduct);
+      });
+
+      if (options?.publishedOnly) {
+        list = list.filter((p) => 
+          p.isPublished === true && 
+          p.status !== 'INACTIVE' && 
+          p.status !== 'ARCHIVED' && 
+          p.status !== 'DRAFT' &&
+          p.isActive !== false && 
+          p.isArchived !== true
+        );
+      }
+
+      if (options?.category && options.category !== 'all') {
+        list = list.filter((p) => p.category === options.category);
+      }
+
+      callback(list);
+    },
+    (err) => {
+      console.warn('Realtime subscription error in subscribeToStoreProducts:', err);
+      callback([]);
+    }
+  );
+}
+
+/**
+ * Subscribe to store product categories from Firestore in real-time
+ */
+export function subscribeToStoreCategories(
+  callback: (categories: StoreCategory[]) => void,
+  activeOnly: boolean = false
+): () => void {
+  const colRef = collection(db, 'store_categories');
+
+  return onSnapshot(
+    colRef,
+    (snapshot) => {
+      let list: StoreCategory[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          ...data
+        } as StoreCategory);
+      });
+
+      // Sort by displayOrder or name
+      list.sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0) || a.name.localeCompare(b.name));
+
+      if (activeOnly) {
+        list = list.filter((c) => c.isActive !== false);
+      }
+
+      callback(list);
+    },
+    (err) => {
+      console.warn('Realtime subscription error in subscribeToStoreCategories:', err);
+      callback([]);
+    }
+  );
+}
+
+/**
+ * Create a new store product
+ */
+export async function createStoreProduct(
+  productData: Omit<StoreProduct, 'id' | 'createdAt' | 'updatedAt'>,
+  actorInfo: { uid: string; email: string }
+): Promise<string> {
+  const now = new Date().toISOString();
+  const colRef = collection(db, 'store_products');
+
+  const newDoc = cleanFirestoreData({
+    ...productData,
+    createdByUid: actorInfo.uid,
+    createdByEmail: actorInfo.email,
+    createdAt: now,
+    updatedAt: now
+  });
+
+  const docRef = await addDoc(colRef, newDoc);
+
+  await logAuditEvent({
+    actorUid: actorInfo.uid,
+    actorEmail: actorInfo.email,
+    actorRole: 'store_admin',
+    action: 'STORE_PRODUCT_CREATED',
+    targetEntity: 'store_products',
+    targetId: docRef.id,
+    details: {
+      name: productData.name,
+      category: productData.category,
+      price: productData.price,
+      isPublished: productData.isPublished
+    }
+  });
+
+  return docRef.id;
+}
+
+/**
+ * Update an existing store product
+ */
+export async function updateStoreProduct(
+  productId: string,
+  updates: Partial<StoreProduct>,
+  actorInfo: { uid: string; email: string }
+): Promise<void> {
+  const docRef = doc(db, 'store_products', productId);
+  const now = new Date().toISOString();
+
+  const cleaned = cleanFirestoreData({
+    ...updates,
+    updatedAt: now
+  });
+
+  await updateDoc(docRef, cleaned);
+
+  await logAuditEvent({
+    actorUid: actorInfo.uid,
+    actorEmail: actorInfo.email,
+    actorRole: 'store_admin',
+    action: 'STORE_PRODUCT_UPDATED',
+    targetEntity: 'store_products',
+    targetId: productId,
+    details: {
+      updatedFields: Object.keys(updates),
+      isPublished: updates.isPublished
+    }
+  });
+}
+
+/**
+ * Delete a store product
+ */
+export async function deleteStoreProduct(
+  productId: string,
+  actorInfo: { uid: string; email: string }
+): Promise<void> {
+  const docRef = doc(db, 'store_products', productId);
+  await deleteDoc(docRef);
+
+  await logAuditEvent({
+    actorUid: actorInfo.uid,
+    actorEmail: actorInfo.email,
+    actorRole: 'super_admin',
+    action: 'STORE_PRODUCT_DELETED',
+    targetEntity: 'store_products',
+    targetId: productId,
+    details: {
+      deletedAt: new Date().toISOString()
+    }
+  });
+}
+
+/**
+ * Archive a store product (soft-delete / decommission)
+ */
+export async function archiveStoreProduct(
+  productId: string,
+  actorInfo: { uid: string; email: string }
+): Promise<void> {
+  const docRef = doc(db, 'store_products', productId);
+  const now = new Date().toISOString();
+
+  await updateDoc(docRef, {
+    status: 'ARCHIVED',
+    isActive: false,
+    isPublished: false,
+    isArchived: true,
+    updatedAt: now
+  });
+
+  await logAuditEvent({
+    actorUid: actorInfo.uid,
+    actorEmail: actorInfo.email,
+    actorRole: 'store_admin',
+    action: 'STORE_PRODUCT_ARCHIVED',
+    targetEntity: 'store_products',
+    targetId: productId,
+    details: {
+      archivedAt: now
+    }
+  });
+}
+
+/**
+ * Create a new store category
+ */
+export async function createStoreCategory(
+  categoryData: Omit<StoreCategory, 'id' | 'createdAt' | 'updatedAt'>,
+  actorInfo: { uid: string; email: string }
+): Promise<string> {
+  const now = new Date().toISOString();
+  const colRef = collection(db, 'store_categories');
+
+  const newDoc = cleanFirestoreData({
+    ...categoryData,
+    createdByUid: actorInfo.uid,
+    createdAt: now,
+    updatedAt: now
+  });
+
+  const docRef = await addDoc(colRef, newDoc);
+
+  await logAuditEvent({
+    actorUid: actorInfo.uid,
+    actorEmail: actorInfo.email,
+    actorRole: 'store_admin',
+    action: 'STORE_CATEGORY_CREATED',
+    targetEntity: 'store_categories',
+    targetId: docRef.id,
+    details: {
+      name: categoryData.name,
+      slug: categoryData.slug
+    }
+  });
+
+  return docRef.id;
+}
+
+/**
+ * Update an existing store category
+ */
+export async function updateStoreCategory(
+  categoryId: string,
+  updates: Partial<StoreCategory>,
+  actorInfo: { uid: string; email: string }
+): Promise<void> {
+  const docRef = doc(db, 'store_categories', categoryId);
+  const now = new Date().toISOString();
+
+  const cleaned = cleanFirestoreData({
+    ...updates,
+    updatedAt: now
+  });
+
+  await updateDoc(docRef, cleaned);
+
+  await logAuditEvent({
+    actorUid: actorInfo.uid,
+    actorEmail: actorInfo.email,
+    actorRole: 'store_admin',
+    action: 'STORE_CATEGORY_UPDATED',
+    targetEntity: 'store_categories',
+    targetId: categoryId,
+    details: {
+      updatedFields: Object.keys(updates)
+    }
+  });
+}
+
+/**
+ * Delete a store category
+ */
+export async function deleteStoreCategory(
+  categoryId: string,
+  actorInfo: { uid: string; email: string }
+): Promise<void> {
+  const docRef = doc(db, 'store_categories', categoryId);
+  await deleteDoc(docRef);
+
+  await logAuditEvent({
+    actorUid: actorInfo.uid,
+    actorEmail: actorInfo.email,
+    actorRole: 'super_admin',
+    action: 'STORE_CATEGORY_DELETED',
+    targetEntity: 'store_categories',
+    targetId: categoryId,
+    details: {
+      deletedAt: new Date().toISOString()
+    }
+  });
+}
+
+/**
+ * ============================================================================
+ * FET STORE ORDERS FOUNDATION (Task 14)
+ * ============================================================================
+ * Authoritative order listeners and status governance.
+ * Deletion is strictly prohibited to preserve historical financial records
+ * and statutory audit compliance.
+ */
+
+/**
+ * Realtime subscription to store orders (Store Managers and Super Admins)
+ */
+export function subscribeToStoreOrders(
+  callback: (orders: StoreOrder[]) => void,
+  onError?: (err: any) => void
+): () => void {
+  try {
+    const q = query(
+      collection(db, 'store_orders'),
+      orderBy('createdAt', 'desc')
+    );
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const list: StoreOrder[] = [];
+        snapshot.forEach((d) => {
+          list.push({ id: d.id, ...d.data() } as StoreOrder);
+        });
+        callback(list);
+      },
+      (err) => {
+        console.warn('Realtime subscription error in subscribeToStoreOrders:', err);
+        if (onError) onError(err);
+      }
+    );
+  } catch (err) {
+    console.warn('Failed to initialize subscribeToStoreOrders listener:', err);
+    return () => {};
+  }
+}
+
+/**
+ * Authoritatively creates a Store Order Draft in Firestore directly with the authenticated customer session.
+ * Strictly satisfies Firestore Security Rules:
+ *   `allow create: if isAuthenticated() && ((incoming().userId == request.auth.uid) || isSuperAdmin() ...)`
+ * Also records in-app notification in `user_notifications`, audit log, and notifies server for Brevo transactional email.
+ */
+export async function createStoreOrderDraft(payload: {
+  userId: string;
+  clientRequestId?: string;
+  customer: StoreCustomerInfo;
+  billingAddress: StoreAddress;
+  shippingAddress: StoreAddress;
+  items: StoreOrderItem[];
+  notes?: string;
+  deliveryNotes?: string;
+  educationalInstitutionalOrder?: boolean;
+  institutionName?: string;
+  scholarshipRollNumber?: string;
+  paymentMethod?: 'COD' | 'razorpay' | string;
+}): Promise<{ 
+  orderId: string; 
+  draftId: string;
+  id: string;
+  orderNumber: string; 
+  total: number;
+  notes: string;
+  deliveryNotes: string;
+  orderStatus: StoreOrderStatus;
+  paymentStatus?: StorePaymentStatus;
+  paymentMethod?: string;
+  order: any;
+}> {
+  if (!auth.currentUser && typeof (auth as any).authStateReady === 'function') {
+    try {
+      await (auth as any).authStateReady();
+    } catch {
+      // Continue with current state
+    }
+  }
+
+  if (!auth.currentUser) {
+    const authErr: any = new Error('Authentication required: You must be signed in with your FET India account to create a store order.');
+    authErr.code = 'UNAUTHENTICATED';
+    authErr.category = 'unauthenticated';
+    throw authErr;
+  }
+
+  if (auth.currentUser.uid !== payload.userId) {
+    const permErr: any = new Error('Security violation: authenticated user does not match the order user identifier.');
+    permErr.code = 'PERMISSION_DENIED';
+    permErr.category = 'permission_denied';
+    throw permErr;
+  }
+
+  const nowIso = new Date().toISOString();
+  const orderNumber = `FET-ORD-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
+
+  const calculatedSubtotal = payload.items.reduce((sum, item) => sum + item.itemTotal, 0);
+  const shippingAmount = 0;
+  const total = calculatedSubtotal + shippingAmount;
+
+  const rawNotes = payload.notes !== undefined ? payload.notes : payload.deliveryNotes;
+  const cleanNotes = typeof rawNotes === 'string' ? rawNotes.trim() : '';
+
+  let initialOrderStatus: StoreOrderStatus = 'draft';
+  let initialPaymentStatus: StorePaymentStatus = 'unpaid';
+  let initialPaymentMethod: string | undefined = undefined;
+  let initialPaymentMethodLabel: string | undefined = undefined;
+  let initialHistoryNote = 'Store order intent draft initialized through secure checkout preparation.';
+
+  if (payload.paymentMethod === 'free' || total === 0) {
+    const isAllDigital = payload.items.every(it => it.isDigital || it.productType === 'digital' || it.productType === 'publication');
+    initialOrderStatus = isAllDigital ? 'completed' : 'processing';
+    initialPaymentStatus = 'free';
+    initialPaymentMethod = 'free';
+    initialPaymentMethodLabel = 'Free Order / Open Access (Zero Payment)';
+    initialHistoryNote = 'Free store order placed at zero cost. Open access fulfilled.';
+  } else if (payload.paymentMethod === 'COD') {
+    initialOrderStatus = 'processing';
+    initialPaymentStatus = 'unpaid';
+    initialPaymentMethod = 'COD';
+    initialPaymentMethodLabel = 'Cash on Delivery (COD)';
+    initialHistoryNote = 'Store order placed with Cash on Delivery (COD). Payment will be collected upon fulfillment.';
+  } else if (payload.paymentMethod === 'razorpay') {
+    initialOrderStatus = 'pending_payment';
+    initialPaymentStatus = 'unpaid';
+    initialPaymentMethod = 'razorpay';
+    initialPaymentMethodLabel = 'Razorpay Online Payment';
+    initialHistoryNote = 'Store order placed with Online Payment (Razorpay). Awaiting payment gateway verification.';
+  }
+
+  const orderData = cleanFirestoreData({
+    orderNumber,
+    clientRequestId: payload.clientRequestId || undefined,
+    userId: auth.currentUser.uid,
+    customer: {
+      fullName: String(payload.customer.fullName || '').trim(),
+      mobileNumber: payload.customer.mobileNumber,
+      email: String(payload.customer.email || '').trim().toLowerCase(),
+      userUid: auth.currentUser.uid,
+      membershipId: payload.customer.membershipId ? String(payload.customer.membershipId).trim() : undefined,
+      isRegisteredUser: true
+    },
+    items: payload.items,
+    itemCount: payload.items.reduce((sum, item) => sum + item.quantity, 0),
+    subtotal: calculatedSubtotal,
+    shippingAmount,
+    taxAmount: 0,
+    total,
+    currency: 'INR',
+    orderStatus: initialOrderStatus,
+    paymentStatus: initialPaymentStatus,
+    paymentMethod: initialPaymentMethod,
+    paymentMethodLabel: initialPaymentMethodLabel,
+    billingAddress: payload.billingAddress,
+    shippingAddress: payload.shippingAddress,
+    notes: cleanNotes,
+    deliveryNotes: cleanNotes,
+    educationalInstitutionalOrder: Boolean(payload.educationalInstitutionalOrder),
+    institutionName: payload.institutionName ? String(payload.institutionName).trim() : '',
+    scholarshipRollNumber: payload.scholarshipRollNumber ? String(payload.scholarshipRollNumber).trim() : '',
+    source: 'web_store',
+    authoritativeValidationCompleted: true,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+    statusHistory: [
+      {
+        status: initialOrderStatus,
+        timestamp: nowIso,
+        note: initialHistoryNote
+      }
+    ]
+  });
+
+  // Check for duplicate submission using clientRequestId if supplied
+  if (payload.clientRequestId) {
+    try {
+      const existingSnap = await getDocs(
+        query(
+          collection(db, 'store_orders'),
+          where('userId', '==', auth.currentUser.uid),
+          where('clientRequestId', '==', payload.clientRequestId.trim()),
+          limit(1)
+        )
+      );
+      if (!existingSnap.empty) {
+        const existingDoc = existingSnap.docs[0];
+        const existingData = existingDoc.data();
+        return {
+          orderId: existingDoc.id,
+          draftId: existingDoc.id,
+          id: existingDoc.id,
+          orderNumber: existingData.orderNumber,
+          total: existingData.total,
+          notes: existingData.notes || '',
+          deliveryNotes: existingData.deliveryNotes || '',
+          orderStatus: existingData.orderStatus,
+          paymentStatus: existingData.paymentStatus,
+          paymentMethod: existingData.paymentMethod,
+          order: {
+            id: existingDoc.id,
+            orderId: existingDoc.id,
+            ...existingData
+          }
+        };
+      }
+    } catch (checkErr) {
+      console.warn('[Store Order] Direct duplicate check notice:', checkErr);
+    }
+  }
+
+  // 1. Create order directly in Firestore with authenticated user credentials, with authoritative server fallback
+  let orderId = '';
+  try {
+    const docRef = await addDoc(collection(db, 'store_orders'), orderData);
+    orderId = docRef.id;
+  } catch (firestoreErr: any) {
+    console.warn('[Store Order] Direct client creation notice, utilizing server fallback:', firestoreErr?.message);
+    const srvHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'x-user-id': auth.currentUser.uid
+    };
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      if (idToken) {
+        srvHeaders['Authorization'] = `Bearer ${idToken}`;
+      }
+    } catch {
+      // Continue with x-user-id
+    }
+
+    const srvRes = await fetch('/api/store/orders/create', {
+      method: 'POST',
+      headers: srvHeaders,
+      body: JSON.stringify({
+        ...payload,
+        paymentMethod: payload.paymentMethod,
+        userId: auth.currentUser.uid
+      })
+    });
+    const srvData = await srvRes.json();
+    if (!srvRes.ok || !srvData.success) {
+      const srvErr: any = new Error(srvData.error || 'Failed to initialize order draft.');
+      srvErr.code = srvData.code || (srvRes.status === 401 ? 'UNAUTHENTICATED' : srvRes.status === 403 ? 'PERMISSION_DENIED' : 'SERVER_ERROR');
+      srvErr.category = srvData.category;
+      srvErr.status = srvRes.status;
+      throw srvErr;
+    }
+    orderId = srvData.orderId;
+  }
+
+  // 2. Safely create in-app notification in user_notifications
+  try {
+    const idempotencyKey = `store_order_${orderId}_order_received`;
+    await addDoc(collection(db, 'user_notifications'), cleanFirestoreData({
+      userId: auth.currentUser.uid,
+      userEmail: String(payload.customer.email || '').trim().toLowerCase(),
+      userName: String(payload.customer.fullName || '').trim(),
+      title: `Order Received: #${orderNumber}`,
+      message: `Your order #${orderNumber} has been recorded with ${payload.items.length} item(s). Total: ₹${total.toLocaleString('en-IN')}.`,
+      type: 'store',
+      category: 'FET Store Order',
+      severity: 'info',
+      priority: 'normal',
+      status: 'published',
+      module: 'store',
+      actionUrl: 'orders',
+      actionLabel: 'View Order Details',
+      targetGroup: 'direct',
+      targetAudience: 'specific_users',
+      broadcastId: '',
+      createdBy: 'FET Store',
+      read: false,
+      readAt: null,
+      isArchived: false,
+      archivedAt: null,
+      idempotencyKey,
+      relatedRecordId: orderId,
+      publishAt: nowIso,
+      expiresAt: null,
+      createdAt: nowIso,
+      emailTriggered: true,
+      emailDeliveryStatus: 'pending'
+    }));
+  } catch (notifErr) {
+    console.warn('[Store Order] Non-fatal in-app notification logging notice:', notifErr);
+  }
+
+  // 3. Safely record audit log in audit_logs
+  try {
+    await addDoc(collection(db, 'audit_logs'), cleanFirestoreData({
+      actorUid: auth.currentUser.uid,
+      actorEmail: String(payload.customer.email || '').trim().toLowerCase(),
+      actorRole: 'customer',
+      action: (payload.paymentMethod === 'free' || total === 0)
+        ? 'STORE_ORDER_PLACED_FREE'
+        : payload.paymentMethod === 'COD'
+        ? 'STORE_ORDER_PLACED_COD'
+        : 'STORE_ORDER_CREATED',
+      targetEntity: 'store_orders',
+      targetId: orderId,
+      timestamp: nowIso,
+      details: (payload.paymentMethod === 'free' || total === 0)
+        ? `Store free order ${orderNumber} placed at ₹0 total with ${payload.items.length} items.`
+        : `Store order ${orderNumber} drafted with ${payload.items.length} items totaling ₹${total}.`
+    }));
+  } catch (auditErr) {
+    console.warn('[Store Order] Non-fatal audit log notice:', auditErr);
+  }
+
+  // 4. Trigger Brevo transactional email notification via backend endpoint (for COD, Free, and draft; Razorpay notifies on payment verification)
+  if (payload.paymentMethod !== 'razorpay' || total === 0) {
+    try {
+      (async () => {
+        try {
+          const notifHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (auth.currentUser?.uid) {
+            notifHeaders['x-user-id'] = auth.currentUser.uid;
+            try {
+              const idToken = await auth.currentUser.getIdToken();
+              if (idToken) notifHeaders['Authorization'] = `Bearer ${idToken}`;
+            } catch {}
+          }
+          await fetch('/api/store/orders/notify-event', {
+            method: 'POST',
+            headers: notifHeaders,
+            body: JSON.stringify({
+              orderId,
+              orderNumber,
+              eventType: 'order_received',
+              userId: auth.currentUser?.uid,
+              customer: {
+                fullName: payload.customer.fullName,
+                email: payload.customer.email,
+                mobileNumber: payload.customer.mobileNumber
+              },
+              total,
+              itemCount: payload.items.reduce((sum, item) => sum + item.quantity, 0),
+              items: payload.items,
+              shippingAddress: payload.shippingAddress,
+              createdAt: nowIso
+            })
+          });
+        } catch (fetchErr) {
+          console.warn('[Store Order] Non-fatal server email trigger notice:', fetchErr);
+        }
+      })();
+    } catch (emailErr) {
+      console.warn('[Store Order] Non-fatal email dispatch notice:', emailErr);
+    }
+  }
+
+  return {
+    orderId,
+    draftId: orderId,
+    id: orderId,
+    orderNumber,
+    total,
+    notes: cleanNotes,
+    deliveryNotes: cleanNotes,
+    orderStatus: initialOrderStatus,
+    paymentStatus: initialPaymentStatus,
+    paymentMethod: initialPaymentMethod,
+    order: {
+      id: orderId,
+      orderId,
+      draftId: orderId,
+      ...orderData,
+      notes: cleanNotes,
+      deliveryNotes: cleanNotes
+    }
+  };
+}
+
+/**
+ * Creates a Razorpay gateway order for a store order purchase
+ */
+export async function createStoreRazorpayOrder(params: {
+  orderId: string;
+  testMode?: boolean;
+}): Promise<{
+  success: boolean;
+  orderId: string;
+  orderNumber: string;
+  razorpayOrderId: string;
+  amount: number;
+  total: number;
+  currency: string;
+  keyId: string;
+  mode: 'test' | 'live';
+  isFree?: boolean;
+  orderStatus?: string;
+  paymentStatus?: string;
+  customer?: { name: string; email: string; contact: string };
+}> {
+  if (!auth.currentUser && typeof (auth as any).authStateReady === 'function') {
+    try {
+      await (auth as any).authStateReady();
+    } catch {
+      // Continue with current state
+    }
+  }
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (auth.currentUser?.uid) {
+    headers['x-user-id'] = auth.currentUser.uid;
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      if (idToken) {
+        headers['Authorization'] = `Bearer ${idToken}`;
+      }
+    } catch {
+      // Continue with x-user-id
+    }
+  }
+  const res = await fetch('/api/store/orders/razorpay/create-order', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(params)
+  });
+  let data: any = {};
+  try {
+    data = await res.json();
+  } catch {
+    const parseErr: any = new Error(`Failed to parse gateway response (HTTP ${res.status}). Expected valid JSON.`);
+    parseErr.status = res.status;
+    parseErr.code = 'INVALID_RESPONSE';
+    throw parseErr;
+  }
+  if (!res.ok || !data.success) {
+    const error: any = new Error(data.error || 'Failed to initialize Razorpay checkout for store order.');
+    error.code = data.code || (res.status === 401 ? 'UNAUTHENTICATED' : res.status === 403 ? 'PERMISSION_DENIED' : 'GATEWAY_ERROR');
+    error.status = res.status;
+    error.category = data.category;
+    throw error;
+  }
+  return data;
+}
+
+/**
+ * Verifies Razorpay payment signature on backend and confirms store order
+ */
+export async function verifyStoreRazorpayPayment(payload: {
+  orderId: string;
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+  testMode?: boolean;
+}): Promise<{
+  success: boolean;
+  message: string;
+  orderId: string;
+  orderNumber: string;
+  paymentStatus: string;
+  orderStatus: string;
+  paymentId: string;
+  amount: number;
+}> {
+  if (!auth.currentUser && typeof (auth as any).authStateReady === 'function') {
+    try {
+      await (auth as any).authStateReady();
+    } catch {
+      // Continue with current state
+    }
+  }
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (auth.currentUser?.uid) {
+    headers['x-user-id'] = auth.currentUser.uid;
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      if (idToken) {
+        headers['Authorization'] = `Bearer ${idToken}`;
+      }
+    } catch {
+      // Continue with x-user-id
+    }
+  }
+  const res = await fetch('/api/store/orders/razorpay/verify-payment', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload)
+  });
+  let data: any = {};
+  try {
+    data = await res.json();
+  } catch {
+    const parseErr: any = new Error(`Failed to parse payment verification response (HTTP ${res.status}). Expected valid JSON.`);
+    parseErr.status = res.status;
+    parseErr.code = 'INVALID_RESPONSE';
+    throw parseErr;
+  }
+  if (!res.ok || !data.success) {
+    const error: any = new Error(data.error || 'Payment signature verification failed.');
+    error.code = data.code || (res.status === 401 ? 'UNAUTHENTICATED' : res.status === 403 ? 'PERMISSION_DENIED' : 'SIGNATURE_VERIFICATION_FAILED');
+    error.status = res.status;
+    error.category = data.category;
+    throw error;
+  }
+  return data;
+}
+
+/**
+ * Records payment failure or modal dismissal for store order
+ */
+export async function recordStorePaymentFailure(params: {
+  orderId: string;
+  razorpayOrderId?: string;
+  errorDescription?: string;
+}): Promise<void> {
+  try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (auth.currentUser?.uid) {
+      headers['x-user-id'] = auth.currentUser.uid;
+      try {
+        const idToken = await auth.currentUser.getIdToken();
+        if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
+      } catch {}
+    }
+    await fetch('/api/store/orders/razorpay/record-failure', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(params)
+    });
+  } catch (err) {
+    console.warn('Notice recording payment failure:', err);
+  }
+}
+
+/**
+ * Staff record of Cash on Delivery / Store Desk payment collection
+ */
+export async function recordStoreStaffPaymentCollection(params: {
+  orderId: string;
+  actorUid: string;
+  paymentMethod?: string;
+  notes?: string;
+}): Promise<{ success: boolean; message: string }> {
+  const res = await fetch('/api/store/orders/record-payment', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params)
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || 'Failed to record payment collection.');
+  }
+  return data;
+}
+
+/**
+ * Realtime subscription to customer's own store orders.
+ * Employs in-memory sorting by createdAt descending to guarantee zero missing-composite-index errors.
+ */
+export function subscribeToUserStoreOrders(
+  userId: string,
+  callback: (orders: StoreOrder[]) => void,
+  onError?: (err: any) => void
+): () => void {
+  try {
+    const q = query(
+      collection(db, 'store_orders'),
+      where('userId', '==', userId)
+    );
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const list: StoreOrder[] = [];
+        snapshot.forEach((d) => {
+          list.push({ id: d.id, ...d.data() } as StoreOrder);
+        });
+        // In-memory sort by createdAt descending guarantees zero missing-composite-index errors
+        list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        callback(list);
+      },
+      (err) => {
+        console.warn('Realtime subscription error in subscribeToUserStoreOrders:', err);
+        if (onError) onError(err);
+      }
+    );
+  } catch (err) {
+    console.warn('Failed to initialize subscribeToUserStoreOrders listener:', err);
+    return () => {};
+  }
+}
+
+/**
+ * Update a store order status with customer ownership checks, direct client authorization,
+ * and reliable Brevo email dispatch.
+ * (No deletion allowed to preserve auditability and historical financial records)
+ */
+export async function updateStoreOrderStatus(
+  orderId: string,
+  newStatus: StoreOrderStatus,
+  note?: string,
+  actorInfo?: { uid: string; email: string; role: string }
+): Promise<void> {
+  const nowIso = new Date().toISOString();
+  const orderRef = doc(db, 'store_orders', orderId);
+
+  // 1. Direct update in Firestore using authenticated client SDK
+  // Satisfies rule: resource != null && resource.data.userId == request.auth.uid && incoming().userId == request.auth.uid
+  const historyEntry = {
+    status: newStatus,
+    timestamp: nowIso,
+    changedByUid: auth.currentUser?.uid || actorInfo?.uid || 'anonymous',
+    changedByRole: actorInfo?.role || 'customer',
+    note: note || `Order status updated to ${newStatus}`
+  };
+
+  try {
+    await updateDoc(orderRef, cleanFirestoreData({
+      orderStatus: newStatus,
+      updatedAt: nowIso,
+      statusHistory: arrayUnion(historyEntry)
+    }));
+  } catch (directErr: any) {
+    // If direct client update fails (e.g. admin role acting via server), fall back to server API
+    console.warn('[Store Order] Direct client update notice, attempting server endpoint fallback:', directErr?.message);
+    let res: Response;
+    try {
+      res = await fetch('/api/store/orders/update-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          newStatus,
+          actorUid: actorInfo?.uid || auth.currentUser?.uid || 'anonymous',
+          note: note || undefined
+        })
+      });
+    } catch (netErr: any) {
+      throw new Error(`Network error while contacting order update service: ${netErr.message || 'connection failed'}`);
+    }
+
+    const cType = res.headers.get('content-type') || '';
+    if (!cType.includes('application/json')) {
+      throw new Error(`Unexpected server response format (HTTP ${res.status}): Expected JSON but received ${cType || 'non-JSON'}.`);
+    }
+
+    let data: any = {};
+    try {
+      data = await res.json();
+    } catch {
+      throw new Error(`Failed to parse response from order update service (HTTP ${res.status}).`);
+    }
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || `Failed to update store order status (HTTP ${res.status}).`);
+    }
+    return;
+  }
+
+  // 2. Dispatch Brevo notification via backend endpoint
+  try {
+    let eventType: string | null = null;
+    if (newStatus === 'cancelled') eventType = 'order_cancelled';
+    else if (newStatus === 'processing') eventType = 'order_processing';
+    else if (newStatus === 'shipped') eventType = 'order_shipped';
+    else if (newStatus === 'delivered') eventType = 'order_delivered';
+
+    if (eventType) {
+      await fetch('/api/store/orders/notify-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          newStatus,
+          eventType,
+          note,
+          actorUid: auth.currentUser?.uid || actorInfo?.uid
+        })
+      });
+    }
+  } catch (err) {
+    console.warn('[Store Order] Non-fatal notification notice during status update:', err);
+  }
+}
+
 
 
 

@@ -72,6 +72,7 @@ import { AdminStaffHRMSView } from './AdminStaffHRMSView';
 import { AdminCMSView } from './AdminCMSView';
 import { AdminManualDonationSettings } from './settings/AdminManualDonationSettings';
 import { AdminQuranicVersesSettings } from './settings/AdminQuranicVersesSettings';
+import { AdminModuleControlsSettings } from './settings/AdminModuleControlsSettings';
 import { UserProfile, UserRole, AuditLog, AppPermission } from '../../types';
 import { ROLE_DEFINITIONS, getRoleMetadata } from '../../lib/rbac';
 
@@ -1252,6 +1253,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         {/* ------------------------------------------------------------- */}
         {activeTab === 'settings' && (
           <div className="space-y-8" id="super-admin-settings-section">
+            {/* Centralized Feature Controls & Module Activation */}
+            <AdminModuleControlsSettings />
+
             {/* Official Qur'anic Verses Registry */}
             <AdminQuranicVersesSettings />
 

@@ -57,6 +57,8 @@ import { useConfig } from '../../contexts/ConfigContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useModules } from '../../contexts/ModuleContext';
+import { useModuleControls } from '../../contexts/ModuleControlsContext';
+import { useCart } from '../../contexts/CartContext';
 import { isPublisherOnly } from '../../lib/rbac';
 import { NavigationMenuItem, NavigationSubItem } from '../../types';
 import { DEFAULT_NAV_MENU } from '../../data/initialData';
@@ -81,6 +83,7 @@ interface HeaderProps {
   onOpenSearch?: () => void;
   onOpenStudentResults?: () => void;
   onOpenGeneralDonation?: (tab?: any) => void;
+  onOpenStore?: () => void;
   activeSection: string;
   setActiveSection: (s: string) => void;
   isMobileMenuOpen?: boolean;
@@ -108,6 +111,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSearch,
   onOpenStudentResults,
   onOpenGeneralDonation,
+  onOpenStore,
   activeSection,
   setActiveSection,
   isMobileMenuOpen,
@@ -118,7 +122,9 @@ export const Header: React.FC<HeaderProps> = ({
   const { currentUser, userProfile, hasAdminAccess, isSuperAdmin, signOut } = useAuth();
   const isPublisherUser = isPublisherOnly(userProfile, isSuperAdmin);
   const { unreadCount } = useNotifications();
+  const { cart, openCartDrawer } = useCart();
   const { getModuleByCode } = useModules();
+  const { isModuleEnabled } = useModuleControls();
   const { canInstall, installApp } = usePWAInstall();
 
   const [internalMobileMenuOpen, setInternalMobileMenuOpen] = useState(false);
@@ -219,7 +225,7 @@ export const Header: React.FC<HeaderProps> = ({
     ? config.navigationMenu.filter(m => m.isEnabled)
     : DEFAULT_NAV_MENU.filter(m => m.isEnabled);
 
-  const navMenuItems: NavigationMenuItem[] = [...rawNavMenu].sort((a, b) => (a.order || 0) - (b.order || 0));
+  let navMenuItems: NavigationMenuItem[] = [...rawNavMenu].sort((a, b) => (a.order || 0) - (b.order || 0));
 
   // Ensure Examination is always available in navigation if not already present
   if (!navMenuItems.some(m => m.target === 'examinations' || m.id === 'nav-examination')) {
@@ -271,15 +277,19 @@ export const Header: React.FC<HeaderProps> = ({
     });
   }
 
-  // Dynamically insert published Store or Travel if not already in menu
-  if (isStorePublished && !navMenuItems.some(m => m.target === 'store' || m.id === 'nav-store')) {
-    navMenuItems.push({
-      id: 'nav-store',
-      label: 'Store',
-      target: 'store',
-      isEnabled: true,
-      order: 99
-    });
+  // Ensure FET Store is available in navigation only if enabled by Super Admin configuration
+  if (isModuleEnabled('store')) {
+    if (!navMenuItems.some(m => m.target === 'store' || m.id === 'nav-store')) {
+      navMenuItems.push({
+        id: 'nav-store',
+        label: 'FET Store',
+        target: 'store',
+        isEnabled: true,
+        order: 11
+      });
+    }
+  } else {
+    navMenuItems = navMenuItems.filter(m => m.target !== 'store' && m.id !== 'nav-store');
   }
 
   if (isTravelPublished && !navMenuItems.some(m => m.target === 'travel' || m.id === 'nav-travel')) {
@@ -648,9 +658,22 @@ export const Header: React.FC<HeaderProps> = ({
       return;
     }
 
-    if (cleanTarget === 'store' || cleanTarget === 'travel' || cleanTarget === 'future_services') {
+    if (cleanTarget === 'store' || cleanTarget === 'fet_store' || cleanTarget === 'store_catalogue') {
+      if (onOpenStore) {
+        onOpenStore();
+        return;
+      }
+      setActiveSection('store');
+      const element = document.getElementById('store') || document.getElementById('future_services');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
+
+    if (cleanTarget === 'travel' || cleanTarget === 'future_services') {
       setActiveSection('future_services');
-      const element = document.getElementById('future_services') || document.getElementById('store');
+      const element = document.getElementById('future_services') || document.getElementById('travel');
       if (element) {
         element.scrollIntoView({ behavior: 'smooth' });
       }
@@ -1012,6 +1035,25 @@ export const Header: React.FC<HeaderProps> = ({
             <HeartHandshake className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-950 shrink-0" />
             <span className="whitespace-nowrap">Donate <span className="hidden xs:inline">(80G)</span></span>
           </button>
+
+          {/* Official FET Store Shopping Cart Trigger (Desktop & Tablet) */}
+          {isModuleEnabled('store') && (
+            <button
+              onClick={openCartDrawer}
+              className="relative flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-emerald-900 transition-colors cursor-pointer text-xs font-bold shadow-2xs"
+              id="header-cart-drawer-trigger-btn"
+              title="Open Shopping Cart"
+              aria-label={`Shopping Cart (${cart.totalItems} items)`}
+            >
+              <ShoppingBag className="w-4 h-4 text-emerald-700 shrink-0" />
+              <span className="hidden xl:inline text-slate-800">Cart</span>
+              {cart.totalItems > 0 && (
+                <span className="flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-black text-white shadow-xs">
+                  {cart.totalItems}
+                </span>
+              )}
+            </button>
+          )}
 
           {/* Quick Notification Bell (Authenticated Users) */}
           {currentUser && (
@@ -1951,16 +1993,40 @@ export const Header: React.FC<HeaderProps> = ({
               Explore & Services
             </p>
             <div className="bg-slate-50/80 rounded-2xl border border-slate-200/80 p-1 divide-y divide-slate-100">
-              <button
-                onClick={() => handleNavClick('store')}
-                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold text-slate-800 hover:bg-white transition-colors cursor-pointer min-h-[44px]"
-              >
-                <div className="flex items-center gap-2.5">
-                  <ShoppingBag className="w-4 h-4 text-emerald-700 shrink-0" />
-                  <span>Publications & Store</span>
-                </div>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-              </button>
+              {isModuleEnabled('store') && (
+                <>
+                  <button
+                    onClick={() => handleNavClick('store')}
+                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold text-slate-800 hover:bg-white transition-colors cursor-pointer min-h-[44px]"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <ShoppingBag className="w-4 h-4 text-emerald-700 shrink-0" />
+                      <span>Publications & Store</span>
+                    </div>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      handleCloseMobileMenu();
+                      openCartDrawer();
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold text-slate-800 hover:bg-white transition-colors cursor-pointer min-h-[44px]"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <ShoppingBag className="w-4 h-4 text-emerald-700 shrink-0" />
+                      <span>My Store Cart</span>
+                    </div>
+                    {cart.totalItems > 0 ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-600 text-white shadow-xs">
+                        {cart.totalItems} {cart.totalItems === 1 ? 'item' : 'items'}
+                      </span>
+                    ) : (
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                    )}
+                  </button>
+                </>
+              )}
 
               <button
                 onClick={() => handleNavClick('contact')}

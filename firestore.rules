@@ -76,15 +76,15 @@ service cloud.firestore {
         (hasUserDoc() && (
           ('roles' in getUserData() && getUserData().roles is list && getUserData().roles.hasAny([
             'super_admin', 'administrator', 'core_member', 'volunteer_admin', 'member_admin', 'donor_admin',
-            'crowdfunding_admin', 'examination_admin', 'exam_admin', 'school_admin',
+            'crowdfunding_admin', 'examination_admin', 'exam_admin', 'exam_controller', 'school_admin',
             'madrasa_admin', 'finance_admin', 'hr_admin', 'content_admin', 'blog_admin',
             'store_admin', 'travel_admin', 'reports_admin',
             'district_admin', 'district_crowdfunding_admin', 'district_exam_admin',
             'state_admin', 'state_crowdfunding_admin', 'state_exam_admin',
             'national_admin', 'national_crowdfunding_admin', 'national_exam_admin'
           ])) ||
-          ('primaryRole' in getUserData() && getUserData().primaryRole in ['super_admin', 'administrator']) ||
-          ('role' in getUserData() && getUserData().role in ['super_admin', 'administrator'])
+          ('primaryRole' in getUserData() && getUserData().primaryRole in ['super_admin', 'administrator', 'exam_controller', 'exam_admin', 'examination_admin']) ||
+          ('role' in getUserData() && getUserData().role in ['super_admin', 'administrator', 'exam_controller', 'exam_admin', 'examination_admin'])
         ))
       );
     }
@@ -155,6 +155,33 @@ service cloud.firestore {
           ('customPermissions' in getUserData() && getUserData().customPermissions is list && getUserData().customPermissions.hasAny([
             'cases.district_review', 'cases.state_review', 'cases.national_review',
             'cases.recommend', 'cases.clarify', 'donors.manage'
+          ]))
+        ))
+      );
+    }
+
+    function canManageFinance() {
+      return isAuthenticated() && (
+        isSuperAdmin() ||
+        (hasUserDoc() && (
+          ('roles' in getUserData() && getUserData().roles is list && getUserData().roles.hasAny([
+            'super_admin', 'administrator', 'finance_admin'
+          ])) ||
+          ('primaryRole' in getUserData() && getUserData().primaryRole in [
+            'super_admin', 'administrator', 'finance_admin'
+          ]) ||
+          ('role' in getUserData() && getUserData().role in [
+            'super_admin', 'administrator', 'finance_admin'
+          ]) ||
+          ('permissions' in getUserData() && getUserData().permissions is list && getUserData().permissions.hasAny([
+            'finance.manage', 'finance.view', 'finance.income', 'finance.expense',
+            'finance.ledger', 'finance.budget', 'finance.accounts', 'finance.reconciliation',
+            'finance.reports', 'finance.approve'
+          ])) ||
+          ('customPermissions' in getUserData() && getUserData().customPermissions is list && getUserData().customPermissions.hasAny([
+            'finance.manage', 'finance.view', 'finance.income', 'finance.expense',
+            'finance.ledger', 'finance.budget', 'finance.accounts', 'finance.reconciliation',
+            'finance.reports', 'finance.approve'
           ]))
         ))
       );
@@ -449,18 +476,231 @@ service cloud.firestore {
     }
 
     // =========================================================
-    // Financial Records & Ledgers
+    // Financial Records & Foundation Accounting Subsystem (Chapter 15 SRS)
     // =========================================================
     match /financial_records/{recordId} {
       allow read: if isAuthenticated() && (
+        canManageFinance() ||
         hasAdminRole() ||
         (resource != null && (
           resource.data.donorUid == request.auth.uid ||
           (request.auth.token.email != null && resource.data.payerPayeeEmail == request.auth.token.email)
         ))
       );
-      allow create, update: if isAuthenticated() && hasAdminRole();
+      allow create, update: if isAuthenticated() && (canManageFinance() || hasAdminRole());
       allow delete: if isSuperAdmin();
+    }
+
+    match /finance_accounts/{accountId} {
+      allow read: if isAuthenticated() && canManageFinance();
+      allow create, update: if isAuthenticated() && canManageFinance();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /finance_bank_accounts/{accountId} {
+      allow read: if isAuthenticated() && (canManageFinance() || hasAdminRole());
+      allow create, update: if isAuthenticated() && (canManageFinance() || hasAdminRole());
+      allow delete: if isSuperAdmin();
+    }
+
+    match /finance_ledgers/{entryId} {
+      allow read: if isAuthenticated() && canManageFinance();
+      allow create: if isAuthenticated() && canManageFinance();
+      allow update: if isSuperAdmin(); // Immutability: adjustments preferred over mutation
+      allow delete: if false; // General Ledgers are strictly immutable audit records
+    }
+
+    match /finance_budgets/{budgetId} {
+      allow read: if isAuthenticated() && (
+        canManageFinance() ||
+        hasAdminRole() ||
+        (hasUserDoc() && (
+          ('roles' in getUserData() && getUserData().roles is list && getUserData().roles.hasAny(['core_member', 'finance_admin', 'administrator', 'super_admin'])) ||
+          ('primaryRole' in getUserData() && getUserData().primaryRole in ['core_member', 'finance_admin', 'administrator', 'super_admin'])
+        ))
+      );
+      allow create, update: if isAuthenticated() && (canManageFinance() || isSuperAdmin());
+      allow delete: if isSuperAdmin();
+    }
+
+    match /finance_vouchers/{voucherId} {
+      allow read: if isAuthenticated() && canManageFinance();
+      allow create, update: if isAuthenticated() && canManageFinance();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /finance_grants/{grantId} {
+      allow read: if isAuthenticated() && canManageFinance();
+      allow create, update: if isAuthenticated() && canManageFinance();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /finance_assets/{assetId} {
+      allow read: if isAuthenticated() && canManageFinance();
+      allow create, update: if isAuthenticated() && canManageFinance();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /finance_reconciliations/{recId} {
+      allow read: if isAuthenticated() && canManageFinance();
+      allow create, update: if isAuthenticated() && canManageFinance();
+      allow delete: if isSuperAdmin();
+    }
+
+    // =========================================================
+    // Institutional Fee Management Subsystem (Chapter 15.10 SRS - Task 6)
+    // =========================================================
+    match /student_fees/{feeId} {
+      allow read: if isAuthenticated() && (
+        canManageFinance() ||
+        hasAdminRole() ||
+        (resource != null && resource.data.studentUid == request.auth.uid) ||
+        (hasUserDoc() && (
+          ('roles' in getUserData() && getUserData().roles is list && getUserData().roles.hasAny(['school_admin', 'madrasa_admin', 'core_member'])) ||
+          ('primaryRole' in getUserData() && getUserData().primaryRole in ['school_admin', 'madrasa_admin', 'core_member'])
+        ))
+      );
+      allow create: if isAuthenticated() && (
+        canManageFinance() ||
+        isSuperAdmin() ||
+        (hasUserDoc() && (
+          ('roles' in getUserData() && getUserData().roles is list && getUserData().roles.hasAny(['school_admin', 'madrasa_admin', 'administrator', 'super_admin'])) ||
+          ('primaryRole' in getUserData() && getUserData().primaryRole in ['school_admin', 'madrasa_admin', 'administrator', 'super_admin'])
+        ))
+      );
+      allow update: if isAuthenticated() && (
+        canManageFinance() ||
+        isSuperAdmin() ||
+        (hasUserDoc() && (
+          ('roles' in getUserData() && getUserData().roles is list && getUserData().roles.hasAny(['school_admin', 'madrasa_admin', 'administrator', 'super_admin'])) ||
+          ('primaryRole' in getUserData() && getUserData().primaryRole in ['school_admin', 'madrasa_admin', 'administrator', 'super_admin'])
+        )) ||
+        (resource != null && resource.data.studentUid == request.auth.uid)
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    // =========================================================
+    // External Platform Integration Subsystem (Task 7)
+    // =========================================================
+    match /integration_platforms/{platformId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+
+    match /integration_sso_sessions/{sessionId} {
+      allow read: if isAuthenticated() && (
+        (resource != null && resource.data.userUid == request.auth.uid) ||
+        isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && request.resource.data.userUid == request.auth.uid;
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // =========================================================
+    // FET Store Subsystem (Products & Categories Foundation)
+    // =========================================================
+    match /store_products/{productId} {
+      allow read: if (resource != null && resource.data.isPublished == true) ||
+                     (isAuthenticated() && (
+                       isSuperAdmin() ||
+                       (hasUserDoc() && (
+                         ('roles' in getUserData() && getUserData().roles is list && getUserData().roles.hasAny(['super_admin', 'administrator', 'store_admin', 'store_manager'])) ||
+                         ('primaryRole' in getUserData() && getUserData().primaryRole in ['super_admin', 'administrator', 'store_admin', 'store_manager'])
+                       ))
+                     ));
+      allow create, update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (hasUserDoc() && (
+          ('roles' in getUserData() && getUserData().roles is list && getUserData().roles.hasAny(['super_admin', 'administrator', 'store_admin', 'store_manager'])) ||
+          ('primaryRole' in getUserData() && getUserData().primaryRole in ['super_admin', 'administrator', 'store_admin', 'store_manager'])
+        ))
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    match /store_categories/{categoryId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (hasUserDoc() && (
+          ('roles' in getUserData() && getUserData().roles is list && getUserData().roles.hasAny(['super_admin', 'administrator', 'store_admin', 'store_manager'])) ||
+          ('primaryRole' in getUserData() && getUserData().primaryRole in ['super_admin', 'administrator', 'store_admin', 'store_manager'])
+        ))
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    match /store_orders/{orderId} {
+      // 1. Read: The authenticated customer can read their own orders; Super Admin and Store Managers can read all orders;
+      // and get is permitted for draft/pending/processing/paid orders or non-existent document checks during validation
+      allow get: if (
+        (isAuthenticated() && (
+          (resource != null && resource.data.userId == request.auth.uid) ||
+          isSuperAdmin() ||
+          (hasUserDoc() && (
+            ('roles' in getUserData() && getUserData().roles is list && getUserData().roles.hasAny(['super_admin', 'administrator', 'store_admin', 'store_manager'])) ||
+            ('primaryRole' in getUserData() && getUserData().primaryRole in ['super_admin', 'administrator', 'store_admin', 'store_manager'])
+          ))
+        )) ||
+        resource == null ||
+        (resource.data.orderStatus in ['draft', 'pending_payment', 'processing', 'paid', 'completed'])
+      );
+      allow list: if (
+        (isAuthenticated() && (
+          (resource != null && resource.data.userId == request.auth.uid) ||
+          isSuperAdmin() ||
+          (hasUserDoc() && (
+            ('roles' in getUserData() && getUserData().roles is list && getUserData().roles.hasAny(['super_admin', 'administrator', 'store_admin', 'store_manager'])) ||
+            ('primaryRole' in getUserData() && getUserData().primaryRole in ['super_admin', 'administrator', 'store_admin', 'store_manager'])
+          ))
+        )) ||
+        (resource != null && (resource.data.orderStatus in ['draft', 'pending_payment', 'processing', 'paid', 'completed']))
+      );
+
+      // 2. Create: Authenticated users can create draft/pending/processing/completed orders bound to their own uid; admins can create desk orders;
+      // or authoritative server-validated drafts in draft/pending/processing/completed status with valid customer identity
+      allow create: if (
+        (isAuthenticated() && (
+          (incoming().userId == request.auth.uid) ||
+          isSuperAdmin() ||
+          (hasUserDoc() && (
+            ('roles' in getUserData() && getUserData().roles is list && getUserData().roles.hasAny(['super_admin', 'administrator', 'store_admin', 'store_manager'])) ||
+            ('primaryRole' in getUserData() && getUserData().primaryRole in ['super_admin', 'administrator', 'store_admin', 'store_manager'])
+          ))
+        )) ||
+        (
+          incoming().orderStatus in ['draft', 'pending_payment', 'processing', 'completed'] &&
+          incoming().paymentStatus in ['unpaid', 'pending', 'paid', 'captured', 'free'] &&
+          incoming().authoritativeValidationCompleted == true &&
+          incoming().userId is string && incoming().userId.size() > 0 &&
+          incoming().customer.email is string && incoming().customer.email.size() > 0 &&
+          incoming().customer.fullName is string && incoming().customer.fullName.size() > 0
+        )
+      );
+
+      // 3. Update: Customers can update notes or cancel their own draft/pending orders; Store Managers and Super Admins can update status/fulfillment;
+      // and updating notes on draft orders while in draft status preserving customer userId and total
+      allow update: if (
+        (isAuthenticated() && (
+          (resource != null && resource.data.userId == request.auth.uid && incoming().userId == request.auth.uid) ||
+          isSuperAdmin() ||
+          (hasUserDoc() && (
+            ('roles' in getUserData() && getUserData().roles is list && getUserData().roles.hasAny(['super_admin', 'administrator', 'store_admin', 'store_manager'])) ||
+            ('primaryRole' in getUserData() && getUserData().primaryRole in ['super_admin', 'administrator', 'store_admin', 'store_manager'])
+          ))
+        )) ||
+        (
+          resource != null &&
+          resource.data.orderStatus in ['draft', 'pending_payment', 'processing', 'paid', 'completed'] &&
+          incoming().userId == resource.data.userId &&
+          incoming().total == resource.data.total &&
+          incoming().orderStatus in ['draft', 'pending_payment', 'processing', 'paid', 'completed']
+        )
+      );
+
+      // 4. Delete: Strictly prohibited to maintain audit trails and preserve historical financial/order records
+      allow delete: if false;
     }
 
     // =========================================================
@@ -476,16 +716,22 @@ service cloud.firestore {
       allow read: if (
         (resource != null && resource.data.isResultPublished == true) ||
         (isAuthenticated() && (
-          (resource != null && resource.data.participantUid == request.auth.uid) ||
+          (resource != null && (
+            resource.data.participantUid == request.auth.uid ||
+            resource.data.userId == request.auth.uid ||
+            resource.data.candidateUid == request.auth.uid ||
+            resource.data.uid == request.auth.uid
+          )) ||
           hasAdminRole()
         ))
       );
       allow create: if isAuthenticated() && (
         request.resource.data.participantUid == request.auth.uid ||
+        request.resource.data.userId == request.auth.uid ||
         hasAdminRole()
       );
       allow update: if isAuthenticated() && (
-        (resource.data.participantUid == request.auth.uid &&
+        (((resource.data.participantUid == request.auth.uid) || (resource.data.userId == request.auth.uid)) &&
          !resource.data.isResultPublished == true &&
          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
            'marksObtained', 'totalMarks', 'percentage', 'grade', 'rank', 'awardCategory',

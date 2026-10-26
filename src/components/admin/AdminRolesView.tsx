@@ -988,6 +988,47 @@ export const AdminRolesView: React.FC = () => {
                   );
                 })}
               </div>
+
+              <label className="block text-xs font-bold text-slate-800 pt-2">Specialized Administrative Portfolios</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[220px] overflow-y-auto p-1">
+                {Object.entries(ROLE_DEFINITIONS)
+                  .filter(([k]) => !CORE_ROLES_LIST.includes(k as CoreRole))
+                  .map(([rKey, rDef]) => {
+                    const isChecked = editedRoles.includes(rKey as UserRole);
+                    const isPrimary = editedPrimaryRole === rKey;
+
+                    return (
+                      <button
+                        key={rKey}
+                        type="button"
+                        onClick={() => toggleRole(rKey as UserRole)}
+                        className={`p-2.5 rounded-xl border text-left transition-all flex items-start gap-2.5 cursor-pointer ${
+                          isChecked 
+                            ? 'border-indigo-500 bg-indigo-50/70 text-indigo-950 shadow-xs' 
+                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {}}
+                          className="mt-0.5 rounded text-indigo-600 pointer-events-none"
+                        />
+                        <div className="space-y-0.5 min-w-0">
+                          <div className="text-xs font-bold flex items-center gap-1.5 truncate">
+                            <span>{rDef.label}</span>
+                            {isPrimary && (
+                              <span className="text-[9px] px-1.5 py-0.2 bg-indigo-200 text-indigo-800 rounded font-semibold shrink-0">
+                                Primary
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-slate-500 line-clamp-1">{rDef.description}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+              </div>
             </div>
 
             {/* Effective Permissions Preview */}

@@ -35,7 +35,9 @@ import {
   ChevronRight,
   Award,
   Layers,
-  HeartHandshake
+  HeartHandshake,
+  GraduationCap,
+  ShoppingBag
 } from 'lucide-react';
 import { FETLogo } from '../common/FETLogo';
 import { useAuth } from '../../contexts/AuthContext';
@@ -58,6 +60,8 @@ import { DigitalDonorCard } from '../donor/DigitalDonorCard';
 import { DigitalVolunteerCard } from '../volunteer/DigitalVolunteerCard';
 import { DonorVerificationModal } from '../donor/DonorVerificationModal';
 import { MemberImpactView } from './MemberImpactView';
+import { StudentFeePortalView } from './StudentFeePortalView';
+import { MemberStoreOrdersView } from './MemberStoreOrdersView';
 
 export type MemberDashboardTab = 
   | 'dashboard'
@@ -69,7 +73,9 @@ export type MemberDashboardTab =
   | 'impact'
   | 'membership'
   | 'donations'
+  | 'fees'
   | 'campaigns'
+  | 'orders'
   | 'notifications'
   | 'settings';
 
@@ -111,7 +117,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
     'impact',
     'membership',
     'donations',
+    'fees',
     'campaigns',
+    'orders',
     'notifications',
     'settings'
   ];
@@ -472,6 +480,19 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('fees')}
+            className={`py-2 px-3 rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              activeTab === 'fees'
+                ? 'bg-emerald-400 text-slate-950 font-bold shadow-xs'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+            id="tab-fees"
+          >
+            <GraduationCap className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Student Fees</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('campaigns')}
             className={`py-2 px-3 rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
               activeTab === 'campaigns'
@@ -482,6 +503,19 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
           >
             <HeartHandshake className="w-3.5 h-3.5 text-emerald-400" />
             <span>My Appeals</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('orders')}
+            className={`py-2 px-3 rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              activeTab === 'orders'
+                ? 'bg-emerald-400 text-slate-950 font-bold shadow-xs'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+            id="tab-store-orders"
+          >
+            <ShoppingBag className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Store Orders</span>
           </button>
 
           <button
@@ -1460,11 +1494,29 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
         )}
 
         {/* ------------------------------------------------------------- */}
-        {/* TAB 5B: MY CAMPAIGNS & APPEALS (CROWDFUNDING MODULE)          */}
+        {/* TAB 5B: STUDENT & INSTITUTION FEES (CHAPTER 15.10 SRS)        */}
+        {/* ------------------------------------------------------------- */}
+        {activeTab === 'fees' && (
+          <div id="dashboard-fees-tab">
+            <StudentFeePortalView onNotify={notify} />
+          </div>
+        )}
+
+        {/* ------------------------------------------------------------- */}
+        {/* TAB 5C: MY CAMPAIGNS & APPEALS (CROWDFUNDING MODULE)          */}
         {/* ------------------------------------------------------------- */}
         {activeTab === 'campaigns' && (
           <div id="dashboard-campaigns-tab">
             <MemberCampaignsView />
+          </div>
+        )}
+
+        {/* ------------------------------------------------------------- */}
+        {/* TAB 5D: MY STORE ORDERS (FET STORE MODULE)                    */}
+        {/* ------------------------------------------------------------- */}
+        {activeTab === 'orders' && (
+          <div id="dashboard-orders-tab">
+            <MemberStoreOrdersView onOpenStore={onReturnToPublic} onOpenAuth={onOpenAuth} />
           </div>
         )}
 

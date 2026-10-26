@@ -34,7 +34,8 @@ import {
   EyeOff,
   Settings,
   Filter,
-  Check
+  Check,
+  ShoppingBag
 } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { AppNotification, NotificationCategory, NotificationPriority, UserNotificationPreferences } from '../../types';
@@ -79,6 +80,7 @@ export const MemberNotificationsView: React.FC<MemberNotificationsViewProps> = (
     generalBulletins: userPreferences?.generalBulletins ?? true,
     competitionAlerts: userPreferences?.competitionAlerts ?? true,
     examinationAlerts: userPreferences?.examinationAlerts ?? true,
+    storeAlerts: userPreferences?.storeAlerts ?? true,
     systemAlerts: true // Locked on
   });
   const [isSavingPrefs, setIsSavingPrefs] = useState<boolean>(false);
@@ -183,6 +185,13 @@ export const MemberNotificationsView: React.FC<MemberNotificationsViewProps> = (
   };
 
   const getCategoryMeta = (type?: NotificationCategory, module?: string) => {
+    if (module === 'store' || type === 'store') {
+      return {
+        label: 'FET Store Order',
+        icon: <ShoppingBag className="w-4 h-4 text-emerald-700" />,
+        badgeBg: 'bg-emerald-50 text-emerald-800 border-emerald-200'
+      };
+    }
     if (module === 'volunteer' || type === 'volunteer') {
       return {
         label: 'Volunteer',
@@ -381,6 +390,7 @@ export const MemberNotificationsView: React.FC<MemberNotificationsViewProps> = (
               { id: 'competitions', label: 'Competitions & Exams' },
               { id: 'certificates', label: 'Certificates' },
               { id: 'campaigns', label: 'Appeals' },
+              { id: 'store', label: 'Store Orders' },
               { id: 'account', label: 'Account Security' }
             ].map((tab) => (
               <button
@@ -775,6 +785,25 @@ export const MemberNotificationsView: React.FC<MemberNotificationsViewProps> = (
                   type="checkbox"
                   checked={prefForm.generalBulletins}
                   onChange={(e) => setPrefForm({ ...prefForm, generalBulletins: e.target.checked })}
+                  className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                />
+              </div>
+
+              {/* Store Order Updates */}
+              <div className="flex items-center justify-between py-2.5">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <ShoppingBag className="w-3.5 h-3.5 text-emerald-600" />
+                    FET Store Order & Delivery Updates
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Real-time status tracking, processing notifications, and dispatch alerts.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={prefForm.storeAlerts ?? true}
+                  onChange={(e) => setPrefForm({ ...prefForm, storeAlerts: e.target.checked })}
                   className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                 />
               </div>

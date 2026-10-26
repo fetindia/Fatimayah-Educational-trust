@@ -4,7 +4,7 @@
  * Fatimyah Educational Trust India (FET India)
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Award, 
@@ -28,7 +28,7 @@ import {
 import { Competition, CompetitionRegistration } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { db, cleanFirestoreData } from '../../lib/firebase';
-import { doc, setDoc, updateDoc, increment, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, increment, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { initiateRazorpayContribution, PaymentVerificationResult } from '../../lib/razorpay';
 
 interface CompetitionRegistrationModalProps {
@@ -77,7 +77,128 @@ export const CompetitionRegistrationModal: React.FC<CompetitionRegistrationModal
     bookTitle?: string;
     bookAuthor?: string;
     requiredChapters?: string;
+    bookFileName?: string;
+    bookFileSizeBytes?: number;
   } | null>(null);
+  const [isDownloadingBook, setIsDownloadingBook] = useState(false);
+  const [downloadBookError, setDownloadBookError] = useState<string | null>(null);
+
+  // Check for existing saved registration on open to prevent duplicate registration and support revisit
+  useEffect(() => {
+    if (!isOpen || !currentUser?.uid || !competition?.id) return;
+    const docId = `reg-${competition.id}-${currentUser.uid}`;
+    getDoc(doc(db, 'competition_registrations', docId))
+      .then((docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const resolvedBookUrl = competition.pdfReadingMaterialUrl || competition.bookDetails?.pdfReadingMaterialUrl;
+          const resolvedBookExt = competition.bookDetails?.pdfExternalUrl || (competition.pdfSourceType === 'external_url' ? competition.pdfReadingMaterialUrl : undefined);
+          setSuccessData({
+            participantId: data.participantId || `FET-PRT-${docSnap.id.slice(-6)}`,
+            registrationDocId: docSnap.id,
+            candidateName: data.participantName || currentUser.displayName || 'Candidate',
+            isPaid: Boolean(data.isPaid),
+            amount: data.participationFee || 0,
+            bookMaterialUrl: resolvedBookUrl,
+            bookExternalUrl: resolvedBookExt,
+            bookTitle: competition.bookDetails?.bookTitle || competition.title,
+            bookAuthor: competition.bookDetails?.author,
+            requiredChapters: competition.bookDetails?.requiredChapters,
+            bookFileName: competition.pdfFileName || competition.bookDetails?.pdfFileName,
+            bookFileSizeBytes: competition.pdfFileSizeBytes || competition.bookDetails?.pdfFileSizeBytes
+          });
+        }
+      })
+      .catch((err) => {
+        console.warn('Existing registration lookup notice:', err);
+      });
+  }, [isOpen, currentUser?.uid, competition?.id]);
+
+  const handleDownloadOfficialBook = async () => {
+    setIsDownloadingBook(true);
+    setDownloadBookError(null);
+
+    try {
+      const compId = competition.id || 'general';
+      const candidateUid = currentUser?.uid || '';
+      const candidateCode = competition.code || 'FET-CMP';
+      const customFilename = successData?.bookFileName || competition.pdfFileName || competition.bookDetails?.pdfFileName || `${candidateCode}_Official_Competition_Book.pdf`;
+      const safeFilename = customFilename.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const regDocId = successData?.registrationDocId || `reg-${compId}-${candidateUid}`;
+      const prtId = successData?.participantId || '';
+      const payStatus = successData?.isPaid ? 'paid' : 'free';
+
+      const targetEndpoint = `/api/competitions/${compId}/material?uid=${encodeURIComponent(candidateUid)}&regId=${encodeURIComponent(regDocId)}&prtId=${encodeURIComponent(prtId)}&payStatus=${encodeURIComponent(payStatus)}`;
+      let downloadBlob: Blob | null = null;
+
+      try {
+        const resp = await fetch(targetEndpoint, {
+          headers: {
+            'x-user-uid': candidateUid,
+            'x-registration-id': regDocId,
+            'x-participant-id': prtId,
+            'x-payment-status': payStatus
+          }
+        });
+        if (resp.ok) {
+          const ct = resp.headers.get('content-type') || '';
+          if (ct.includes('application/pdf') || ct.includes('application/octet-stream')) {
+            downloadBlob = await resp.blob();
+          } else {
+            const err = await resp.json().catch(() => null);
+            if (err?.error) throw new Error(err.error);
+          }
+        } else if (resp.status === 403) {
+          const err = await resp.json().catch(() => null);
+          throw new Error(err?.error || 'Candidate registration verification required to download official study material.');
+        } else if (!resp.ok) {
+          const err = await resp.json().catch(() => null);
+          throw new Error(err?.error || 'Official competition PDF is currently being prepared by the Examination Board.');
+        }
+      } catch (endpointErr: any) {
+        if (endpointErr?.message && endpointErr.message.includes('verification')) {
+          throw endpointErr;
+        }
+        console.warn('Backend download notice, checking direct stream fallback:', endpointErr);
+      }
+
+      const directUrl = successData?.bookMaterialUrl || competition.pdfReadingMaterialUrl || competition.bookDetails?.pdfReadingMaterialUrl;
+      if (!downloadBlob && directUrl && (directUrl.startsWith('http://') || directUrl.startsWith('https://')) && !directUrl.includes('/api/competitions/')) {
+        try {
+          const dResp = await fetch(directUrl);
+          if (dResp.ok) {
+            downloadBlob = await dResp.blob();
+          }
+        } catch {
+          // Fallback handled below
+        }
+      }
+
+      if (downloadBlob) {
+        const blobUrl = window.URL.createObjectURL(downloadBlob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = safeFilename.endsWith('.pdf') ? safeFilename : `${safeFilename}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1500);
+      } else if (directUrl && directUrl.startsWith('data:application/pdf;base64,')) {
+        const link = document.createElement('a');
+        link.href = directUrl;
+        link.download = safeFilename.endsWith('.pdf') ? safeFilename : `${safeFilename}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        throw new Error('Official competition PDF is being prepared by the Examination Board. It will also be accessible from your Student Dashboard.');
+      }
+    } catch (err: any) {
+      setDownloadBookError(err?.message || 'Failed to download official PDF book.');
+    } finally {
+      setIsDownloadingBook(false);
+    }
+  };
 
   // Check deadline
   const isRegistrationClosed = competition.registrationEndDate 
@@ -128,10 +249,38 @@ export const CompetitionRegistrationModal: React.FC<CompetitionRegistrationModal
       amount: number;
     }) => {
       try {
+        const registrationDocId = `reg-${competition.id || 'cmp'}-${currentUser.uid}`;
+        const bookUrl = competition.pdfReadingMaterialUrl || competition.bookDetails?.pdfReadingMaterialUrl;
+        const bookExt = competition.bookDetails?.pdfExternalUrl || (competition.pdfSourceType === 'external_url' ? competition.pdfReadingMaterialUrl : undefined);
+        const bookTitle = competition.bookDetails?.bookTitle || competition.title;
+        const bookAuthor = competition.bookDetails?.author;
+        const requiredChapters = competition.bookDetails?.requiredChapters;
+
+        // 1. Prevent duplicate registration when page is refreshed or submission retried
+        const existingSnap = await getDoc(doc(db, 'competition_registrations', registrationDocId)).catch(() => null);
+        if (existingSnap && existingSnap.exists()) {
+          const existing = existingSnap.data() as CompetitionRegistration;
+          setSuccessData({
+            participantId: existing.participantId,
+            registrationDocId,
+            candidateName: existing.participantName || formData.participantName.trim(),
+            isPaid: Boolean(existing.isPaid),
+            amount: existing.participationFee || 0,
+            bookMaterialUrl: bookUrl,
+            bookExternalUrl: bookExt,
+            bookTitle,
+            bookAuthor,
+            requiredChapters,
+            bookFileName: competition.pdfFileName || competition.bookDetails?.pdfFileName,
+            bookFileSizeBytes: competition.pdfFileSizeBytes || competition.bookDetails?.pdfFileSizeBytes
+          });
+          if (onSuccess) onSuccess(registrationDocId);
+          return;
+        }
+
         // Generate Unique Participant Roll ID
         const randomSuffix = Math.floor(1000 + Math.random() * 9000);
         const participantId = `FET-PRT-${new Date().getFullYear()}-${randomSuffix}`;
-        const registrationDocId = `reg-${competition.id || 'cmp'}-${currentUser.uid}`;
 
         const newRegistration: CompetitionRegistration = {
           registrationId: registrationDocId,
@@ -169,11 +318,21 @@ export const CompetitionRegistrationModal: React.FC<CompetitionRegistrationModal
           totalMarks: competition.maxMarks,
           isResultPublished: false,
           certificateIssued: false,
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
+
+          // Test vs Live Environment Separation
+          isTestRegistration: Boolean(competition.isTestCompetition || competition.environment === 'test'),
+          environment: (competition.environment || (competition.isTestCompetition ? 'test' : 'live')) as 'live' | 'test'
         };
 
         // Write to Firestore
         await setDoc(doc(db, 'competition_registrations', registrationDocId), cleanFirestoreData(newRegistration));
+
+        // Authoritatively verify save succeeded in database before presenting success screen
+        const verifySnap = await getDoc(doc(db, 'competition_registrations', registrationDocId));
+        if (!verifySnap.exists()) {
+          throw new Error('Registration verification failed: Saved record could not be confirmed in the database. Please try again.');
+        }
 
         // Increment registered count in competition document
         if (competition.id) {
@@ -206,13 +365,6 @@ export const CompetitionRegistrationModal: React.FC<CompetitionRegistrationModal
           details: `Registered candidate ${formData.participantName} for ${competition.title} with Participant ID ${participantId}${isPaidExam ? ` (Paid: ₹${feeAmount})` : ' (Free)'}`,
           timestamp: new Date().toISOString()
         })).catch(() => {});
-
-        // Resolve Book & Study Material
-        const bookUrl = competition.pdfReadingMaterialUrl || competition.bookDetails?.pdfReadingMaterialUrl;
-        const bookExt = competition.bookDetails?.pdfExternalUrl || (competition.pdfSourceType === 'external_url' ? competition.pdfReadingMaterialUrl : undefined);
-        const bookTitle = competition.bookDetails?.bookTitle || competition.title;
-        const bookAuthor = competition.bookDetails?.author;
-        const requiredChapters = competition.bookDetails?.requiredChapters;
 
         // AUTOMATIC STUDY MATERIAL DELIVERY:
         // For Paid: Immediately trigger automatic download of PDF where supported
@@ -247,7 +399,9 @@ export const CompetitionRegistrationModal: React.FC<CompetitionRegistrationModal
           bookExternalUrl: bookExt,
           bookTitle,
           bookAuthor,
-          requiredChapters
+          requiredChapters,
+          bookFileName: competition.pdfFileName || competition.bookDetails?.pdfFileName,
+          bookFileSizeBytes: competition.pdfFileSizeBytes || competition.bookDetails?.pdfFileSizeBytes
         });
 
         if (onSuccess) {
@@ -320,7 +474,7 @@ export const CompetitionRegistrationModal: React.FC<CompetitionRegistrationModal
                 {successData.isPaid ? 'Payment & Enrollment Confirmed' : 'Free Registration Confirmed'}
               </span>
               <h2 className="text-xl sm:text-2xl font-black text-slate-900">
-                Candidate Successfully Registered!
+                Registration Successful! Download the Official Competition Book below.
               </h2>
               <p className="text-xs sm:text-sm text-slate-600 mt-1">
                 Your examination seat has been officially reserved for <span className="font-semibold text-slate-900">{competition.title}</span>.
@@ -358,61 +512,86 @@ export const CompetitionRegistrationModal: React.FC<CompetitionRegistrationModal
               </div>
             </div>
 
-            {/* AUTOMATIC BOOK / STUDY MATERIAL DELIVERY CARD */}
-            {(successData.bookMaterialUrl || successData.bookExternalUrl || competition.bookDetails) && (
-              <div className="bg-gradient-to-br from-indigo-50 to-blue-50 border-2 border-indigo-200 rounded-2xl p-5 text-left space-y-3 shadow-sm">
-                <div className="flex items-center space-x-2.5 text-indigo-900">
-                  <BookOpen className="w-5 h-5 text-indigo-600 flex-shrink-0" />
-                  <div>
-                    <h3 className="text-sm font-black text-indigo-950">Prescribed Study Material & Syllabus Delivered</h3>
-                    <p className="text-xs text-indigo-700">
-                      {successData.bookTitle ? `Title: ${successData.bookTitle}` : 'Official Examination Preparation Literature'}
-                      {successData.bookAuthor ? ` • Author: ${successData.bookAuthor}` : ''}
-                    </p>
-                  </div>
+            {/* OFFICIAL PDF / BOOK DOWNLOAD SECTION */}
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 rounded-2xl p-5 text-left space-y-4 shadow-sm">
+              <div className="flex items-center space-x-2.5 text-amber-950">
+                <div className="p-2 bg-amber-600 text-white rounded-xl shadow-xs">
+                  <BookOpen className="w-5 h-5" />
                 </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900">Official Prescribed Competition Book & Study Material</h3>
+                  <p className="text-xs text-slate-600">
+                    {successData.bookTitle ? `Title: ${successData.bookTitle}` : (competition.bookDetails?.bookTitle || competition.title)}
+                    {successData.bookAuthor ? ` • Author: ${successData.bookAuthor}` : (competition.bookDetails?.author ? ` • Author: ${competition.bookDetails.author}` : '')}
+                  </p>
+                </div>
+              </div>
 
-                {successData.requiredChapters && (
-                  <div className="text-xs text-slate-700 bg-white/80 p-2.5 rounded-xl border border-indigo-100">
-                    <span className="font-bold text-indigo-950">Curriculum Scope: </span>
-                    {successData.requiredChapters}
+              {successData.requiredChapters && (
+                <div className="text-xs text-slate-700 bg-white/90 p-2.5 rounded-xl border border-amber-200">
+                  <span className="font-bold text-amber-950">Curriculum Scope: </span>
+                  {successData.requiredChapters}
+                </div>
+              )}
+
+              {/* Prominent Download Button */}
+              <div className="space-y-2 pt-1">
+                {(successData.bookMaterialUrl || competition.pdfReadingMaterialUrl || competition.bookDetails?.pdfReadingMaterialUrl || successData.bookExternalUrl || competition.pdfExternalUrl || competition.bookDetails?.pdfExternalUrl) ? (
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleDownloadOfficialBook}
+                      disabled={isDownloadingBook}
+                      className="px-6 py-3.5 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl text-sm font-black shadow-lg shadow-amber-600/30 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {isDownloadingBook ? (
+                        <>
+                          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                          <span>Downloading Official PDF Book...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-4 h-4" />
+                          <span>Download Official PDF / Book</span>
+                        </>
+                      )}
+                    </button>
+
+                    {successData.bookExternalUrl && (
+                      <a
+                        href={successData.bookExternalUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-3 bg-white hover:bg-slate-50 text-indigo-700 border border-indigo-300 rounded-2xl text-xs font-bold shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        <span>Open Online Reader URL</span>
+                      </a>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-amber-100/70 border border-amber-300 text-xs text-amber-900 font-medium">
+                    Official competition study material and curriculum book is being prepared by the Examination Board. It will also be accessible from your Student Dashboard.
                   </div>
                 )}
 
-                <div className="flex flex-wrap gap-2.5 pt-1">
-                  {successData.bookMaterialUrl && (
-                    <a
-                      href={successData.bookMaterialUrl}
-                      download={`${(competition.code || 'FET').replace(/[^a-zA-Z0-9_-]/g, '_')}_Study_Material.pdf`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center space-x-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-200 transition cursor-pointer"
+                {downloadBookError && (
+                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>{downloadBookError}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleDownloadOfficialBook}
+                      className="text-rose-700 hover:text-rose-950 underline font-bold text-xs"
                     >
-                      <Download className="w-4 h-4" />
-                      <span>Download Book / Study Material (PDF)</span>
-                    </a>
-                  )}
-
-                  {successData.bookExternalUrl && (
-                    <a
-                      href={successData.bookExternalUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center space-x-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-indigo-700 border border-indigo-300 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      <span>Open Prescribed Literature URL</span>
-                    </a>
-                  )}
-                </div>
-
-                {successData.isPaid && (
-                  <p className="text-[11px] text-emerald-800 bg-emerald-50/80 px-2.5 py-1.5 rounded-lg border border-emerald-200 font-medium">
-                    ✓ Immediate PDF download was dispatched automatically. If your browser blocked it, click the "Download Book" button above.
-                  </p>
+                      Retry Download
+                    </button>
+                  </div>
                 )}
               </div>
-            )}
+            </div>
 
             <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
               <button

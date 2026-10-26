@@ -88,6 +88,139 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     targetModule: 'Finance & Accounting'
   },
   {
+    id: 'finance.view',
+    name: 'View Financial Records',
+    description: 'Read-only access to view Trust ledgers, income, expenses, accounts, and financial reports.',
+    category: 'Core Operations',
+    targetModule: 'Finance & Accounting'
+  },
+  {
+    id: 'finance.income',
+    name: 'Record & Manage Income',
+    description: 'Create and verify income entries, donations receipts, and miscellaneous incoming funds.',
+    category: 'Core Operations',
+    targetModule: 'Finance & Accounting'
+  },
+  {
+    id: 'finance.income.view',
+    name: 'View Income Records',
+    description: 'Access and review income registers, fee contributions, and linked donor credits.',
+    category: 'Core Operations',
+    targetModule: 'Finance & Accounting'
+  },
+  {
+    id: 'finance.income.create',
+    name: 'Register Incoming Funds',
+    description: 'Create new manual income entries for fees, offline receipts, grants, and contributions.',
+    category: 'Core Operations',
+    targetModule: 'Finance & Accounting'
+  },
+  {
+    id: 'finance.income.edit',
+    name: 'Modify Income Records',
+    description: 'Update draft income records and reference numbers prior to final ledger posting.',
+    category: 'Core Operations',
+    targetModule: 'Finance & Accounting'
+  },
+  {
+    id: 'finance.expense',
+    name: 'Manage Expenses & Requisitions',
+    description: 'Draft and submit expense requisitions, vendor bills, and operational disbursement requests.',
+    category: 'Core Operations',
+    targetModule: 'Finance & Accounting'
+  },
+  {
+    id: 'finance.expense.view',
+    name: 'View Expense Requisitions',
+    description: 'Access department expense vouchers, requisitions, and vendor payment tracking.',
+    category: 'Core Operations',
+    targetModule: 'Finance & Accounting'
+  },
+  {
+    id: 'finance.expense.create',
+    name: 'Create Expense Requisition',
+    description: 'Draft and submit new expense requests with supporting quotation or invoice documents.',
+    category: 'Core Operations',
+    targetModule: 'Finance & Accounting'
+  },
+  {
+    id: 'finance.expense.edit',
+    name: 'Edit Expense Requisition',
+    description: 'Update draft expense requisitions before department or finance submission.',
+    category: 'Core Operations',
+    targetModule: 'Finance & Accounting'
+  },
+  {
+    id: 'finance.expense.verify',
+    name: 'Finance Verification',
+    description: 'Verify expense documentation, tax compliance, budget allocation, and fund availability.',
+    category: 'Core Operations',
+    targetModule: 'Finance & Accounting'
+  },
+  {
+    id: 'finance.expense.approve',
+    name: 'Approve Expense Requisitions',
+    description: 'Departmental and institutional authorization to approve verified expenditure requests.',
+    category: 'Core Operations',
+    targetModule: 'Finance & Accounting'
+  },
+  {
+    id: 'finance.payment.process',
+    name: 'Process & Execute Payments',
+    description: 'Disburse approved funds via bank transfer, cheque, or gateway and record reference details.',
+    category: 'Core Operations',
+    targetModule: 'Finance & Accounting'
+  },
+  {
+    id: 'finance.accounting.post',
+    name: 'Post Accounting Entries',
+    description: 'Post finalized vouchers and executed payments directly into the double-entry General Ledger.',
+    category: 'Core Operations',
+    targetModule: 'Finance & Accounting'
+  },
+  {
+    id: 'finance.ledger',
+    name: 'General Ledger Operations',
+    description: 'Access double-entry chart of accounts, post journal entries, and review accounting trial balances.',
+    category: 'Core Operations',
+    targetModule: 'Finance & Accounting'
+  },
+  {
+    id: 'finance.budget',
+    name: 'Budget Planning & Control',
+    description: 'Define, allocate, and monitor department-wise annual budgets and expenditure variance.',
+    category: 'Core Operations',
+    targetModule: 'Finance & Accounting'
+  },
+  {
+    id: 'finance.accounts',
+    name: 'Chart of Accounts Management',
+    description: 'Manage master chart of accounts, bank accounts, and classification codes.',
+    category: 'Core Operations',
+    targetModule: 'Finance & Accounting'
+  },
+  {
+    id: 'finance.reconciliation',
+    name: 'Bank & Gateway Reconciliation',
+    description: 'Reconcile bank statements, gateway receipts, and ledger closing balances.',
+    category: 'Core Operations',
+    targetModule: 'Finance & Accounting'
+  },
+  {
+    id: 'finance.reports',
+    name: 'Financial & Statutory Reporting',
+    description: 'Generate balance sheets, profit & loss, 80G tax reports, and statutory audit statements.',
+    category: 'Core Operations',
+    targetModule: 'Finance & Accounting'
+  },
+  {
+    id: 'finance.approve',
+    name: 'Approve Financial Transactions',
+    description: 'Executive authority to authorize expense vouchers, fund disbursements, and adjustment entries.',
+    category: 'Core Operations',
+    targetModule: 'Finance & Accounting'
+  },
+  {
     id: 'exams.manage',
     name: 'Manage Examination System',
     description: 'Oversee examination setup, schedules, papers, candidate registrations, results computation, and certification.',
@@ -242,6 +375,41 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     description: 'Full authorization to create, edit, and publish content across media modules.',
     category: 'Core Operations',
     targetModule: 'Blog, Press & News'
+  },
+  {
+    id: 'store.manage',
+    name: 'Manage Store Operations',
+    description: 'Authority to manage FET Store catalogue, inventory, products, and categories.',
+    category: 'Core Operations',
+    targetModule: 'FET Store'
+  },
+  {
+    id: 'store.products',
+    name: 'Manage Products & Variants',
+    description: 'Create, modify, and publish store products, digital attachments, and product options.',
+    category: 'Core Operations',
+    targetModule: 'FET Store'
+  },
+  {
+    id: 'store.categories',
+    name: 'Manage Categories & Subcategories',
+    description: 'Configure store departments, categories, subcategories, and catalogue navigation.',
+    category: 'Core Operations',
+    targetModule: 'FET Store'
+  },
+  {
+    id: 'store.inventory',
+    name: 'Manage Stock & Availability',
+    description: 'Track stock counts, low stock alerts, backorders, and item availability statuses.',
+    category: 'Core Operations',
+    targetModule: 'FET Store'
+  },
+  {
+    id: 'store.orders',
+    name: 'Review Store Orders & Allocations',
+    description: 'Review customer orders, update order fulfillment status, and inspect institutional dispatch records.',
+    category: 'Core Operations',
+    targetModule: 'FET Store'
   }
 ];
 
@@ -255,6 +423,25 @@ export const ALL_PERMISSIONS: AppPermission[] = [
   'modules.manage',
   'settings.manage',
   'finance.manage',
+  'finance.view',
+  'finance.income',
+  'finance.income.view',
+  'finance.income.create',
+  'finance.income.edit',
+  'finance.expense',
+  'finance.expense.view',
+  'finance.expense.create',
+  'finance.expense.edit',
+  'finance.expense.approve',
+  'finance.expense.verify',
+  'finance.payment.process',
+  'finance.accounting.post',
+  'finance.ledger',
+  'finance.budget',
+  'finance.accounts',
+  'finance.reconciliation',
+  'finance.reports',
+  'finance.approve',
   'exams.manage',
   'exams.evaluate',
   'cases.district_review',
@@ -276,7 +463,12 @@ export const ALL_PERMISSIONS: AppPermission[] = [
   'trust.edit',
   'bulletin.publish',
   'bulletin.edit',
-  'content.publish'
+  'content.publish',
+  'store.manage',
+  'store.products',
+  'store.categories',
+  'store.inventory',
+  'store.orders'
 ];
 
 /**
@@ -464,7 +656,31 @@ export const ROLE_DEFINITIONS: Record<UserRole, RoleMetadata> = {
     description: 'Oversees double-entry ledgers, expense authorizations, and audits.',
     hierarchyLevel: 75,
     isAdministrative: true,
-    defaultPermissions: ['users.view', 'donors.manage', 'settings.manage', 'finance.manage'],
+    defaultPermissions: [
+      'users.view', 
+      'donors.manage', 
+      'settings.manage', 
+      'finance.manage',
+      'finance.view',
+      'finance.income',
+      'finance.income.view',
+      'finance.income.create',
+      'finance.income.edit',
+      'finance.expense',
+      'finance.expense.view',
+      'finance.expense.create',
+      'finance.expense.edit',
+      'finance.expense.approve',
+      'finance.expense.verify',
+      'finance.payment.process',
+      'finance.accounting.post',
+      'finance.ledger',
+      'finance.budget',
+      'finance.accounts',
+      'finance.reconciliation',
+      'finance.reports',
+      'finance.approve'
+    ],
     badgeColor: 'bg-emerald-950 text-emerald-300 border-emerald-800'
   },
   hr_admin: {
@@ -521,11 +737,20 @@ export const ROLE_DEFINITIONS: Record<UserRole, RoleMetadata> = {
   store_admin: {
     id: 'store_admin',
     label: 'Store Administrator',
-    description: 'Oversees FET Store merchandise, books, and orders.',
+    description: 'Oversees FET Store merchandise, books, publications, and store operations.',
     hierarchyLevel: 60,
     isAdministrative: true,
-    defaultPermissions: ['modules.manage'],
+    defaultPermissions: ['modules.manage', 'store.manage', 'store.products', 'store.categories', 'store.inventory', 'store.orders'],
     badgeColor: 'bg-amber-950 text-amber-300 border-amber-800'
+  },
+  store_manager: {
+    id: 'store_manager',
+    label: 'Store Manager',
+    description: 'Dedicated Store Manager: manages products, categories, variants, inventory, and order fulfillment without accessing finance or other modules.',
+    hierarchyLevel: 55,
+    isAdministrative: true,
+    defaultPermissions: ['modules.manage', 'store.manage', 'store.products', 'store.categories', 'store.inventory', 'store.orders'],
+    badgeColor: 'bg-emerald-950 text-emerald-300 border-emerald-800'
   },
   travel_admin: {
     id: 'travel_admin',
@@ -1256,4 +1481,270 @@ export function canOperateAnyPublishing(userProfile: UserProfile | null, isSuper
     canEditBulletin(userProfile, false) ||
     canPublishBulletin(userProfile, false);
 }
+
+/**
+ * Granular Finance & Accounting Access Control Helpers (Chapter 15 SRS)
+ */
+export function canViewFinance(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('administrator') || roles.includes('finance_admin')) return true;
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('finance.manage') || perms.includes('finance.view') || perms.includes('finance.reports') || perms.includes('finance.ledger');
+}
+
+export function canManageFinance(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('finance_admin')) return true;
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('finance.manage');
+}
+
+export function canApproveFinance(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('finance_admin')) return true;
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('finance.manage') || perms.includes('finance.approve') || perms.includes('finance.expense.approve');
+}
+
+export const canApproveExpense = canApproveFinance;
+
+export function canCreateExpense(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('administrator') || roles.includes('finance_admin')) return true;
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('finance.manage') || perms.includes('finance.expense') || perms.includes('finance.expense.create');
+}
+
+export function canVerifyExpense(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('finance_admin')) return true;
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('finance.manage') || perms.includes('finance.expense.verify');
+}
+
+export function canProcessPayment(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('finance_admin')) return true;
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('finance.manage') || perms.includes('finance.payment.process');
+}
+
+export function canRecordIncome(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('administrator') || roles.includes('finance_admin')) return true;
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('finance.manage') || perms.includes('finance.income') || perms.includes('finance.income.create');
+}
+
+export function canPostAccounting(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('finance_admin')) return true;
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('finance.manage') || perms.includes('finance.accounting.post') || perms.includes('finance.ledger');
+}
+
+export function canManageBudget(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('administrator') || roles.includes('finance_admin')) return true;
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('finance.manage') || perms.includes('finance.budget');
+}
+
+export function canViewBudget(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  if (canManageBudget(userProfile, false)) return true;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('core_member')) return true; // Trustees have audit & budget oversight
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('finance.view') || perms.includes('finance.reports') || perms.includes('finance.ledger') || perms.includes('finance.budget');
+}
+
+export function canApproveBudget(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('finance_admin')) return true;
+  if (roles.includes('core_member')) {
+    const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+    return perms.includes('finance.manage') || perms.includes('finance.approve') || perms.includes('finance.budget');
+  }
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('finance.manage') || perms.includes('finance.approve');
+}
+
+export function canManageBankAccounts(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('administrator') || roles.includes('finance_admin')) return true;
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('finance.manage') || perms.includes('finance.bank');
+}
+
+export function canPerformBankReconciliation(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('administrator') || roles.includes('finance_admin') || roles.includes('core_member')) return true;
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('finance.manage') || perms.includes('finance.reconcile') || perms.includes('finance.bank') || perms.includes('finance.accounting.post');
+}
+
+export function canViewBankManagement(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  if (canManageBankAccounts(userProfile, false) || canPerformBankReconciliation(userProfile, false)) return true;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('core_member')) return true; // Trustees have review & oversight access
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('finance.view') || perms.includes('finance.reports') || perms.includes('finance.ledger') || perms.includes('finance.bank');
+}
+
+// =========================================================================
+// INSTITUTIONAL FEE MANAGEMENT RBAC (CHAPTER 15.10 SRS - TASK 6)
+// =========================================================================
+
+export function canManageSchoolFees(userProfile: UserProfile | null, isSuperAdmin: boolean, schoolId?: string): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('administrator') || roles.includes('finance_admin')) return true;
+  if (roles.includes('school_admin')) {
+    // If user has specific assigned school, verify strict match to prevent cross-school access
+    if (schoolId && (userProfile as any).assignedSchoolId) {
+      return (userProfile as any).assignedSchoolId === schoolId;
+    }
+    return true;
+  }
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('fee.manage') || perms.includes('finance.manage') || perms.includes('fee.collect');
+}
+
+export function canManageMadrasaFees(userProfile: UserProfile | null, isSuperAdmin: boolean, madrasaId?: string): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('administrator') || roles.includes('finance_admin')) return true;
+  if (roles.includes('madrasa_admin')) {
+    // If user has specific assigned madrasa, verify strict match to prevent cross-madrasa access
+    if (madrasaId && (userProfile as any).assignedMadrasaId) {
+      return (userProfile as any).assignedMadrasaId === madrasaId;
+    }
+    return true;
+  }
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('fee.manage') || perms.includes('finance.manage') || perms.includes('fee.collect');
+}
+
+export function canViewFeeManagement(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('administrator') || roles.includes('finance_admin') || roles.includes('school_admin') || roles.includes('madrasa_admin') || roles.includes('core_member')) {
+    return true;
+  }
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('fee.view') || perms.includes('fee.manage') || perms.includes('finance.view') || perms.includes('finance.manage') || perms.includes('fee.collect');
+}
+
+export function canCollectFees(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('administrator') || roles.includes('finance_admin') || roles.includes('school_admin') || roles.includes('madrasa_admin')) {
+    return true;
+  }
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('fee.collect') || perms.includes('fee.manage') || perms.includes('finance.manage');
+}
+
+export function canSendFeeReminders(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('administrator') || roles.includes('finance_admin') || roles.includes('school_admin') || roles.includes('madrasa_admin')) {
+    return true;
+  }
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('fee.remind') || perms.includes('fee.manage');
+}
+
+/**
+ * Granular FET Store Management Access Control Helpers
+ */
+export function canManageStore(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('administrator') || roles.includes('store_admin') || roles.includes('store_manager')) {
+    return true;
+  }
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('store.manage') || perms.includes('store.products') || perms.includes('store.categories') || perms.includes('store.inventory');
+}
+
+/**
+ * Returns true if the user has authorization to review and process Store customer orders.
+ */
+export function canManageStoreOrders(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!userProfile) return false;
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+  if (roles.includes('super_admin') || roles.includes('administrator') || roles.includes('store_admin') || roles.includes('store_manager')) {
+    return true;
+  }
+  const perms = [...(userProfile.permissions || []), ...(userProfile.customPermissions || [])];
+  return perms.includes('store.manage') || perms.includes('store.orders');
+}
+
+/**
+ * Returns true if the user has ONLY Store management authorization and no global administrative roles.
+ * Used for strict dashboard isolation so Store Managers cannot view or access unrelated trust consoles.
+ */
+export function isStorePersonnelOnly(userProfile: UserProfile | null, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin) return false;
+  if (!userProfile) return false;
+
+  const roles = userProfile.roles || (userProfile.primaryRole ? [userProfile.primaryRole] : []);
+
+  // Check if they have store manager/admin access
+  const isStore = roles.includes('store_manager') || roles.includes('store_admin') ||
+    userProfile.permissions?.some(p => ['store.manage', 'store.products'].includes(p)) ||
+    userProfile.customPermissions?.some(p => ['store.manage', 'store.products'].includes(p));
+
+  if (!isStore) return false;
+
+  // If user has other administrative or governance roles, they are not store-only
+  const otherAdminRoles: UserRole[] = [
+    'super_admin', 'administrator', 'core_member',
+    'finance_admin', 'hr_admin', 'exam_controller', 'exam_admin', 'examiner',
+    'donor_admin', 'member_admin', 'volunteer_admin', 'crowdfunding_admin',
+    'school_admin', 'madrasa_admin', 'travel_admin', 'reports_admin',
+    'content_admin', 'blog_admin',
+    'district_admin', 'state_admin', 'national_admin'
+  ];
+
+  return !roles.some(r => otherAdminRoles.includes(r));
+}
+
+
 

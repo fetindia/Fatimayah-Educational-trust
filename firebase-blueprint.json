@@ -333,6 +333,144 @@
       },
       "required": ["transactionId", "type", "category", "amount", "date", "status", "payerPayeeName", "description", "createdByUid", "createdByEmail", "createdAt"]
     },
+    "finance_budgets": {
+      "title": "Annual and Departmental Finance Budgets",
+      "description": "Authorized institutional budget allocations with real-time expenditure utilization tracking",
+      "type": "object",
+      "properties": {
+        "budgetId": { "type": "string" },
+        "name": { "type": "string" },
+        "financialYear": { "type": "string" },
+        "department": { "type": "string" },
+        "allocatedAmount": { "type": "number" },
+        "category": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "approved", "active", "closed"] },
+        "organizationalUnit": { "type": "string" },
+        "fundType": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdByUid": { "type": "string" },
+        "createdByEmail": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "financialYear", "department", "allocatedAmount", "category", "status", "createdByUid", "createdByEmail", "createdAt"]
+    },
+    "finance_bank_accounts": {
+      "title": "Trust Official Bank Accounts",
+      "description": "Authorized institutional bank and treasury accounts without internet credentials",
+      "type": "object",
+      "properties": {
+        "accountCode": { "type": "string" },
+        "accountName": { "type": "string" },
+        "bankName": { "type": "string" },
+        "accountNumber": { "type": "string" },
+        "ifscCode": { "type": "string" },
+        "branchName": { "type": "string" },
+        "accountType": { "type": "string" },
+        "currency": { "type": "string" },
+        "openingBalance": { "type": "number" },
+        "currentBalance": { "type": "number" },
+        "status": { "type": "string" },
+        "isPrimary": { "type": "boolean" },
+        "upiId": { "type": "string" },
+        "createdByUid": { "type": "string" },
+        "createdByEmail": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["accountName", "bankName", "accountNumber", "ifscCode", "accountType", "openingBalance", "status", "createdByUid", "createdByEmail", "createdAt"]
+    },
+    "student_fees": {
+      "title": "Institutional Student Fee Records",
+      "description": "Student fee assessments, payment tracking, and receipt linkages for School and Madrasa ERP",
+      "type": "object",
+      "properties": {
+        "feeCode": { "type": "string" },
+        "studentName": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentUid": { "type": "string" },
+        "parentName": { "type": "string" },
+        "parentEmail": { "type": "string" },
+        "parentPhone": { "type": "string" },
+        "institutionType": { "type": "string" },
+        "institutionId": { "type": "string" },
+        "institutionName": { "type": "string" },
+        "academicSession": { "type": "string" },
+        "courseOrGrade": { "type": "string" },
+        "category": { "type": "string" },
+        "categoryLabel": { "type": "string" },
+        "description": { "type": "string" },
+        "totalAssessed": { "type": "number" },
+        "amountPaid": { "type": "number" },
+        "outstandingAmount": { "type": "number" },
+        "dueDate": { "type": "string" },
+        "paymentStatus": { "type": "string" },
+        "paymentDate": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "transactionReference": { "type": "string" },
+        "receiptNumber": { "type": "string" },
+        "razorpayOrderId": { "type": "string" },
+        "razorpayPaymentId": { "type": "string" },
+        "remindersSentCount": { "type": "number" },
+        "lastReminderSentAt": { "type": "string" },
+        "financialRecordId": { "type": "string" },
+        "createdByUid": { "type": "string" },
+        "createdByEmail": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["feeCode", "studentName", "studentId", "institutionType", "institutionId", "institutionName", "academicSession", "courseOrGrade", "category", "totalAssessed", "amountPaid", "outstandingAmount", "paymentStatus", "createdByUid", "createdAt"]
+    },
+    "integration_platforms": {
+      "title": "External Platform Integration Configurations",
+      "description": "Configuration metadata for FAT School ERP, FAT Multilingual, and external partner ecosystems",
+      "type": "object",
+      "properties": {
+        "platformKey": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string" },
+        "healthStatus": { "type": "string" },
+        "baseUrl": { "type": "string" },
+        "ssoEndpoint": { "type": "string" },
+        "apiEndpoint": { "type": "string" },
+        "allowedModules": { "type": "array" },
+        "allowedOperations": { "type": "array" },
+        "authMethod": { "type": "string" },
+        "tenantIsolationEnforced": { "type": "boolean" },
+        "externalAppId": { "type": "string" },
+        "lastHealthCheckAt": { "type": "string" },
+        "healthMessage": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "updatedByUid": { "type": "string" }
+      },
+      "required": ["platformKey", "name", "status", "healthStatus", "allowedModules", "tenantIsolationEnforced", "updatedAt"]
+    },
+    "integration_sso_sessions": {
+      "title": "External SSO Handoff Sessions",
+      "description": "Short-lived cryptographic session tokens for seamless authentication handoff to external platforms",
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string" },
+        "userUid": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "userRole": { "type": "string" },
+        "targetPlatform": { "type": "string" },
+        "targetTenantId": { "type": "string" },
+        "targetResourceId": { "type": "string" },
+        "resourceAccessLevel": { "type": "string" },
+        "returnUrl": { "type": "string" },
+        "nonce": { "type": "string" },
+        "issuedAt": { "type": "number" },
+        "expiresAt": { "type": "number" },
+        "isUsed": { "type": "boolean" },
+        "usedAt": { "type": "string" },
+        "ipAddress": { "type": "string" },
+        "userAgent": { "type": "string" }
+      },
+      "required": ["sessionId", "userUid", "targetPlatform", "issuedAt", "expiresAt"]
+    },
     "public_memberships": {
       "title": "Public Membership Verification Records",
       "description": "Publicly readable non-sensitive member accreditation for QR card verification",
@@ -574,6 +712,87 @@
         "evaluatedAt": { "type": "string" }
       },
       "required": ["registrationId", "participantId", "competitionId", "participantUid", "startedAt", "status"]
+    },
+    "store_products": {
+      "title": "FET Store Published Products & Inventory",
+      "description": "Educational materials, books, publications, and modest merchandise curated by FET India",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "categoryName": { "type": "string" },
+        "productType": { "type": "string", "enum": ["physical", "digital", "book", "educational_material", "publication", "educational_resource", "merchandise", "other"] },
+        "price": { "type": "number" },
+        "mrp": { "type": "number" },
+        "availability": { "type": "string", "enum": ["in_stock", "out_of_stock", "pre_order", "discontinued"] },
+        "isPublished": { "type": "boolean" },
+        "stockCount": { "type": "number" },
+        "sku": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "productImages": { "type": "array" },
+        "authorOrPublisher": { "type": "string" },
+        "features": { "type": "array" },
+        "paymentMethods": { "type": "string", "enum": ["cod", "razorpay", "both"] },
+        "createdByUid": { "type": "string" },
+        "createdByEmail": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "description", "category", "productType", "price", "availability", "isPublished", "createdAt", "updatedAt"]
+    },
+    "store_categories": {
+      "title": "FET Store Product Categories",
+      "description": "Taxonomy categories organizing store products and publications",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "description": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "displayOrder": { "type": "number" },
+        "createdByUid": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "slug", "isActive", "createdAt", "updatedAt"]
+    },
+    "store_orders": {
+      "title": "FET Store Customer Orders & Allocations",
+      "description": "Store orders containing authenticated customer information, authoritative pricing, items, and fulfillment history",
+      "type": "object",
+      "properties": {
+        "orderNumber": { "type": "string" },
+        "userId": { "type": "string" },
+        "customer": { "type": "object" },
+        "items": { "type": "array" },
+        "itemCount": { "type": "number" },
+        "subtotal": { "type": "number" },
+        "shippingAmount": { "type": "number" },
+        "taxAmount": { "type": "number" },
+        "total": { "type": "number" },
+        "currency": { "type": "string", "enum": ["INR"] },
+        "orderStatus": { "type": "string", "enum": ["draft", "pending_payment", "paid", "processing", "shipped", "delivered", "cancelled", "refunded"] },
+        "paymentStatus": { "type": "string", "enum": ["unpaid", "pending", "authorized", "captured", "failed", "refunded", "waived_scholarship"] },
+        "billingAddress": { "type": "object" },
+        "shippingAddress": { "type": "object" },
+        "sameAsBilling": { "type": "boolean" },
+        "deliveryNotes": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "paymentMethodLabel": { "type": "string" },
+        "razorpayOrderId": { "type": "string" },
+        "razorpayPaymentId": { "type": "string" },
+        "razorpaySignature": { "type": "string" },
+        "paidAt": { "type": "string" },
+        "educationalInstitutionalOrder": { "type": "boolean" },
+        "institutionName": { "type": "string" },
+        "scholarshipRollNumber": { "type": "string" },
+        "source": { "type": "string" },
+        "authoritativeValidationCompleted": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["orderNumber", "userId", "customer", "items", "subtotal", "total", "orderStatus", "paymentStatus", "billingAddress", "shippingAddress", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -629,6 +848,26 @@
       "schema": "financial_records",
       "description": "Trust financial income and expense ledger"
     },
+    "/finance_budgets/{budgetId}": {
+      "schema": "finance_budgets",
+      "description": "Annual and departmental approved budget allocations"
+    },
+    "/finance_bank_accounts/{accountId}": {
+      "schema": "finance_bank_accounts",
+      "description": "Trust official institutional bank accounts"
+    },
+    "/student_fees/{feeId}": {
+      "schema": "student_fees",
+      "description": "Student fee assessments, collections, and receipt records for School and Madrasa ERP"
+    },
+    "/integration_platforms/{platformId}": {
+      "schema": "integration_platforms",
+      "description": "External platform integration configurations for School ERP and Multilingual platforms"
+    },
+    "/integration_sso_sessions/{sessionId}": {
+      "schema": "integration_sso_sessions",
+      "description": "Cryptographically signed SSO handoff session tokens"
+    },
     "/public_memberships/{memberId}": {
       "schema": "public_memberships",
       "description": "Non-sensitive public membership verification data"
@@ -668,6 +907,18 @@
     "/exam_attempts/{attemptId}": {
       "schema": "exam_attempts",
       "description": "Participant online examination attempts and integrity records"
+    },
+    "/store_products/{productId}": {
+      "schema": "store_products",
+      "description": "Published store products, inventory, and merchandise"
+    },
+    "/store_categories/{categoryId}": {
+      "schema": "store_categories",
+      "description": "Product categories and collections in the FET Store"
+    },
+    "/store_orders/{orderId}": {
+      "schema": "store_orders",
+      "description": "Customer store orders with authoritative validation and status tracking"
     }
   }
 }

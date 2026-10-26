@@ -18,6 +18,7 @@ export interface UploadResult {
   fileName: string;
   sizeBytes: number;
   mimeType: string;
+  storagePath?: string;
 }
 
 export interface FileValidationResult {
@@ -446,6 +447,75 @@ export async function uploadUserProfilePhoto(
  * Upload Examination Curriculum / Book PDF to Cloud Storage
  * Path: examination_materials/{examId}/{timestamp}_{filename}
  */
+/**
+ * Fast, resilient PDF upload using XMLHttpRequest for real byte-level progress tracking.
+ * Avoids browser freezes, eliminates 35s timeouts, and never converts PDFs to oversized Base64.
+ */
+function uploadPdfViaServerXhr(
+  file: File,
+  examId: string,
+  onProgress?: (progressPercent: number) => void
+): Promise<UploadResult> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+    // Critical: append metadata fields BEFORE file so multipart parser has examId when initializing destination
+    formData.append('examId', examId);
+    formData.append('pdfFile', file);
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && onProgress) {
+        // Map upload byte transmission from 10% to 88%
+        const pct = Math.min(88, Math.max(10, Math.round((event.loaded / event.total) * 88)));
+        onProgress(pct);
+      }
+    };
+
+    xhr.onload = () => {
+      if (onProgress) onProgress(95); // Finalizing state
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (data && data.success && data.url) {
+            if (onProgress) onProgress(100);
+            resolve({
+              url: data.url,
+              fileName: data.fileName || file.name,
+              sizeBytes: data.sizeBytes || file.size,
+              mimeType: 'application/pdf',
+              storagePath: data.storagePath
+            });
+          } else {
+            reject(new Error(data?.error || 'Invalid upload confirmation from storage service.'));
+          }
+        } catch {
+          reject(new Error('Failed to parse storage server response.'));
+        }
+      } else {
+        try {
+          const errData = JSON.parse(xhr.responseText);
+          reject(new Error(errData?.error || `Upload failed with HTTP ${xhr.status}`));
+        } catch {
+          reject(new Error(`Storage service returned HTTP ${xhr.status}.`));
+        }
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error('Network connection error during PDF upload. Please verify connectivity and try again.'));
+    };
+
+    xhr.ontimeout = () => {
+      reject(new Error('PDF upload timed out after 3 minutes. Please check your network connection and try again.'));
+    };
+
+    xhr.timeout = 180000; // 180 seconds (3 minutes) for reliable large document uploads
+    // Also include examId in the query string so it is available before the multipart body stream begins
+    xhr.open('POST', `/api/competitions/upload-pdf?examId=${encodeURIComponent(examId)}`);
+    xhr.send(formData);
+  });
+}
+
 export async function uploadExamPdfMaterial(
   file: File,
   examId: string,
@@ -453,36 +523,111 @@ export async function uploadExamPdfMaterial(
 ): Promise<UploadResult> {
   const validation = validateDocumentFile(file, 25);
   if (!validation.valid) {
-    throw new Error(validation.error || 'Invalid file. Please upload an official PDF document.');
+    throw new Error(validation.error || 'Invalid file. Please upload an official PDF document up to 25 MB.');
   }
 
-  if (onProgress) onProgress(15);
+  if (onProgress) onProgress(5);
 
   const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const storagePath = `examination_materials/${examId}/${Date.now()}_${sanitizedName}`;
 
-  if (onProgress) onProgress(40);
+  // 1. Primary authoritative server disk upload via XHR with accurate progress
+  try {
+    return await uploadPdfViaServerXhr(file, examId, onProgress);
+  } catch (serverErr: any) {
+    console.info('Server storage notice, attempting Firebase Storage fallback:', serverErr?.message || serverErr);
+    if (onProgress) onProgress(40);
+
+    // 2. Resilient fallback to Firebase Cloud Storage if server upload is unreachable
+    try {
+      const storageRef = ref(storage, storagePath);
+      const uploadTask = uploadBytesResumable(storageRef, file, {
+        contentType: file.type || 'application/pdf',
+        customMetadata: {
+          examId,
+          uploadedAt: new Date().toISOString(),
+          originalFileName: file.name,
+          purpose: 'examination_reading_material'
+        }
+      });
+
+      uploadTask.on('state_changed', (snapshot) => {
+        if (snapshot.totalBytes > 0 && onProgress) {
+          const pct = Math.min(95, Math.max(40, Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)));
+          onProgress(pct);
+        }
+      });
+
+      const snap = await withTimeout<UploadTaskSnapshot>(uploadTask, 60000, 'Cloud Storage upload timed out after 60 seconds');
+      if (onProgress) onProgress(95);
+
+      const downloadUrl = await getDownloadURL(snap.ref);
+      if (onProgress) onProgress(100);
+
+      return {
+        url: downloadUrl,
+        fileName: file.name,
+        sizeBytes: file.size,
+        mimeType: file.type || 'application/pdf',
+        storagePath
+      };
+    } catch (fbErr: any) {
+      console.error('All storage targets failed for examination PDF:', { serverErr, fbErr });
+      // Surface the specific error from the primary server or fallback
+      const primaryReason = serverErr?.message || fbErr?.message || 'Storage transmission error';
+      throw new Error(`Failed to upload official examination PDF: ${primaryReason}`);
+    }
+  }
+}
+
+/**
+ * Upload Store Product image with pre-processing, compression and resilient storage fallback
+ */
+export async function uploadStoreProductImage(
+  file: File,
+  onProgress?: (progressPercent: number) => void
+): Promise<UploadResult> {
+  return uploadCampaignMedia(file, 'gallery', onProgress);
+}
+
+/**
+ * Upload Store Digital Product File (PDF books, publications, curriculum materials)
+ * with validation, secure storage referencing, and resilient fallback
+ */
+export async function uploadStoreDigitalFile(
+  file: File,
+  productId?: string,
+  onProgress?: (progressPercent: number) => void
+): Promise<UploadResult> {
+  const validation = validateDocumentFile(file, 50); // up to 50MB
+  if (!validation.valid) {
+    throw new Error(validation.error || 'Invalid file. Please upload an official PDF or document.');
+  }
+
+  if (onProgress) onProgress(15);
+  const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const storagePath = `store_digital_assets/${productId || 'new'}/${Date.now()}_${sanitizedName}`;
 
   try {
     const storageRef = ref(storage, storagePath);
     const uploadTask = uploadBytesResumable(storageRef, file, {
       contentType: file.type || 'application/pdf',
       customMetadata: {
-        examId,
-        uploadedAt: new Date().toISOString(),
+        productId: productId || 'unassigned',
         originalFileName: file.name,
-        purpose: 'examination_reading_material'
+        uploadedAt: new Date().toISOString(),
+        purpose: 'store_digital_asset'
       }
     });
 
     uploadTask.on('state_changed', (snapshot) => {
       if (snapshot.totalBytes > 0 && onProgress) {
-        const pct = Math.min(95, Math.max(40, Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)));
+        const pct = Math.min(95, Math.max(20, Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)));
         onProgress(pct);
       }
     });
 
-    const snap = await withTimeout<UploadTaskSnapshot>(uploadTask, 35000, 'PDF upload timed out after 35 seconds');
+    const snap = await withTimeout<UploadTaskSnapshot>(uploadTask, 45000, 'Digital file upload timed out after 45 seconds');
     if (onProgress) onProgress(95);
 
     const downloadUrl = await getDownloadURL(snap.ref);
@@ -495,7 +640,7 @@ export async function uploadExamPdfMaterial(
       mimeType: file.type || 'application/pdf'
     };
   } catch (storageErr: any) {
-    console.info('Storage fallback for examination PDF (using resilient stream):', storageErr?.message || storageErr);
+    console.info('Storage fallback for store digital file (using resilient data URL stream):', storageErr?.message || storageErr);
     if (onProgress) onProgress(75);
     const dataUrl = await fileToDataUrl(file);
     if (onProgress) onProgress(100);
@@ -508,4 +653,5 @@ export async function uploadExamPdfMaterial(
     };
   }
 }
+
 

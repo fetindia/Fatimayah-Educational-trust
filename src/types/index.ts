@@ -60,6 +60,7 @@ export type UserRole =
   | 'content_admin'
   | 'blog_admin'
   | 'store_admin'
+  | 'store_manager'
   | 'travel_admin'
   | 'reports_admin'
   | 'student'
@@ -84,6 +85,33 @@ export type AppPermission =
   | 'modules.manage'
   | 'settings.manage'
   | 'finance.manage'
+  // Granular Finance & Accounting Permissions (Chapter 15 SRS)
+  | 'finance.view'
+  | 'finance.income'
+  | 'finance.income.view'
+  | 'finance.income.create'
+  | 'finance.income.edit'
+  | 'finance.expense'
+  | 'finance.expense.view'
+  | 'finance.expense.create'
+  | 'finance.expense.edit'
+  | 'finance.expense.approve'
+  | 'finance.expense.verify'
+  | 'finance.payment.process'
+  | 'finance.accounting.post'
+  | 'finance.ledger'
+  | 'finance.budget'
+  | 'finance.accounts'
+  | 'finance.bank'
+  | 'finance.reconciliation'
+  | 'finance.reconcile'
+  | 'finance.reports'
+  | 'finance.approve'
+  | 'finance.fee'
+  | 'fee.manage'
+  | 'fee.view'
+  | 'fee.collect'
+  | 'fee.remind'
   | 'exams.manage'
   | 'exams.evaluate'
   // Delegated Scoped Permissions
@@ -107,7 +135,13 @@ export type AppPermission =
   | 'trust.edit'
   | 'bulletin.publish'
   | 'bulletin.edit'
-  | 'content.publish';
+  | 'content.publish'
+  // Granular FET Store Management Permissions
+  | 'store.manage'
+  | 'store.products'
+  | 'store.categories'
+  | 'store.inventory'
+  | 'store.orders';
 
 export type AdminScopeLevel = 'district' | 'state' | 'national';
 export type AdminModuleScope = 'crowdfunding' | 'examinations' | 'both';
@@ -155,6 +189,36 @@ export interface RoleMetadata {
 }
 
 export type ModuleLifecycle = 'DRAFT' | 'TESTING' | 'READY' | 'PUBLISHED' | 'DISABLED';
+
+export type SystemModuleKey = 
+  | 'store' 
+  | 'school_erp' 
+  | 'madarsa_erp' 
+  | 'education_empowerment' 
+  | 'higher_education_grant' 
+  | 'examinations';
+
+export interface SystemModuleSetting {
+  key: SystemModuleKey;
+  name: string;
+  code: string;
+  description: string;
+  enabled: boolean;
+  status: 'active' | 'disabled' | 'deferred';
+  isCore?: boolean;
+  locked?: boolean;
+  category: string;
+  routePath?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export interface SystemModuleControlsDoc {
+  modules: Record<SystemModuleKey, SystemModuleSetting>;
+  updatedAt: string;
+  updatedBy: string;
+}
+
 
 export interface UserProfile {
   uid: string;
@@ -729,7 +793,8 @@ export type NotificationCategory =
   | 'examination'
   | 'certificate'
   | 'crowdfunding'
-  | 'staff';
+  | 'staff'
+  | 'store';
 
 export type NotificationSeverity = 'info' | 'success' | 'warning' | 'critical';
 export type NotificationPriority = 'normal' | 'important' | 'urgent';
@@ -746,6 +811,7 @@ export interface UserNotificationPreferences {
   competitionAlerts?: boolean;
   examinationAlerts?: boolean;
   systemAlerts?: boolean;
+  storeAlerts?: boolean;
 }
 
 export interface AppNotification {
@@ -763,7 +829,7 @@ export interface AppNotification {
   severity?: NotificationSeverity;
   priority?: NotificationPriority;
   status?: AnnouncementStatus;
-  module?: 'membership' | 'volunteer' | 'donor' | 'account' | 'system' | 'donations' | 'applications' | 'campaigns' | 'competitions' | 'exams' | 'certificates' | 'general';
+  module?: 'membership' | 'volunteer' | 'donor' | 'account' | 'system' | 'donations' | 'applications' | 'campaigns' | 'competitions' | 'exams' | 'certificates' | 'general' | 'store';
   actionUrl?: string;
   actionLabel?: string;
   targetGroup?: NotificationTargetGroup | string;
@@ -1285,18 +1351,186 @@ export interface CampaignDonation {
   financialYear?: string;
 }
 
+export type StoreProductType = 
+  | 'physical' 
+  | 'digital' 
+  | 'book' 
+  | 'clothing'
+  | 'fashion'
+  | 'perfume'
+  | 'fragrance'
+  | 'educational_material' 
+  | 'publication' 
+  | 'educational_resource' 
+  | 'merchandise' 
+  | 'other';
+
+export type StoreProductAvailability = 
+  | 'in_stock' 
+  | 'available'
+  | 'out_of_stock' 
+  | 'unavailable'
+  | 'pre_order' 
+  | 'discontinued';
+
+export type StoreProductStatus = 'ACTIVE' | 'INACTIVE' | 'ARCHIVED' | 'DRAFT';
+
+export interface StoreCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  subcategories?: string[];
+  isActive: boolean;
+  displayOrder?: number;
+  isCore?: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdByUid?: string;
+}
+
+export type StoreDigitalAccessType = 
+  | 'public_download'      // Free/Publicly accessible (open syllabus, annual reports, free publications)
+  | 'sample_preview'       // Free sample excerpt or preview chapter (full copy deferred to future orders)
+  | 'restricted';          // Protected institutional/enrolled access (requires entitlement/order)
+
+export interface StoreDigitalAsset {
+  fileName: string;
+  fileUrl: string;
+  fileSize?: number;        // size in bytes
+  fileType?: string;        // e.g. "application/pdf"
+  accessType: StoreDigitalAccessType;
+  previewUrl?: string;      // optional sample preview URL if full file is restricted
+  pageCount?: number;       // e.g. 120
+  downloadCount?: number;
+  uploadedAt?: string;
+  description?: string;
+}
+
+export type StoreImageViewType = 
+  | 'front' 
+  | 'back' 
+  | 'side' 
+  | 'detail' 
+  | 'model' 
+  | 'bottle' 
+  | 'box' 
+  | 'packaging' 
+  | 'label' 
+  | 'ingredients' 
+  | 'other';
+
+export interface StoreProductImageItem {
+  id?: string;
+  url: string;
+  label?: string; // e.g. "Front View", "Main Bottle", "Box / Packaging", "Label & Ingredients"
+  viewType?: StoreImageViewType;
+  isPrimary?: boolean;
+}
+
+export interface StoreProductOption {
+  name: string; // e.g. "Size", "Color", "Bottle Size", "Format", "Edition"
+  values: string[]; // e.g. ["S", "M", "L", "XL"] or ["30 ml", "50 ml", "100 ml"]
+}
+
+export interface StoreProductVariant {
+  id: string;
+  name: string; // e.g. 'Size L / Navy Blue' or 'Bottle: 50 ml'
+  sku?: string;
+  price?: number; // Optional variant price override
+  mrp?: number; // Optional variant MRP
+  imageUrl?: string;
+  availability: StoreProductAvailability;
+  isAvailable?: boolean;
+  stockCount?: number;
+  trackInventory?: boolean;
+  attributes?: Record<string, string>; // e.g. { "Size": "L", "Color": "Navy Blue" } or { "Bottle Size": "50 ml" }
+  isDigital?: boolean;
+  digitalAsset?: StoreDigitalAsset;
+}
+
 export interface StoreProduct {
   id: string;
   name: string;
-  category: 'Garments' | 'Islamic Garments' | 'Perfumes' | 'Books' | 'Merchandise';
-  subCategory?: string;
+  slug?: string;
+  description: string;
+  category: string;
+  categoryName?: string;
+  productType: StoreProductType;
   price: number;
   mrp?: number;
-  stockCount: number;
-  sku: string;
-  status: 'ACTIVE' | 'OUT_OF_STOCK' | 'DRAFT';
-  description: string;
+  availability: StoreProductAvailability;
+  isAvailable?: boolean;
+  trackInventory?: boolean;
+  stockCount?: number;
+  lowStockThreshold?: number;
+  allowBackorders?: boolean;
+  isPublished: boolean;
+  isActive?: boolean;
+  isArchived?: boolean;
+  isDemo?: boolean;
+  sku?: string;
   imageUrl?: string;
+  productImages?: string[];
+  galleryItems?: StoreProductImageItem[];
+  subCategory?: string;
+  status?: StoreProductStatus | 'OUT_OF_STOCK';
+  authorOrPublisher?: string;
+  features?: string[];
+  hasVariants?: boolean;
+  variantOptions?: StoreProductOption[];
+  variants?: StoreProductVariant[];
+  isDigital?: boolean;
+  digitalAsset?: StoreDigitalAsset;
+  language?: string;
+  edition?: string;
+  format?: string;
+  pagesCount?: number;
+  
+  // Fashion & Clothing Attributes (Task 29)
+  brand?: string;
+  fabric?: string;
+  fit?: string;
+  style?: string;
+  clothingGender?: 'women' | 'men' | 'children' | 'unisex';
+  weightGrams?: number;
+  shippingInfo?: {
+    weightGrams?: number;
+    estimatedDays?: string;
+    freeShipping?: boolean;
+    shippingFee?: number;
+    deliveryNotes?: string;
+  };
+
+  // Books & Educational Products Attributes (Task 29)
+  isbn?: string;
+  publisher?: string;
+  binding?: string; // Paperback, Hardcover, Spiral, Leatherette, etc.
+
+  // Perfumes & Fragrances Attributes (Task 30)
+  fragranceName?: string;
+  perfumeAudience?: 'women' | 'men' | 'unisex';
+  fragranceConcentration?: 'edp' | 'edt' | 'parfum' | 'attar' | 'body_mist' | 'other' | string;
+  bottleSizes?: string[]; // Configurable sizes (e.g. ['10 ml', '30 ml', '50 ml', '100 ml'])
+  fragranceNotes?: {
+    top?: string;
+    middle?: string;
+    base?: string;
+  };
+  fragranceFamily?: string; // Floral, Woody, Fresh, Oriental, Citrus, etc.
+  countryOfOrigin?: string;
+  manufacturer?: string;
+  ingredients?: string;
+
+  // Related & Complementary Products (Task 29)
+  relatedProductIds?: string[];
+
+  // Product-Level Payment Eligibility (Task 30)
+  paymentMethods?: 'cod' | 'razorpay' | 'both';
+  createdAt: string;
+  updatedAt: string;
+  createdByUid?: string;
+  createdByEmail?: string;
 }
 
 export interface TravelPackage {
@@ -1484,6 +1718,7 @@ export interface BookReadingDetails {
   pdfFileSizeBytes?: number;
   pdfSourceType?: 'upload' | 'external_url';
   pdfExternalUrl?: string;
+  pdfStoragePath?: string;
 }
 
 export interface ExamStructureDetails {
@@ -1568,6 +1803,8 @@ export interface Competition {
   pdfFileName?: string;
   pdfFileSizeBytes?: number;
   pdfSourceType?: 'upload' | 'external_url';
+  pdfExternalUrl?: string;
+  pdfStoragePath?: string;
   examDetails?: ExamStructureDetails;
   prizesSummary?: string[];
   prizeRewards?: CompetitionPrizeTier[];
@@ -1606,6 +1843,10 @@ export interface Competition {
   createdByName?: string;
   createdAt: string;
   updatedAt: string;
+
+  // Test vs Live Environment Separation
+  isTestCompetition?: boolean;
+  environment?: 'live' | 'test';
 }
 
 export type ParticipantAward = '1st_rank' | '2nd_rank' | '3rd_rank' | 'merit' | 'participation' | 'special_award' | 'none';
@@ -1635,9 +1876,14 @@ export interface CompetitionRegistration {
 
   // Registration Metadata
   registeredAt: string;
-  status: 'registered' | 'attended' | 'absent' | 'disqualified' | 'evaluated' | 'completed';
+  status: 'registered' | 'attended' | 'absent' | 'disqualified' | 'evaluated' | 'completed' | 'pending_review' | 'pending' | 'verified';
   
   // Aliases and Extended Fields
+  userId?: string;
+  candidateUid?: string;
+  uid?: string;
+  isVerified?: boolean;
+  verificationStatus?: 'verified' | 'pending' | 'rejected' | string;
   registrationNumber?: string;
   candidateName?: string;
   candidateEmail?: string;
@@ -1690,6 +1936,10 @@ export interface CompetitionRegistration {
   certificateId?: string; // "FET-CERT-CMP-2026-0101"
   certificateIssuedAt?: string;
   updatedAt?: string;
+
+  // Test vs Live Environment Separation
+  isTestRegistration?: boolean;
+  environment?: 'live' | 'test';
 }
 
 export interface ExamAttemptViolationLog {
@@ -1888,30 +2138,65 @@ export type FinancialIncomeCategory =
   | 'crowdfunding_donation'
   | 'direct_donation'
   | 'membership_fee'
-  | 'event_competition_fee'
   | 'school_fee'
+  | 'madrasa_fee'
   | 'madrasa_contribution'
   | 'corpus_grant'
+  | 'institutional_grant'
+  | 'csr_contribution'
+  | 'investment_income'
+  | 'event_competition_fee'
   | 'other_income';
 
 export type FinancialExpenseCategory =
-  | 'education_scholarships'
-  | 'staff_salaries'
-  | 'community_relief'
-  | 'events_competitions'
   | 'office_administration'
-  | 'campaign_disbursement'
+  | 'staff_salaries'
   | 'utilities_maintenance'
+  | 'construction_infrastructure'
+  | 'equipment_purchases'
+  | 'educational_materials'
+  | 'education_scholarships'
+  | 'medical_assistance'
+  | 'community_relief'
+  | 'relief_activities'
+  | 'campaign_disbursement'
+  | 'events_competitions'
   | 'statutory_compliance'
   | 'other_expense';
 
 export type ExpenseApprovalStatus =
   | 'draft'
+  | 'submitted'
   | 'pending_approval'
+  | 'department_review'
+  | 'finance_review'
+  | 'trust_approval'
   | 'approved'
   | 'paid'
+  | 'accounted'
   | 'rejected'
   | 'cancelled';
+
+export type FinancialOrgUnit = 
+  | 'Trust Head Office'
+  | 'State Office'
+  | 'District Office'
+  | 'School'
+  | 'Madrasa'
+  | 'Project'
+  | 'Campaign'
+  | 'Fund';
+
+export interface ExpenseApprovalStep {
+  stage: 'submission' | 'department_review' | 'finance_review' | 'trust_approval' | 'payment_execution' | 'rejection' | 'cancellation' | 'accounting_entry';
+  action: 'submitted' | 'department_approved' | 'finance_verified' | 'trust_approved' | 'paid' | 'accounted' | 'rejected' | 'cancelled';
+  actorUid: string;
+  actorEmail: string;
+  actorName?: string;
+  actorRole: string;
+  timestamp: string;
+  notes?: string;
+}
 
 export type FinancialPaymentStatus =
   | 'verified'
@@ -1928,6 +2213,14 @@ export type FinancialPaymentMethod =
   | 'cash'
   | 'card'
   | 'online_gateway';
+
+export type BankReconciliationStatus =
+  | 'unmatched'
+  | 'matched'
+  | 'pending_review'
+  | 'reconciled';
+
+export type BankAccountType = 'current' | 'savings' | 'fcra' | 'corpus';
 
 export interface FinancialRecord {
   id?: string;
@@ -1957,6 +2250,35 @@ export interface FinancialRecord {
   financialYear: string; // e.g. "2026-27"
   isLinkedDonation?: boolean;
   linkedDonationId?: string;
+
+  // Bank Management & Reconciliation (Task 5)
+  bankAccountId?: string;
+  bankAccountName?: string;
+  bankTransactionType?: 'deposit' | 'withdrawal' | 'transfer' | 'settlement';
+  reconciliationStatus?: BankReconciliationStatus;
+  reconciledAt?: string;
+  reconciledByUid?: string;
+  reconciledByName?: string;
+  bankStatementReference?: string;
+  reconciliationNotes?: string;
+  settlementBatchId?: string;
+
+  // Organizational Scope & Multi-Unit Architecture (SRS Requirement 9)
+  organizationalUnit?: FinancialOrgUnit | string;
+  sourceModule?: 'crowdfunding' | 'direct_donation' | 'membership' | 'school' | 'madrasa' | 'examinations' | 'manual';
+  sourceRecordId?: string;
+  supportingDocumentUrls?: string[];
+
+  // General Ledger & Chart of Accounts Integration
+  accountId?: string;
+  accountCode?: string;
+  voucherId?: string;
+
+  // Non-destructive adjustment entry tracking (SRS Immutability Principle)
+  isAdjustmentEntry?: boolean;
+  originalTransactionId?: string;
+  adjustmentReason?: string;
+  isLocked?: boolean;
   
   // Creation metadata
   createdByUid: string;
@@ -1964,6 +2286,9 @@ export interface FinancialRecord {
   createdByName?: string;
   createdAt: string;
   updatedAt?: string;
+
+  // Multi-Stage Workflow & Approval History (SRS Chapter 15)
+  approvalHistory?: ExpenseApprovalStep[];
 
   // Workflow / Approval metadata
   approvedByUid?: string;
@@ -2003,6 +2328,264 @@ export interface FinancialSummaryMetrics {
   verifiedIncomesCount: number;
   paidExpensesCount: number;
   pendingApprovalsCount: number;
+}
+
+// -------------------------------------------------------------
+// FINANCE & ACCOUNTING FOUNDATION TYPES (CHAPTER 15 SRS)
+// -------------------------------------------------------------
+
+export type FinanceAccountType = 'asset' | 'liability' | 'equity' | 'income' | 'expense';
+
+export type FinanceAccountClassification = 
+  | 'current_asset' 
+  | 'fixed_asset' 
+  | 'current_liability' 
+  | 'long_term_liability' 
+  | 'corpus_fund' 
+  | 'general_reserve' 
+  | 'direct_income' 
+  | 'indirect_income' 
+  | 'program_expense' 
+  | 'operating_expense' 
+  | 'compliance_expense';
+
+export interface FinanceAccount {
+  id: string;
+  code: string; // e.g. "1010", "4010"
+  name: string;
+  type: FinanceAccountType;
+  classification: FinanceAccountClassification;
+  currency: string;
+  openingBalance: number;
+  currentBalance: number;
+  status: 'active' | 'archived';
+  isBankOrCash: boolean;
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankIfsc?: string;
+  isSystemAccount?: boolean;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FinanceBankAccount {
+  id?: string;
+  accountCode?: string; // e.g. "FET-BNK-01"
+  accountName: string; // e.g. "Trust Main Operating Account"
+  bankName: string; // e.g. "State Bank of India"
+  accountNumber: string; // Stored securely, displayed with masking
+  ifscCode: string;
+  branchName?: string;
+  accountType: BankAccountType;
+  currency: string; // Default: "INR"
+  openingBalance: number;
+  currentBalance: number;
+  status: 'active' | 'inactive';
+  upiId?: string;
+  isPrimary?: boolean;
+  notes?: string;
+  createdByUid: string;
+  createdByEmail: string;
+  createdByName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BankTransactionMatchPayload {
+  bankAccountId: string;
+  bankAccountName: string;
+  bankStatementReference: string;
+  reconciliationStatus: BankReconciliationStatus;
+  notes?: string;
+}
+
+export interface GeneralLedgerEntry {
+  id: string;
+  transactionId: string; // references FinancialRecord.transactionId
+  voucherNumber?: string;
+  entryDate: string; // YYYY-MM-DD
+  accountId: string;
+  accountCode: string;
+  accountName: string;
+  debit: number;
+  credit: number;
+  narration: string;
+  financialYear: string;
+  isAdjustmentEntry: boolean;
+  originalTransactionId?: string;
+  adjustmentReason?: string;
+  isLocked: boolean; // Immutable once posted
+  createdByUid: string;
+  createdAt: string;
+}
+
+export interface FinanceBudget {
+  id?: string;
+  budgetId?: string; // e.g. "FET-BGT-2026-0001"
+  name: string;
+  financialYear: string; // e.g. "2026-27"
+  department: string;
+  allocatedAmount: number;
+  utilizedAmount?: number;
+  remainingAmount?: number;
+  category: string;
+  status: 'draft' | 'approved' | 'active' | 'closed';
+  organizationalUnit?: FinancialOrgUnit | string;
+  fundType?: 'General' | 'Zakat' | 'Sadaqah' | 'Corpus' | 'Restricted' | string;
+  notes?: string;
+  createdByUid: string;
+  createdByEmail: string;
+  createdByName?: string;
+  approvedByUid?: string;
+  approvedByName?: string;
+  approvedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FinanceVoucher {
+  id: string;
+  voucherNumber: string; // e.g. "FET-VCH-PAY-2026-0001"
+  voucherType: 'receipt' | 'payment' | 'journal' | 'contra';
+  date: string;
+  amount: number;
+  paidToOrReceivedFrom: string;
+  narration: string;
+  transactionId?: string;
+  supportingDocUrls?: string[];
+  preparedByUid: string;
+  preparedByName?: string;
+  authorizedByUid?: string;
+  authorizedByName?: string;
+  status: 'draft' | 'authorized' | 'posted' | 'cancelled';
+  createdAt: string;
+}
+
+export interface FinanceGrant {
+  id: string;
+  grantName: string;
+  grantorAgencyOrDonor: string;
+  sanctionedAmount: number;
+  receivedAmount: number;
+  disbursedAmount: number;
+  fundType: 'Corpus' | 'Restricted' | 'General' | string;
+  startDate: string;
+  endDate?: string;
+  status: 'active' | 'completed' | 'pending';
+  termsAndConditionsUrl?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface FinanceAsset {
+  id: string;
+  assetTag: string; // e.g. "FET-AST-2026-001"
+  assetName: string;
+  category: 'technology' | 'furniture' | 'vehicle' | 'real_estate' | 'educational_equipment' | 'other';
+  purchaseDate: string;
+  originalCost: number;
+  accumulatedDepreciation?: number;
+  currentBookValue: number;
+  location: string;
+  custodianName?: string;
+  status: 'in_service' | 'maintenance' | 'disposed' | 'written_off';
+  invoiceDocUrl?: string;
+  createdAt: string;
+}
+
+export interface FinanceReconciliationRecord {
+  id: string;
+  accountId: string;
+  accountName: string;
+  periodStartDate: string;
+  periodEndDate: string;
+  statementClosingBalance: number;
+  ledgerClosingBalance: number;
+  differenceAmount: number;
+  status: 'in_progress' | 'reconciled' | 'discrepancy_flagged';
+  notes?: string;
+  reconciledByUid?: string;
+  reconciledAt?: string;
+  createdAt: string;
+}
+
+// -------------------------------------------------------------
+// INSTITUTIONAL FEE MANAGEMENT (CHAPTER 15.10 SRS - TASK 6)
+// -------------------------------------------------------------
+export type FeeCategoryType = 
+  | 'admission' 
+  | 'tuition' 
+  | 'hostel' 
+  | 'examination' 
+  | 'library' 
+  | 'transport' 
+  | 'other';
+
+export type FeePaymentStatus = 
+  | 'pending' 
+  | 'partially_paid' 
+  | 'paid' 
+  | 'overdue' 
+  | 'waived';
+
+export interface StudentFeeRecord {
+  id?: string;
+  feeCode: string; // e.g. "FET-FEE-2026-0001"
+  studentName: string;
+  studentId: string; // Roll number or student identifier e.g. "FET-STU-1042"
+  studentUid?: string; // Optional linked user profile UID
+  parentName?: string;
+  parentEmail?: string;
+  parentPhone?: string;
+  
+  institutionType: 'school' | 'madrasa';
+  institutionId: string; // e.g. "SCH-01" or "MAD-01"
+  institutionName: string; // e.g. "FET Model Academy Srinagar", "Madrasa Fatimyah Al-Zahra"
+  
+  academicSession: string; // e.g. "AY 2026-2027"
+  courseOrGrade: string; // e.g. "Grade 10 - Section A", "Hifz Year 2", "Alim Course"
+  
+  category: FeeCategoryType;
+  categoryLabel?: string; // e.g. "Tuition Fees", "Hostel & Mess"
+  description: string; // e.g. "Term 1 Tuition Fee (April - June 2026)"
+  
+  totalAssessed: number;
+  amountPaid: number;
+  outstandingAmount: number; // totalAssessed - amountPaid
+  dueDate?: string; // YYYY-MM-DD
+  
+  paymentStatus: FeePaymentStatus;
+  paymentDate?: string; // YYYY-MM-DD
+  paymentMethod?: 'razorpay' | 'upi' | 'bank_transfer' | 'cash' | 'cheque' | string;
+  transactionReference?: string; // Razorpay payment ID (pay_...) or UTR or Cash Voucher
+  receiptNumber?: string; // e.g. "FET-FEE-REC-2026-0001"
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  
+  // Payment reminders tracking
+  remindersSentCount: number;
+  lastReminderSentAt?: string;
+  
+  // Finance ledger cross-link
+  financialRecordId?: string; // Linked doc in financial_records
+  
+  // Audit metadata
+  createdByUid: string;
+  createdByEmail: string;
+  createdByName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FeePaymentPayload {
+  paymentAmount: number;
+  paymentMethod: 'razorpay' | 'upi' | 'bank_transfer' | 'cash' | 'cheque' | string;
+  transactionReference?: string;
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  paymentDate?: string;
+  notes?: string;
 }
 
 // -------------------------------------------------------------
@@ -2082,5 +2665,285 @@ export interface MobileAppSettings {
   privacyPolicyUrl: string;
   termsOfServiceUrl: string;
 }
+
+// =============================================================
+// EXTERNAL PLATFORM INTEGRATION ARCHITECTURE (RELEASE 2 - TASK 7)
+// FET School ERP + FET Madrasa ERP + FET Multilingual Platform
+// =============================================================
+
+export type ExternalPlatformKey = 'school_erp' | 'madrasa_erp' | 'multilingual';
+
+export type ExternalPlatformStatus = 'active' | 'maintenance' | 'disabled' | 'unconfigured';
+
+export type ExternalPlatformHealthStatus = 
+  | 'connected' 
+  | 'disconnected' 
+  | 'configuration_missing' 
+  | 'auth_failed' 
+  | 'service_unavailable';
+
+export type ExternalAuthMethod = 
+  | 'signed_token_exchange' 
+  | 'oidc_handoff' 
+  | 'api_key_proxy' 
+  | 'secure_session_redirect';
+
+export interface ExternalPlatformConfig {
+  id?: string;
+  platformKey: ExternalPlatformKey;
+  name: string;
+  description: string;
+  status: ExternalPlatformStatus;
+  healthStatus: ExternalPlatformHealthStatus;
+  connectionStatus?: 'connected' | 'not_connected';
+  baseUrl?: string;
+  ssoEndpoint?: string;
+  apiEndpoint?: string;
+  allowedModules: string[];
+  allowedOperations: string[];
+  authMethod: ExternalAuthMethod;
+  tenantIsolationEnforced: boolean;
+  externalAppId?: string;
+  lastHealthCheckAt?: string;
+  healthMessage?: string;
+  updatedAt: string;
+  updatedByUid?: string;
+}
+
+export interface SSOHandoffSession {
+  id?: string;
+  sessionId: string;
+  userUid: string;
+  userEmail: string;
+  userName: string;
+  userRole: UserRole | string;
+  roles?: string[];
+  targetPlatform: ExternalPlatformKey;
+  targetTenantId?: string; // School tenant e.g. "SCH-01"
+  targetResourceId?: string; // Document, exam material, or student ID
+  resourceAccessLevel: 'public' | 'student' | 'admin' | 'restricted_exam';
+  returnUrl: string;
+  nonce: string;
+  issuedAt: number;
+  expiresAt: number;
+  isUsed?: boolean;
+  usedAt?: string;
+  signature?: string;
+}
+
+export interface MultilingualDocumentReference {
+  resourceId: string;
+  title: string;
+  author?: string;
+  category: 'exam_study_material' | 'curriculum_text' | 'quranic_study' | 'general_literature';
+  sourcePlatform: 'fet_india';
+  targetPlatform: 'fat_multilingual';
+  availableLanguages: string[];
+  defaultLanguage: string;
+  accessLevel: 'public' | 'registered' | 'exam_candidate' | 'institution_only';
+  competitionId?: string;
+  deepLinkUrl?: string;
+}
+
+export interface SchoolTenantContext {
+  schoolId: string;
+  schoolName: string;
+  tenantCode: string;
+  userRoleInSchool: 'school_admin' | 'teacher' | 'student' | 'parent' | 'super_admin';
+  isAuthorized: boolean;
+}
+
+/**
+ * FET Store Shopping Cart & Purchase Intent Foundation (Store Task 13)
+ * Non-destructive cart state, isolated per user with guest fallback.
+ * Strictly decoupled from payment processing / checkout.
+ */
+export interface StoreCartItem {
+  cartItemId: string; // Deterministic: `${productId}_${variantId || 'base'}`
+  productId: string;
+  productName: string;
+  productSlug?: string;
+  productType: StoreProductType;
+  category: string;
+  categoryName?: string;
+  imageUrl?: string;
+  price: number;
+  mrp?: number;
+  quantity: number;
+  maxQuantity?: number;
+  hasVariants?: boolean;
+  selectedVariant?: {
+    id: string;
+    name: string;
+    sku?: string;
+    price?: number;
+    mrp?: number;
+    attributes?: Record<string, string>;
+  };
+  sku?: string;
+  isDemo?: boolean;
+  paymentMethods?: 'cod' | 'razorpay' | 'both';
+  addedAt: string;
+  updatedAt: string;
+}
+
+export interface StoreCart {
+  items: StoreCartItem[];
+  totalItems: number;
+  subtotal: number;
+  currency: 'INR';
+  lastUpdated: string;
+}
+
+export interface CartValidationResult {
+  isValid: boolean;
+  reason?: string;
+  adjustedQuantity?: number;
+}
+
+/**
+ * ============================================================================
+ * FET Store Checkout Preparation & Order Foundation (Store Task 14)
+ * ============================================================================
+ * Foundation data models for protected order capture, authoritative validation,
+ * customer information collection, and Store Manager / Super Admin review.
+ * Strictly decoupled from payment capture and courier integrations.
+ */
+
+export type StoreOrderStatus =
+  | 'draft'
+  | 'pending_payment'
+  | 'paid'
+  | 'processing'
+  | 'shipped'
+  | 'delivered'
+  | 'completed'
+  | 'cancelled'
+  | 'refunded';
+
+export type StorePaymentStatus =
+  | 'unpaid'
+  | 'pending'
+  | 'authorized'
+  | 'captured'
+  | 'paid'
+  | 'failed'
+  | 'refunded'
+  | 'waived_scholarship'
+  | 'free';
+
+export interface StoreCustomerInfo {
+  fullName: string;
+  mobileNumber: string;
+  email: string;
+  userUid?: string;
+  membershipId?: string;
+  isRegisteredUser?: boolean;
+}
+
+export interface StoreAddress {
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  district?: string;
+  state: string;
+  pincode: string;
+  country: string;
+  landmark?: string;
+}
+
+export interface StoreOrderItem {
+  productId: string;
+  productName: string;
+  productSlug?: string;
+  productType: StoreProductType;
+  category: string;
+  categoryName?: string;
+  sku?: string;
+  imageUrl?: string;
+  hasVariants?: boolean;
+  variantId?: string;
+  variantName?: string;
+  variantAttributes?: Record<string, string>;
+  quantity: number;
+  unitPrice: number;
+  unitMrp?: number;
+  itemTotal: number;
+  isDigital?: boolean;
+  isDemo?: boolean;
+  paymentMethods?: 'cod' | 'razorpay' | 'both';
+}
+
+export interface StoreOrder {
+  id: string; // e.g. "FET-ORD-2026-0001" or Firestore Doc ID
+  orderNumber: string;
+  userId: string;
+  customer: StoreCustomerInfo;
+  items: StoreOrderItem[];
+  itemCount: number;
+  subtotal: number;
+  shippingAmount: number; // Placeholder: ₹0 for Task 14
+  taxAmount: number; // Placeholder: ₹0 for Task 14
+  total: number;
+  currency: 'INR';
+  orderStatus: StoreOrderStatus;
+  paymentStatus: StorePaymentStatus;
+  paymentMethod?: 'COD' | 'razorpay' | string;
+  paymentMethodLabel?: string;
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  razorpaySignature?: string;
+  paidAt?: string;
+  billingAddress: StoreAddress;
+  shippingAddress: StoreAddress;
+  sameAsBilling?: boolean;
+  notes?: string;
+  deliveryNotes?: string;
+  educationalInstitutionalOrder?: boolean;
+  institutionName?: string;
+  scholarshipRollNumber?: string;
+  source: 'web_store' | 'pwa' | 'admin_desk';
+  authoritativeValidationCompleted: boolean;
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+  statusHistory?: {
+    status: StoreOrderStatus;
+    timestamp: string;
+    changedByUid?: string;
+    note?: string;
+  }[];
+}
+
+export interface StoreOrderValidationRequest {
+  items: {
+    productId: string;
+    variantId?: string;
+    quantity: number;
+  }[];
+  customer: StoreCustomerInfo;
+  billingAddress: StoreAddress;
+  shippingAddress: StoreAddress;
+  notes?: string;
+  deliveryNotes?: string;
+  educationalInstitutionalOrder?: boolean;
+  institutionName?: string;
+  paymentMethod?: 'COD' | 'razorpay' | string;
+}
+
+export interface StoreOrderValidationResponse {
+  isValid: boolean;
+  errors?: string[];
+  validatedItems: StoreOrderItem[];
+  subtotal: number;
+  shippingAmount: number;
+  total: number;
+  currency: 'INR';
+  allowedPaymentMethods?: ('COD' | 'razorpay' | 'free')[];
+  isFreeOrder?: boolean;
+  hasPaymentMethodConflict?: boolean;
+  paymentMethodConflictReason?: string;
+}
+
 
 

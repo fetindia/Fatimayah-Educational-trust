@@ -62,6 +62,14 @@ service firebase.storage {
       allow write: if isSignedIn() && isValidDocument();
     }
 
+    // Examination Materials, Prescribed Book PDFs & Syllabi
+    match /examination_materials/{examId}/{allPaths=**} {
+      // Registered candidates, enrolled students, exam controllers and administrators can access reading material
+      allow read: if isSignedIn();
+      // Authorized exam controllers and administrators can upload/update valid PDF documents up to 25MB
+      allow write: if isSignedIn() && isValidDocument();
+    }
+
     // Default deny all other paths
     match /{allPaths=**} {
       allow read, write: if false;

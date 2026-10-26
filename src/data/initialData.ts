@@ -122,6 +122,13 @@ export const DEFAULT_NAV_MENU: NavigationMenuItem[] = [
     target: 'contact',
     isEnabled: true,
     order: 10
+  },
+  {
+    id: 'nav-store',
+    label: 'FET Store',
+    target: 'store',
+    isEnabled: true,
+    order: 11
   }
 ];
 
@@ -1156,6 +1163,11 @@ export const ADMIN_ROLE_DEFINITIONS: Record<string, { label: string; description
     label: 'Store Administrator',
     description: 'Oversees the pre-architected FET Store merchandise, garments, islamic garments, perfumes, and books.',
     badgeColor: 'bg-amber-950 text-amber-200 border-amber-800'
+  },
+  store_manager: {
+    label: 'Store Manager',
+    description: 'Dedicated Store Manager: manages products, categories, variants, inventory, and presentation without accessing finance or other modules.',
+    badgeColor: 'bg-emerald-950 text-emerald-200 border-emerald-800'
   },
   travel_admin: {
     label: 'Travel Administrator',

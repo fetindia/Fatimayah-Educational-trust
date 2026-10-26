@@ -14,9 +14,11 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { ShoppingBag } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ConfigProvider } from './contexts/ConfigContext';
 import { ModuleProvider } from './contexts/ModuleContext';
+import { ModuleControlsProvider, useModuleControls } from './contexts/ModuleControlsContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { useConfig } from './contexts/ConfigContext';
 import { Header } from './components/layout/Header';
@@ -68,6 +70,10 @@ import { VolunteersPage } from './components/pages/VolunteersPage';
 import { EventsNewsPage } from './components/pages/EventsNewsPage';
 import { ContactUsPage } from './components/pages/ContactUsPage';
 import { ExaminationPage } from './components/pages/ExaminationPage';
+import { FETStorePage } from './components/store/FETStorePage';
+import { CartProvider } from './contexts/CartContext';
+import { StoreCartDrawer } from './components/store/StoreCartDrawer';
+import { StoreCheckoutModal } from './components/store/StoreCheckoutModal';
 
 export type AppExperience = 
   | 'public' 
@@ -81,11 +87,13 @@ export type AppExperience =
   | 'volunteers' 
   | 'events_news' 
   | 'contact' 
-  | 'examination';
+  | 'examination'
+  | 'store';
 
 const FETIndiaPlatform: React.FC = () => {
   const { currentUser } = useAuth();
   const { config } = useConfig();
+  const { isModuleEnabled } = useModuleControls();
   const [currentExperience, setCurrentExperience] = useState<AppExperience>('public');
   const [dashboardInitialTab, setDashboardInitialTab] = useState<MemberDashboardTab>('dashboard');
   const [activeSection, setActiveSection] = useState<string>('home');
@@ -123,10 +131,12 @@ const FETIndiaPlatform: React.FC = () => {
   const [isStudentResultModalOpen, setIsStudentResultModalOpen] = useState<boolean>(false);
   const [studentResultPrefill, setStudentResultPrefill] = useState<string>('');
   const [examinationTargetId, setExaminationTargetId] = useState<string>('');
+  const [storeTargetProductSlug, setStoreTargetProductSlug] = useState<string>('');
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState<boolean>(false);
 
-  // Pending Authenticated Action State (Exam Application & Crowdfunding Case Creation)
+  // Pending Authenticated Action State (Exam Application, Crowdfunding, and Store Checkout)
   const [pendingAuthAction, setPendingAuthAction] = useState<{
-    type: 'apply_exam' | 'create_crowdfunding' | 'start_exam';
+    type: 'apply_exam' | 'create_crowdfunding' | 'start_exam' | 'store_checkout';
     competition?: Competition | null;
     competitionId?: string;
   } | null>(() => {
@@ -165,6 +175,8 @@ const FETIndiaPlatform: React.FC = () => {
         } else if (pending.type === 'start_exam') {
           setDashboardInitialTab('competitions');
           setCurrentExperience('dashboard');
+        } else if (pending.type === 'store_checkout') {
+          setIsCheckoutModalOpen(true);
         }
         setPendingAuthAction(null);
         if (typeof window !== 'undefined') {
@@ -275,6 +287,20 @@ const FETIndiaPlatform: React.FC = () => {
         setCurrentExperience('events_news');
       } else if (hash === '#contact' || hash === '#contact-us' || path.startsWith('/contact')) {
         setCurrentExperience('contact');
+      } else if (hash.startsWith('#store/') || hash.startsWith('#store?') || path.startsWith('/store/') || path === '/store' || hash === '#store' || hash === '#fet_store' || hash === '#store_catalogue') {
+        let slug = '';
+        if (searchParams.has('product') || searchParams.has('slug') || searchParams.has('id')) {
+          slug = searchParams.get('product') || searchParams.get('slug') || searchParams.get('id') || '';
+        }
+        if (!slug && path.startsWith('/store/')) {
+          slug = decodeURIComponent(path.replace(/^\/store\/?/i, ''));
+        }
+        if (!slug && hash.startsWith('#store/')) {
+          slug = decodeURIComponent(hash.replace(/^#store\/?/i, ''));
+        }
+        slug = slug.split('?')[0].split('#')[0].trim();
+        setStoreTargetProductSlug(slug || '');
+        setCurrentExperience('store');
       } else if (hash.startsWith('#examinations') || hash.startsWith('#examination') || path.startsWith('/examination')) {
         let compId = '';
         if (searchParams.has('exam') || searchParams.has('competition') || searchParams.has('id')) {
@@ -416,6 +442,16 @@ const FETIndiaPlatform: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleOpenStore = () => {
+    if (!isModuleEnabled('store')) {
+      return;
+    }
+    setStoreTargetProductSlug('');
+    setCurrentExperience('store');
+    window.history.pushState(null, '', '/store');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // Synchronize document title and description based on current experience
   useEffect(() => {
     const titles: Record<AppExperience, { title: string; desc: string }> = {
@@ -458,6 +494,10 @@ const FETIndiaPlatform: React.FC = () => {
       examination: {
         title: 'National Examination Bureau & Talent Search | Fatimyah Educational Trust India',
         desc: 'National book reading competitions, academic olympiads, syllabus guides, and verified candidate results by FET India.'
+      },
+      store: {
+        title: 'Official FET Store & Educational Publications | Fatimyah Educational Trust India',
+        desc: 'Curated textbooks, academic publications, official trust literature, and ethical merchandise by Fatimyah Educational Trust India.'
       },
       dashboard: {
         title: 'Member & Volunteer Portal | Fatimyah Educational Trust India',
@@ -521,6 +561,10 @@ const FETIndiaPlatform: React.FC = () => {
     }
     if (targetId === 'examinations' || targetId === 'examination') {
       handleOpenExamination();
+      return;
+    }
+    if (targetId === 'store' || targetId === 'fet_store' || targetId === 'shop' || targetId === 'books') {
+      handleOpenStore();
       return;
     }
     if (actionType === 'scroll') {
@@ -669,6 +713,10 @@ const FETIndiaPlatform: React.FC = () => {
       handleOpenExamination();
       return;
     }
+    if (sectionId === 'store' || sectionId === 'fet_store' || sectionId === 'store_catalogue') {
+      handleOpenStore();
+      return;
+    }
 
     setActiveSection(sectionId);
     if (currentExperience !== 'public') {
@@ -760,6 +808,7 @@ const FETIndiaPlatform: React.FC = () => {
               setIsStudentResultModalOpen(true);
             }}
             onOpenGeneralDonation={(tab?: any) => handleOpenDonate(tab || 'general')}
+            onOpenStore={handleOpenStore}
             isMobileMenuOpen={isMobileMenuOpen}
             onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
             onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
@@ -1052,6 +1101,7 @@ const FETIndiaPlatform: React.FC = () => {
               setIsStudentResultModalOpen(true);
             }}
             onOpenGeneralDonation={(tab?: any) => handleOpenDonate(tab || 'general')}
+            onOpenStore={handleOpenStore}
             isMobileMenuOpen={isMobileMenuOpen}
             onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
             onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
@@ -1138,6 +1188,7 @@ const FETIndiaPlatform: React.FC = () => {
               setIsStudentResultModalOpen(true);
             }}
             onOpenGeneralDonation={(tab?: any) => handleOpenDonate(tab || 'general')}
+            onOpenStore={handleOpenStore}
             isMobileMenuOpen={isMobileMenuOpen}
             onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
             onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
@@ -1222,6 +1273,7 @@ const FETIndiaPlatform: React.FC = () => {
               setIsStudentResultModalOpen(true);
             }}
             onOpenGeneralDonation={(tab?: any) => handleOpenDonate(tab || 'general')}
+            onOpenStore={handleOpenStore}
             isMobileMenuOpen={isMobileMenuOpen}
             onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
             onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
@@ -1305,6 +1357,7 @@ const FETIndiaPlatform: React.FC = () => {
               setIsStudentResultModalOpen(true);
             }}
             onOpenGeneralDonation={(tab?: any) => handleOpenDonate(tab || 'general')}
+            onOpenStore={handleOpenStore}
             isMobileMenuOpen={isMobileMenuOpen}
             onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
             onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
@@ -1389,6 +1442,7 @@ const FETIndiaPlatform: React.FC = () => {
               setIsStudentResultModalOpen(true);
             }}
             onOpenGeneralDonation={(tab?: any) => handleOpenDonate(tab || 'general')}
+            onOpenStore={handleOpenStore}
             isMobileMenuOpen={isMobileMenuOpen}
             onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
             onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
@@ -1472,6 +1526,7 @@ const FETIndiaPlatform: React.FC = () => {
               setIsStudentResultModalOpen(true);
             }}
             onOpenGeneralDonation={(tab?: any) => handleOpenDonate(tab || 'general')}
+            onOpenStore={handleOpenStore}
             isMobileMenuOpen={isMobileMenuOpen}
             onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
             onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
@@ -1554,6 +1609,7 @@ const FETIndiaPlatform: React.FC = () => {
               setIsStudentResultModalOpen(true);
             }}
             onOpenGeneralDonation={(tab?: any) => handleOpenDonate(tab || 'general')}
+            onOpenStore={handleOpenStore}
             isMobileMenuOpen={isMobileMenuOpen}
             onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
             onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
@@ -1636,6 +1692,7 @@ const FETIndiaPlatform: React.FC = () => {
               setIsStudentResultModalOpen(true);
             }}
             onOpenGeneralDonation={(tab?: any) => handleOpenDonate(tab || 'general')}
+            onOpenStore={handleOpenStore}
             isMobileMenuOpen={isMobileMenuOpen}
             onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
             onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
@@ -1666,6 +1723,112 @@ const FETIndiaPlatform: React.FC = () => {
 
           <MobileBottomNav
             activeSection="examinations"
+            setActiveSection={handleScrollToSection}
+            onOpenAuth={() => {
+              setIsMobileMenuOpen(false);
+              setIsAuthModalOpen(true);
+            }}
+            onOpenUserDashboard={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenUserDashboard(tab);
+            }}
+            onOpenMoreMenu={() => setIsMobileMenuOpen(true)}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+          />
+        </div>
+      )}
+
+      {/* EXPERIENCE STORE: FET STORE CATALOGUE & FOUNDATION */}
+      {currentExperience === 'store' && (
+        <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col pb-16 md:pb-0 selection:bg-emerald-100 selection:text-emerald-900" id="fet-india-store-experience">
+          <Header
+            activeSection="store"
+            setActiveSection={handleScrollToSection}
+            onOpenAuth={() => {
+              setIsMobileMenuOpen(false);
+              setIsAuthModalOpen(true);
+            }}
+            onOpenUserDashboard={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenUserDashboard(tab);
+            }}
+            onOpenAdminConsole={(view) => {
+              setIsMobileMenuOpen(false);
+              handleOpenAdmin(view);
+            }}
+            onOpenVerification={(memberId) => {
+              setIsMobileMenuOpen(false);
+              handleOpenVerification(memberId);
+            }}
+            onOpenLegal={(tab) => {
+              setIsMobileMenuOpen(false);
+              handleOpenLegal(tab);
+            }}
+            onOpenAbout={handleOpenAbout}
+            onOpenPrograms={handleOpenPrograms}
+            onOpenAppeals={handleOpenAppeals}
+            onOpenMembership={handleOpenMembership}
+            onOpenVolunteers={handleOpenVolunteers}
+            onOpenEventsNews={handleOpenEventsNews}
+            onOpenContact={handleOpenContact}
+            onOpenExamination={handleOpenExamination}
+            onOpenApplyExam={handleOpenApplyExamDirect}
+            onOpenChairmanMessage={() => setIsChairmanModalOpen(true)}
+            onOpenNewsBlogs={handleOpenEventsNews}
+            onOpenSearch={() => setIsSearchModalOpen(true)}
+            onOpenStudentResults={() => {
+              setStudentResultPrefill('');
+              setIsStudentResultModalOpen(true);
+            }}
+            onOpenGeneralDonation={(tab?: any) => handleOpenDonate(tab || 'general')}
+            onOpenStore={handleOpenStore}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+            onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
+          />
+
+          <main className="flex-1">
+            {!isModuleEnabled('store') ? (
+              <div className="max-w-xl mx-auto px-4 py-24 text-center space-y-4">
+                <div className="w-16 h-16 rounded-3xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto shadow-sm">
+                  <ShoppingBag className="w-8 h-8" />
+                </div>
+                <h2 className="text-xl font-black text-slate-900">FET India Store Paused</h2>
+                <p className="text-xs text-slate-600 leading-relaxed max-w-md mx-auto">
+                  The official store and ethical merchandise module is currently disabled by Super Admin configuration. Orders and checkouts are temporarily paused.
+                </p>
+                <div className="pt-2">
+                  <button
+                    onClick={handleReturnToPublic}
+                    className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer shadow-sm transition"
+                  >
+                    Return to Homepage
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <FETStorePage
+                initialProductSlug={storeTargetProductSlug || undefined}
+                onReturnToHome={handleReturnToPublic}
+                onOpenAuth={() => setIsAuthModalOpen(true)}
+                onOpenDonate={() => handleOpenDonate('general')}
+                onOpenContact={handleOpenContact}
+                onOpenAdminConsole={() => handleOpenAdmin('store')}
+              />
+            )}
+          </main>
+
+          <Footer
+            onOpenSection={handleScrollToSection}
+            onOpenAdmin={handleOpenAdmin}
+            onOpenVerification={handleOpenVerification}
+            onOpenLegal={handleOpenLegal}
+            onOpenAbout={handleOpenAbout}
+          />
+
+          <MobileBottomNav
+            activeSection="store"
             setActiveSection={handleScrollToSection}
             onOpenAuth={() => {
               setIsMobileMenuOpen(false);
@@ -1848,6 +2011,33 @@ const FETIndiaPlatform: React.FC = () => {
         }}
         prefillRollNumber={studentResultPrefill}
       />
+
+      {/* Official FET Store Cart Slide-Out Drawer */}
+      <StoreCartDrawer
+        onOpenStore={() => {
+          setCurrentExperience('store');
+          window.history.pushState(null, '', '/store');
+        }}
+        onOpenContact={handleOpenContact}
+        onOpenDonate={() => handleOpenDonate('general')}
+        onProceedToCheckout={() => setIsCheckoutModalOpen(true)}
+      />
+
+      {/* Official FET Store Checkout Preparation Modal (Store Task 14) */}
+      <StoreCheckoutModal
+        isOpen={isCheckoutModalOpen}
+        onClose={() => setIsCheckoutModalOpen(false)}
+        onViewOrderHistory={() => handleOpenUserDashboard('orders')}
+        onOpenAuth={() => {
+          setPendingAuthAction({ type: 'store_checkout' });
+          if (typeof window !== 'undefined') {
+            try {
+              sessionStorage.setItem('fet_pending_auth_action', JSON.stringify({ type: 'store_checkout' }));
+            } catch {}
+          }
+          setIsAuthModalOpen(true);
+        }}
+      />
     </>
   );
 };
@@ -1858,9 +2048,13 @@ export default function App() {
       <AuthProvider>
         <ConfigProvider>
           <ModuleProvider>
-            <NotificationProvider>
-              <FETIndiaPlatform />
-            </NotificationProvider>
+            <ModuleControlsProvider>
+              <NotificationProvider>
+                <CartProvider>
+                  <FETIndiaPlatform />
+                </CartProvider>
+              </NotificationProvider>
+            </ModuleControlsProvider>
           </ModuleProvider>
         </ConfigProvider>
       </AuthProvider>
