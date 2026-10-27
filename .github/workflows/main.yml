@@ -1,4 +1,4 @@
-name: Deploy Fatimiyah Educational Trust to Firebase Hosting
+name: Deploy Fatimyah Educational Trust to Firebase Hosting
 
 on:
   push:
