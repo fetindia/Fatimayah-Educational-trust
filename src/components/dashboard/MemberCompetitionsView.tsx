@@ -24,7 +24,8 @@ import {
   AlertCircle,
   QrCode,
   X,
-  CreditCard
+  CreditCard,
+  Share2
 } from 'lucide-react';
 import { Competition, CompetitionRegistration, CompetitionCertificateRecord } from '../../types';
 import { INITIAL_COMPETITIONS } from '../../data/initialCompetitions';
@@ -37,6 +38,9 @@ import { OnlineExamModal } from '../competitions/OnlineExamModal';
 import { DigitalCertificateModal } from '../competitions/DigitalCertificateModal';
 import { HallTicketModal } from '../competitions/HallTicketModal';
 import { getExamScheduleStatus } from '../../utils/examSchedule';
+import { downloadCompetitionBook } from '../../utils/downloadBookMaterial';
+import { isPublicActiveCompetition } from '../../utils/competitionFilters';
+import { ShareCompetitionModal } from '../competitions/ShareCompetitionModal';
 
 interface MemberCompetitionsViewProps {
   onOpenAuth?: () => void;
@@ -59,6 +63,7 @@ export const MemberCompetitionsView: React.FC<MemberCompetitionsViewProps> = ({ 
   const [viewingHallTicket, setViewingHallTicket] = useState<{ comp: Competition; reg: CompetitionRegistration } | null>(null);
   const [notificationMsg, setNotificationMsg] = useState<string | null>(null);
   const [downloadingCompId, setDownloadingCompId] = useState<string | null>(null);
+  const [sharingComp, setSharingComp] = useState<Competition | null>(null);
   const [downloadError, setDownloadError] = useState<{ compId: string; message: string } | null>(null);
 
   const showNotification = (msg: string) => {
@@ -105,91 +110,38 @@ export const MemberCompetitionsView: React.FC<MemberCompetitionsViewProps> = ({ 
     setDownloadError(null);
 
     try {
-      const filename = comp.pdfFileName || comp.bookDetails?.pdfFileName || `${comp.code || 'FET'}_Study_Material.pdf`;
-      const safeFileName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const regDocId = userReg?.id || userReg?.registrationId || `reg-${comp.id}-${currentUser.uid}`;
-      const prtId = userReg?.participantId || '';
-      const payStatus = userReg?.paymentStatus || (userReg?.isPaid ? 'paid' : (comp.isPaid ? 'pending' : 'free'));
-      
-      // 1. Call authoritative server download endpoint with candidate verification
-      const secureEndpoint = `/api/competitions/${comp.id}/material?uid=${encodeURIComponent(currentUser.uid)}&regId=${encodeURIComponent(regDocId)}&prtId=${encodeURIComponent(prtId)}&payStatus=${encodeURIComponent(payStatus)}`;
-      let downloadBlob: Blob | null = null;
-
-      try {
-        const resp = await fetch(secureEndpoint, {
-          headers: {
-            'x-user-uid': currentUser.uid,
-            'x-registration-id': regDocId,
-            'x-participant-id': prtId,
-            'x-payment-status': payStatus
-          }
-        });
-        if (resp.ok) {
-          const contentType = resp.headers.get('content-type') || '';
-          if (contentType.includes('application/pdf') || contentType.includes('application/octet-stream')) {
-            downloadBlob = await resp.blob();
-          } else {
-            const errJson = await resp.json().catch(() => null);
-            if (errJson?.error) {
-              throw new Error(errJson.error);
-            }
-          }
-        } else if (resp.status === 403) {
-          const errJson = await resp.json().catch(() => null);
-          throw new Error(errJson?.error || 'Candidate registration verification required to download study material.');
-        } else if (!resp.ok) {
-          const errJson = await resp.json().catch(() => null);
-          throw new Error(errJson?.error || 'Official study material is being prepared by the Examination Board.');
+      await downloadCompetitionBook({
+        competition: comp,
+        currentUser,
+        userRegistration: userReg,
+        onStart: () => {
+          setDownloadingCompId(comp.id);
+        },
+        onSuccess: (fileName) => {
+          setDownloadingCompId(null);
+          showNotification(`Official study material downloaded: ${fileName}`);
+        },
+        onError: (err) => {
+          setDownloadingCompId(null);
+          setDownloadError({
+            compId: comp.id,
+            message: err?.message || 'Failed to download PDF. Please try again or open study material link.'
+          });
+        },
+        onAuthRequired: (reason) => {
+          setDownloadingCompId(null);
+          setDownloadError({
+            compId: comp.id,
+            message: reason
+          });
         }
-      } catch (endpointErr: any) {
-        if (endpointErr?.message && endpointErr.message.includes('verification')) {
-          throw endpointErr;
-        }
-        console.warn('Server download endpoint notice, attempting direct stream fallback:', endpointErr);
-      }
-
-      // 2. Direct fetch fallback if endpoint not responding with blob and external URL is available
-      if (!downloadBlob && rawPdfUrl && (rawPdfUrl.startsWith('http://') || rawPdfUrl.startsWith('https://')) && !rawPdfUrl.includes('/api/competitions/')) {
-        try {
-          const directResp = await fetch(rawPdfUrl);
-          if (directResp.ok) {
-            downloadBlob = await directResp.blob();
-          }
-        } catch (directErr) {
-          // Handled below
-        }
-      }
-
-      // 3. Initiate browser save
-      if (downloadBlob) {
-        const blobUrl = window.URL.createObjectURL(downloadBlob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = safeFileName.endsWith('.pdf') ? safeFileName : `${safeFileName}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1500);
-        showNotification(`Official study material downloaded: ${safeFileName}`);
-      } else if (rawPdfUrl && rawPdfUrl.startsWith('data:application/pdf;base64,')) {
-        const link = document.createElement('a');
-        link.href = rawPdfUrl;
-        link.download = safeFileName.endsWith('.pdf') ? safeFileName : `${safeFileName}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        showNotification(`Official study material downloaded: ${safeFileName}`);
-      } else {
-        throw new Error('Official study material is being finalized by the Examination Board. Please try again shortly or contact your coordinator.');
-      }
+      });
     } catch (err: any) {
-      console.error('Error downloading competition PDF:', err);
+      setDownloadingCompId(null);
       setDownloadError({
         compId: comp.id,
-        message: err?.message || 'Failed to download PDF. Please try again or open study material link.'
+        message: err?.message || 'Failed to download study material.'
       });
-    } finally {
-      setDownloadingCompId(null);
     }
   };
 
@@ -304,8 +256,9 @@ export const MemberCompetitionsView: React.FC<MemberCompetitionsViewProps> = ({ 
     return () => unsubscribe();
   }, [currentUser]);
 
-  // Filter competitions
+  // Filter competitions: strictly only active, published, non-deleted, non-archived competitions
   const filteredCompetitions = competitions.filter((cmp) => {
+    if (!isPublicActiveCompetition(cmp)) return false;
     const matchesCategory = selectedCategory === 'all' || cmp.category === selectedCategory;
     const matchesSearch = 
       cmp.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -533,6 +486,21 @@ export const MemberCompetitionsView: React.FC<MemberCompetitionsViewProps> = ({ 
                       <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-slate-900/90 text-amber-300 border border-slate-700 backdrop-blur-xs">
                         {comp.code}
                       </span>
+                    </div>
+
+                    <div className="absolute top-3 right-3">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSharingComp(comp);
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-slate-950/80 hover:bg-slate-900 text-white border border-white/20 backdrop-blur-xs flex items-center gap-1 cursor-pointer transition shadow-xs"
+                        title="Share Competition"
+                      >
+                        <Share2 className="w-3 h-3 text-emerald-400" />
+                        <span>Share</span>
+                      </button>
                     </div>
 
                     <div className="absolute bottom-3 left-3 right-3">
@@ -1092,6 +1060,14 @@ export const MemberCompetitionsView: React.FC<MemberCompetitionsViewProps> = ({ 
           onClose={() => setViewingHallTicket(null)}
           onDownloadPdfBook={() => handleDownloadPdfMaterial(viewingHallTicket.comp, viewingHallTicket.reg)}
           isDownloadingPdf={downloadingCompId === viewingHallTicket.comp.id}
+        />
+      )}
+
+      {/* Social Media Sharing Modal */}
+      {sharingComp && (
+        <ShareCompetitionModal
+          competition={sharingComp}
+          onClose={() => setSharingComp(null)}
         />
       )}
 

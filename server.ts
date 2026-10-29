@@ -1336,17 +1336,44 @@ app.get('/api/competitions/:competitionId/material', async (req: Request, res: R
     }
 
     if (!compData) {
+      const cleanCompId = competitionId.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const examDir = path.join(EXAM_MATERIALS_DIR, cleanCompId);
+      if (fs.existsSync(examDir)) {
+        compData = {
+          id: competitionId,
+          title: `Examination ${competitionId}`,
+          isPaid: true,
+          participationFee: 50
+        };
+      }
+    }
+
+    if (!compData) {
       res.status(404).json({ error: 'Competition record not found.' });
       return;
     }
 
+    if (compData.isDeleted === true || compData.deleted === true || compData.status === 'archived' || compData.status === 'deleted') {
+      res.status(404).json({ error: 'This examination has been concluded or archived.' });
+      return;
+    }
+
     const pdfUrl = compData.pdfReadingMaterialUrl || compData.bookDetails?.pdfReadingMaterialUrl || compData.pdfExternalUrl || compData.bookDetails?.pdfExternalUrl;
+    const cloudStorageUrl = compData.pdfCloudStorageUrl || compData.bookDetails?.pdfCloudStorageUrl;
     const rawFileName = compData.pdfFileName || compData.bookDetails?.pdfFileName || `${compData.code || 'FET'}_Study_Material.pdf`;
     const safeFileName = rawFileName.replace(/[^a-zA-Z0-9._-]/g, '_');
 
     // 2. Candidate authorization check
     let isAuthorized = false;
     let authFailureReason = 'Candidate registration verification required to access official competition book.';
+
+    // Allow public access only if book or competition is explicitly marked public
+    if (
+      compData.allowPublicBookDownload === true ||
+      compData.bookDetails?.isPublic === true
+    ) {
+      isAuthorized = true;
+    }
 
     if (uid) {
       // Check admin/controller role
@@ -1552,22 +1579,30 @@ app.get('/api/competitions/:competitionId/material', async (req: Request, res: R
       return;
     }
 
-    // 5. Remote Cloud Storage URL or Web URL (stream buffer directly without redirect)
-    if (pdfUrl && (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://'))) {
-      try {
-        const remoteResp = await fetch(pdfUrl);
-        if (remoteResp.ok) {
-          const ct = remoteResp.headers.get('content-type') || '';
-          if (ct.includes('application/pdf') || ct.includes('octet-stream') || pdfUrl.endsWith('.pdf')) {
+    // 5. Remote Cloud Storage URL or Web URL (stream buffer directly with attachment header)
+    const remoteCandidates = [
+      cloudStorageUrl,
+      pdfUrl,
+      compData.pdfExternalUrl,
+      compData.bookDetails?.pdfExternalUrl,
+      compData.pdfStoragePath ? `https://firebasestorage.googleapis.com/v0/b/fatimyah-educational-trust.firebasestorage.app/o/${encodeURIComponent(compData.pdfStoragePath)}?alt=media` : null
+    ].filter(Boolean) as string[];
+
+    for (const rUrl of remoteCandidates) {
+      if (rUrl.startsWith('http://') || rUrl.startsWith('https://')) {
+        try {
+          const remoteResp = await fetch(rUrl);
+          if (remoteResp.ok) {
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', `attachment; filename="${safeFileName.endsWith('.pdf') ? safeFileName : safeFileName + '.pdf'}"`);
+            res.setHeader('Cache-Control', 'public, max-age=3600');
             const arrayBuffer = await remoteResp.arrayBuffer();
             res.send(Buffer.from(arrayBuffer));
             return;
           }
+        } catch (remoteErr) {
+          console.warn('Remote PDF candidate stream notice:', remoteErr);
         }
-      } catch (remoteErr) {
-        console.warn('Remote PDF stream notice:', remoteErr);
       }
     }
 
@@ -1666,6 +1701,197 @@ app.get('/api/competitions/:competitionId/access-check', async (req: Request, re
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Server error checking document access.' });
   }
+});
+
+// =============================================================
+// SOCIAL MEDIA SHARING CARDS & OPEN GRAPH PREVIEWS (RELEASE 2)
+// WhatsApp, Facebook, Twitter, Telegram, LinkedIn Crawlers
+// =============================================================
+
+function isSocialCrawler(userAgent?: string): boolean {
+  if (!userAgent) return false;
+  const ua = userAgent.toLowerCase();
+  return (
+    ua.includes('facebookexternalhit') ||
+    ua.includes('facebot') ||
+    ua.includes('whatsapp') ||
+    ua.includes('twitterbot') ||
+    ua.includes('telegrambot') ||
+    ua.includes('linkedinbot') ||
+    ua.includes('slackbot') ||
+    ua.includes('discordbot') ||
+    ua.includes('pinterest') ||
+    ua.includes('skypeuripreview') ||
+    ua.includes('vkshare') ||
+    ua.includes('w3c_validator') ||
+    ua.includes('googlebot') ||
+    ua.includes('bingbot')
+  );
+}
+
+function renderCompetitionShareHtml(comp: any, hostHeader?: string): string {
+  const title = comp.title || 'National Academic Competition';
+  const rawDesc = comp.description || comp.shortDescription || 'Participate in the nationwide talent examination organized by FATIMYAH Educational Trust India. Prescribed curriculum, merit awards, and educational scholarship grants.';
+  const cleanDesc = rawDesc.replace(/\s+/g, ' ').replace(/"/g, '&quot;').trim();
+  const description = cleanDesc.slice(0, 260);
+  const siteName = 'FATIMYAH Educational Trust India';
+  const coverImage = (comp.coverImageUrl && comp.coverImageUrl.startsWith('http'))
+    ? comp.coverImageUrl
+    : 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=1200&q=80';
+  
+  let baseUrl = 'https://fetindia.com';
+  if (hostHeader && !hostHeader.includes('localhost') && !hostHeader.includes('127.0.0.1')) {
+    baseUrl = `https://${hostHeader.split(':')[0]}`;
+  }
+  const canonicalUrl = `${baseUrl}/examination/${encodeURIComponent(comp.id)}`;
+  const feeLabel = comp.isPaid && (comp.participationFee ?? 0) > 0 ? `Entry Fee: ₹${comp.participationFee}` : '100% Free Entry';
+  const dateLabel = comp.competitionDate || comp.examScheduleDate || comp.registrationEndDate ? `Exam Date: ${comp.competitionDate || comp.examScheduleDate || comp.registrationEndDate}` : 'Registration Open';
+  const bookLabel = comp.bookDetails?.bookTitle ? `Prescribed Literature: "${comp.bookDetails.bookTitle}"` : '';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title} | ${siteName}</title>
+  <meta name="description" content="${description}">
+
+  <!-- Open Graph / Facebook / WhatsApp -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="${siteName}">
+  <meta property="og:title" content="${title}">
+  <meta property="og:description" content="${description} | ${feeLabel} • ${dateLabel}">
+  <meta property="og:image" content="${coverImage}">
+  <meta property="og:image:secure_url" content="${coverImage}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="${title}">
+  <meta property="og:url" content="${canonicalUrl}">
+
+  <!-- Twitter / X -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@FETIndia">
+  <meta name="twitter:title" content="${title}">
+  <meta name="twitter:description" content="${description} | ${feeLabel} • ${dateLabel}">
+  <meta name="twitter:image" content="${coverImage}">
+
+  <!-- Academic Competition Structured Data (JSON-LD) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "EducationEvent",
+    "name": ${JSON.stringify(title)},
+    "description": ${JSON.stringify(description)},
+    "organizer": {
+      "@type": "Organization",
+      "name": "FATIMYAH Educational Trust India",
+      "url": "https://fetindia.com"
+    },
+    "image": ${JSON.stringify(coverImage)},
+    "eventStatus": "https://schema.org/EventScheduled",
+    "offers": {
+      "@type": "Offer",
+      "price": ${comp.participationFee ? comp.participationFee : 0},
+      "priceCurrency": "INR",
+      "availability": "https://schema.org/InStock"
+    }
+  }
+  </script>
+
+  <!-- Instant Browser Redirect for Human Visitors -->
+  <meta http-equiv="refresh" content="0;url=/examination/${encodeURIComponent(comp.id)}">
+  <script>
+    if (typeof window !== 'undefined') {
+      window.location.replace('/examination/${encodeURIComponent(comp.id)}');
+    }
+  </script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0B2545; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+    .card { max-width: 500px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; padding: 24px; text-align: center; }
+    h1 { font-size: 20px; margin-bottom: 8px; color: #F59E0B; }
+    p { font-size: 14px; color: #CBD5E1; line-height: 1.5; }
+    a { display: inline-block; margin-top: 16px; padding: 10px 20px; background: #0D6E42; color: #fff; border-radius: 8px; text-decoration: none; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>${title}</h1>
+    <p>${description}</p>
+    <p style="color: #10B981; font-weight: bold;">${feeLabel} • ${dateLabel}</p>
+    ${bookLabel ? `<p style="color: #93C5FD; font-size: 13px;">${bookLabel}</p>` : ''}
+    <a href="/examination/${encodeURIComponent(comp.id)}">Open Competition & Details &rarr;</a>
+  </div>
+</body>
+</html>`;
+}
+
+// GET /api/competitions/:competitionId/share - Rich Social Media Preview endpoint
+app.get('/api/competitions/:competitionId/share', async (req: Request, res: Response) => {
+  try {
+    const { competitionId } = req.params;
+    let compData: any = null;
+    try {
+      const compSnap = await getDoc(doc(db, 'competitions', competitionId));
+      if (compSnap.exists()) compData = { id: compSnap.id, ...compSnap.data() };
+    } catch (e) {}
+
+    if (!compData) {
+      const match = INITIAL_COMPETITIONS.find(c => c.id === competitionId || c.code?.toLowerCase() === competitionId.toLowerCase());
+      if (match) compData = match;
+    }
+
+    // Exclude deleted, archived, or unpublished competitions from social share cards
+    if (compData && (compData.isDeleted === true || compData.deleted === true || compData.status === 'archived' || compData.status === 'deleted' || compData.status === 'draft' || compData.isPublished === false)) {
+      compData = null;
+    }
+
+    if (!compData) {
+      res.redirect('/examination');
+      return;
+    }
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.send(renderCompetitionShareHtml(compData, req.headers.host));
+  } catch (err: any) {
+    res.redirect('/examination');
+  }
+});
+
+// Social crawler interception for direct competition deep-links
+app.use(async (req: Request, res: Response, next: NextFunction) => {
+  const reqPath = req.path;
+  const match = reqPath.match(/^\/(examination|examinations|competitions|competition|exam|exams)\/([a-zA-Z0-9_-]+)/i);
+  if (match && isSocialCrawler(req.headers['user-agent'])) {
+    const compId = match[2];
+    try {
+      let compData: any = null;
+      try {
+        const compSnap = await getDoc(doc(db, 'competitions', compId));
+        if (compSnap.exists()) compData = { id: compSnap.id, ...compSnap.data() };
+      } catch (e) {}
+
+      if (!compData) {
+        const fallback = INITIAL_COMPETITIONS.find(c => c.id === compId || c.code?.toLowerCase() === compId.toLowerCase());
+        if (fallback) compData = fallback;
+      }
+
+      // Exclude deleted or archived competitions
+      if (compData && (compData.isDeleted === true || compData.deleted === true || compData.status === 'archived' || compData.status === 'deleted' || compData.status === 'draft' || compData.isPublished === false)) {
+        compData = null;
+      }
+
+      if (compData) {
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        res.send(renderCompetitionShareHtml(compData, req.headers.host));
+        return;
+      }
+    } catch (err) {
+      // Fall through to standard SPA
+    }
+  }
+  next();
 });
 
 // =============================================================

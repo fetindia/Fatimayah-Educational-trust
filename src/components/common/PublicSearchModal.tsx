@@ -54,31 +54,21 @@ const SEARCH_INDEX: SearchResultItem[] = [
   // Competitions & Examinations
   {
     id: 'exam-1',
-    title: 'All-India National Book Reading & Comprehension Challenge',
+    title: 'Ayam-e-Fatimiyah Special Book Reading Competition 2026 — Fatima Zahra (Salaamun Alayha)',
     category: 'exams',
     categoryLabel: 'Competitions & Exams',
-    snippet: 'Annual national literary competition open to school and college students with ₹50,000 in cash prizes and merit medals.',
-    tags: ['book reading', 'wings of fire', 'comprehension', 'exam', 'competition', 'scholarship', 'prize'],
+    snippet: 'Annual national book reading challenge based on the Urdu book Fatima Zahra (S.A.) with cash prizes, medals, and merit distinctions.',
+    tags: ['book reading', 'fatima zahra', 'ayam-e-fatimiyah', 'comprehension', 'exam', 'competition', 'scholarship', 'prize', 'urdu'],
     actionType: 'scroll',
     targetId: 'examinations'
   },
   {
     id: 'exam-2',
-    title: 'STEM Science & Mathematics National Olympiad 2026',
+    title: 'FET India Academic Talent Search & National Examinations',
     category: 'exams',
     categoryLabel: 'Competitions & Exams',
-    snippet: 'Competitive Olympiad testing analytical mathematics, natural sciences, and problem-solving skills.',
-    tags: ['stem', 'science', 'math', 'olympiad', 'exam', 'hall ticket', 'rankings'],
-    actionType: 'scroll',
-    targetId: 'examinations'
-  },
-  {
-    id: 'exam-3',
-    title: 'Islamic History & Moral Ethics Annual Assessment',
-    category: 'exams',
-    categoryLabel: 'Competitions & Exams',
-    snippet: 'Comprehensive assessment of Islamic civilizational history, ethical values, and moral philosophy.',
-    tags: ['islamic history', 'ethics', 'moral', 'examination', 'test', 'madrasa'],
+    snippet: 'Standardized national examinations, book mastery evaluations, and merit olympiads empowering students with verified academic credentials.',
+    tags: ['examinations', 'syllabus', 'hall ticket', 'talent search', 'merit', 'scholarships', 'admit card'],
     actionType: 'scroll',
     targetId: 'examinations'
   },

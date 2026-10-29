@@ -27,23 +27,29 @@ import {
   ExternalLink,
   Medal,
   Check,
+  Copy,
+  MessageCircle,
+  Share2,
   FileCheck2,
   QrCode,
   ArrowLeft,
-  Share2,
   Lock,
   Globe,
   Star
 } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Competition } from '../../types';
+import { Competition, User } from '../../types';
 import { INITIAL_COMPETITIONS } from '../../data/initialCompetitions';
 import { useConfig } from '../../contexts/ConfigContext';
 import { Top100ResultsShowcase } from '../home/Top100ResultsShowcase';
 import { getExamScheduleStatus } from '../../utils/examSchedule';
+import { downloadCompetitionBook, CandidateAuthUser } from '../../utils/downloadBookMaterial';
+import { isPublicActiveCompetition } from '../../utils/competitionFilters';
+import { ShareCompetitionModal } from '../competitions/ShareCompetitionModal';
 
 interface ExaminationPageProps {
+  currentUser?: CandidateAuthUser | null;
   targetCompetitionId?: string;
   onApplyExam: (competition: Competition) => void;
   onViewExamInfo: (competition: Competition, tab?: 'instructions' | 'book_mastery' | 'eligibility' | 'prizes') => void;
@@ -54,6 +60,7 @@ interface ExaminationPageProps {
 }
 
 export const ExaminationPage: React.FC<ExaminationPageProps> = ({
+  currentUser,
   targetCompetitionId,
   onApplyExam,
   onViewExamInfo,
@@ -69,6 +76,10 @@ export const ExaminationPage: React.FC<ExaminationPageProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedDirectExamId, setSelectedDirectExamId] = useState<string | undefined>(targetCompetitionId);
   const [shareToast, setShareToast] = useState<string | null>(null);
+  const [sharingComp, setSharingComp] = useState<Competition | null>(null);
+  const [downloadingCompId, setDownloadingCompId] = useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState<number>(0);
+  const [downloadNotice, setDownloadNotice] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   useEffect(() => {
     if (targetCompetitionId) {
@@ -81,24 +92,55 @@ export const ExaminationPage: React.FC<ExaminationPageProps> = ({
   }, [targetCompetitionId]);
 
   const handleShareExam = (comp: Competition) => {
-    const shareUrl = `${window.location.origin}/examination/${comp.id}`;
-    const shareTitle = `${comp.title} - FET India National Examinations`;
-    const shareText = `Official Entrance / Competition: ${comp.title} (${comp.categoryLabel || 'Assessment'}). Proctored Duration: ${comp.examDetails?.durationMinutes || 45} mins. Register online: ${shareUrl}`;
-
-    if (navigator.share) {
-      navigator.share({
-        title: shareTitle,
-        text: shareText,
-        url: shareUrl
-      }).catch(() => {});
-    } else {
-      navigator.clipboard.writeText(shareUrl);
-      setShareToast(`Share link copied: ${shareUrl}`);
-      setTimeout(() => setShareToast(null), 4000);
-    }
+    setSharingComp(comp);
   };
 
-  const directCompetition = React.useMemo(() => {
+  const handleDownloadBook = async (comp: Competition) => {
+    setDownloadingCompId(comp.id);
+    setDownloadProgress(10);
+    setDownloadNotice(null);
+
+    await downloadCompetitionBook({
+      competition: comp,
+      currentUser,
+      onStart: () => {
+        setDownloadingCompId(comp.id);
+        setDownloadProgress(20);
+      },
+      onProgress: (pct) => {
+        setDownloadProgress(pct);
+      },
+      onSuccess: (fileName) => {
+        setDownloadingCompId(null);
+        setDownloadNotice({
+          message: `Official study material downloaded: ${fileName}`,
+          type: 'success'
+        });
+        setTimeout(() => setDownloadNotice(null), 5000);
+      },
+      onError: (err) => {
+        setDownloadingCompId(null);
+        setDownloadNotice({
+          message: err.message || 'Failed to download study material.',
+          type: 'error'
+        });
+        setTimeout(() => setDownloadNotice(null), 6000);
+      },
+      onAuthRequired: (reason) => {
+        setDownloadingCompId(null);
+        setDownloadNotice({
+          message: `${reason} Opening registration form...`,
+          type: 'info'
+        });
+        setTimeout(() => {
+          setDownloadNotice(null);
+          onApplyExam(comp);
+        }, 1500);
+      }
+    });
+  };
+
+  const requestedCompRecord = React.useMemo(() => {
     if (!selectedDirectExamId) return null;
     return (
       competitions.find(
@@ -106,6 +148,15 @@ export const ExaminationPage: React.FC<ExaminationPageProps> = ({
       ) || null
     );
   }, [competitions, selectedDirectExamId]);
+
+  const isRequestedCompArchived = Boolean(
+    requestedCompRecord && !isPublicActiveCompetition(requestedCompRecord)
+  );
+
+  const directCompetition = React.useMemo(() => {
+    if (!requestedCompRecord) return null;
+    return isPublicActiveCompetition(requestedCompRecord) ? requestedCompRecord : null;
+  }, [requestedCompRecord]);
 
   const primaryGreen = config.primaryGreen || '#0D6E42';
   const primaryBlue = config.primaryBlue || '#0B2545';
@@ -155,8 +206,8 @@ export const ExaminationPage: React.FC<ExaminationPageProps> = ({
   // Filtered competitions
   const filteredCompetitions = useMemo(() => {
     return competitions.filter((comp) => {
-      // Quarantined Test vs Live Separation: Exclude test competitions from public candidate portal
-      if (comp.isTestCompetition || comp.environment === 'test') return false;
+      // Strictly require active, published, non-deleted, non-archived competitions
+      if (!isPublicActiveCompetition(comp)) return false;
 
       // Category filter
       if (activeCategory === 'book_reading' && comp.category !== 'book_reading') return false;
@@ -347,6 +398,51 @@ export const ExaminationPage: React.FC<ExaminationPageProps> = ({
           </div>
         </div>
 
+        {/* Download Notice / Eligibility Banner */}
+        {downloadNotice && (
+          <div className={`mb-6 p-4 rounded-2xl text-xs font-bold border flex items-center justify-between gap-3 shadow-lg transition-all ${
+            downloadNotice.type === 'success' 
+              ? 'bg-emerald-950/80 text-emerald-200 border-emerald-500/50' 
+              : downloadNotice.type === 'error'
+              ? 'bg-rose-950/80 text-rose-200 border-rose-500/50'
+              : 'bg-indigo-950/80 text-indigo-200 border-indigo-500/50'
+          }`}>
+            <div className="flex items-center gap-2">
+              {downloadNotice.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
+              {downloadNotice.type === 'error' && <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />}
+              {downloadNotice.type === 'info' && <HelpCircle className="w-4 h-4 text-indigo-400 shrink-0" />}
+              <span>{downloadNotice.message}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDownloadNotice(null)}
+              className="text-white/60 hover:text-white px-2 py-1 rounded text-[11px] cursor-pointer"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {/* Notice for archived or removed competition requested via old URL */}
+        {isRequestedCompArchived && (
+          <div className="mb-8 p-6 rounded-3xl bg-amber-50 border-2 border-amber-300 text-slate-800 shadow-sm flex items-start gap-4">
+            <div className="w-10 h-10 rounded-2xl bg-amber-200 text-amber-900 flex items-center justify-center shrink-0">
+              <AlertCircle className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-sm font-bold text-amber-950">
+                Examination Concluded or Archived
+              </h4>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                The requested examination <strong className="text-slate-900 font-mono">{requestedCompRecord?.title || selectedDirectExamId}</strong> has concluded or has been retired from active candidate enrollment by the Academic Directorate. Historical participant registrations, scores, and verified certificates remain fully preserved in student dashboards.
+              </p>
+              <p className="text-xs text-emerald-800 font-bold pt-1">
+                Please explore currently active competitions and talent examinations below.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Direct Competition Presentation Showcase (When opened via public link) */}
         {directCompetition && (
           <div className="mb-10 bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-900 rounded-3xl border-2 border-amber-500/40 p-6 sm:p-8 text-white shadow-2xl relative overflow-hidden">
@@ -358,134 +454,177 @@ export const ExaminationPage: React.FC<ExaminationPageProps> = ({
                 <div className="flex items-center gap-2">
                   <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>Direct Share Link</span>
+                    <span>Public Competition Showcase</span>
                   </span>
                   <span className="font-mono text-xs text-slate-400 bg-white/10 px-2.5 py-0.5 rounded">
                     {directCompetition.code}
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold">
+                    FATIMYAH Educational Trust
                   </span>
                 </div>
 
                 <button
                   type="button"
                   onClick={() => setSelectedDirectExamId(undefined)}
-                  className="text-xs text-slate-400 hover:text-white transition cursor-pointer flex items-center gap-1 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-xl border border-white/10"
+                  className="text-xs text-slate-300 hover:text-white transition cursor-pointer flex items-center gap-1 bg-white/10 hover:bg-white/20 px-3.5 py-1.5 rounded-xl border border-white/20"
                 >
                   <span>View All Competitions</span>
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
 
-              {/* Title & Description */}
-              <div className="space-y-2 max-w-4xl">
-                <h2 className="text-2xl sm:text-4xl font-black text-white leading-tight">
-                  {directCompetition.title}
-                </h2>
-                <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
-                  {directCompetition.description}
-                </p>
-              </div>
-
-              {/* Detailed Presentation Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
-                  <div className="text-[11px] uppercase font-bold text-slate-400">Duration Limit</div>
-                  <div className="text-sm sm:text-base font-bold text-amber-400 mt-0.5 flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    <span>{directCompetition.examDetails?.durationMinutes || 45} Minutes</span>
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
-                  <div className="text-[11px] uppercase font-bold text-slate-400">Questions Count</div>
-                  <div className="text-sm sm:text-base font-bold text-white mt-0.5 flex items-center gap-1">
-                    <FileText className="w-4 h-4 text-indigo-400" />
-                    <span>{directCompetition.examDetails?.questions?.length || 25} Questions</span>
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
-                  <div className="text-[11px] uppercase font-bold text-slate-400">Entry Status</div>
-                  <div className="text-sm sm:text-base font-bold text-emerald-400 mt-0.5">
-                    {directCompetition.isPaid ? `Fee: ₹${directCompetition.participationFee}` : '100% Free Entry'}
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10">
-                  <div className="text-[11px] uppercase font-bold text-slate-400">Registration End</div>
-                  <div className="text-sm sm:text-base font-bold text-white mt-0.5">
-                    {directCompetition.registrationEndDate || 'Open Now'}
-                  </div>
-                </div>
-              </div>
-
-              {/* Prescribed Literature / Study Material */}
-              {directCompetition.bookDetails && (
-                <div className="p-4 rounded-2xl bg-indigo-900/40 border border-indigo-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400">
-                      <BookOpen className="w-4 h-4" />
-                      <span>Prescribed Book / Study Literature</span>
-                    </div>
-                    <div className="text-sm font-bold text-white">
-                      &ldquo;{directCompetition.bookDetails.bookTitle}&rdquo;
-                    </div>
-                    <div className="text-xs text-slate-300">
-                      Author: {directCompetition.bookDetails.author || 'FET Academic Bureau'} • Scope: {directCompetition.bookDetails.requiredChapters || 'Entire Syllabus'}
+              {/* Poster + Details Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+                {/* Poster / Cover Image */}
+                {(directCompetition.coverImageUrl || directCompetition.bookDetails?.coverImageUrl || directCompetition.imageUrl) && (
+                  <div className="md:col-span-4 shrink-0">
+                    <div className="relative rounded-2xl overflow-hidden border-2 border-amber-500/30 shadow-2xl group bg-slate-950">
+                      <img
+                        src={directCompetition.coverImageUrl || directCompetition.bookDetails?.coverImageUrl || directCompetition.imageUrl}
+                        alt={directCompetition.title}
+                        className="w-full h-64 md:h-80 object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
+                      <div className="absolute bottom-3 left-3 right-3 text-center">
+                        <span className="px-3 py-1 rounded-full bg-slate-900/90 text-amber-300 border border-amber-500/40 text-[11px] font-bold">
+                          Official Curriculum Poster
+                        </span>
+                      </div>
                     </div>
                   </div>
+                )}
 
-                  {(directCompetition.pdfReadingMaterialUrl || directCompetition.bookDetails?.pdfReadingMaterialUrl) && (
+                {/* Title, Vision & Description */}
+                <div className={`${(directCompetition.coverImageUrl || directCompetition.bookDetails?.coverImageUrl || directCompetition.imageUrl) ? 'md:col-span-8' : 'md:col-span-12'} space-y-4`}>
+                  <div className="space-y-2">
+                    <div className="text-xs font-bold text-amber-400 uppercase tracking-widest">
+                      {directCompetition.categoryLabel || 'Academic Talent Examination'}
+                    </div>
+                    <h2 className="text-2xl sm:text-4xl font-black text-white leading-tight">
+                      {directCompetition.title}
+                    </h2>
+                    <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+                      {directCompetition.description}
+                    </p>
+                  </div>
+
+                  {/* Presentation Badges Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                    <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
+                      <div className="text-[10px] uppercase font-bold text-slate-400">Exam Duration</div>
+                      <div className="text-xs sm:text-sm font-bold text-amber-400 mt-0.5 flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>{directCompetition.examDetails?.durationMinutes || 45} Mins</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
+                      <div className="text-[10px] uppercase font-bold text-slate-400">Total Questions</div>
+                      <div className="text-xs sm:text-sm font-bold text-white mt-0.5 flex items-center gap-1">
+                        <FileText className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>{directCompetition.examDetails?.questions?.length || 25} MCQs</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
+                      <div className="text-[10px] uppercase font-bold text-slate-400">Participation</div>
+                      <div className="text-xs sm:text-sm font-bold text-emerald-400 mt-0.5">
+                        {directCompetition.isPaid ? `Fee: ₹${directCompetition.participationFee}` : '100% Free Entry'}
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
+                      <div className="text-[10px] uppercase font-bold text-slate-400">Registration End</div>
+                      <div className="text-xs sm:text-sm font-bold text-white mt-0.5">
+                        {directCompetition.registrationEndDate || 'Open Now'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Prescribed Literature / Study Material */}
+                  {directCompetition.bookDetails && (
+                    <div className="p-4 rounded-2xl bg-indigo-900/50 border border-indigo-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400">
+                          <BookOpen className="w-4 h-4" />
+                          <span>Prescribed Book / Study Literature</span>
+                        </div>
+                        <div className="text-sm font-bold text-white">
+                          &ldquo;{directCompetition.bookDetails.bookTitle}&rdquo;
+                        </div>
+                        <div className="text-xs text-slate-300">
+                          Author: {directCompetition.bookDetails.author || 'FET Academic Bureau'} • Scope: {directCompetition.bookDetails.requiredChapters || 'Entire Syllabus'}
+                        </div>
+                      </div>
+
+                      {(directCompetition.pdfReadingMaterialUrl || directCompetition.bookDetails?.pdfReadingMaterialUrl || (directCompetition as any).pdfCloudStorageUrl) && (
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadBook(directCompetition)}
+                          disabled={downloadingCompId === directCompetition.id}
+                          className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black shadow-lg transition flex items-center justify-center gap-2 flex-shrink-0 cursor-pointer disabled:opacity-75"
+                        >
+                          {downloadingCompId === directCompetition.id ? (
+                            <>
+                              <span className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                              <span>Downloading ({downloadProgress}%)...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-3.5 h-3.5" />
+                              <span>Download Official Book</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Rewards Summary */}
+                  {directCompetition.prizesSummary && directCompetition.prizesSummary.length > 0 && (
+                    <div className="p-3.5 rounded-2xl bg-amber-950/40 border border-amber-500/30 text-xs text-amber-200">
+                      <span className="font-bold text-amber-400">Medals & Scholarship Awards: </span>
+                      {directCompetition.prizesSummary.join(' • ')}
+                    </div>
+                  )}
+
+                  {/* Action Buttons: Apply, Download & Social Sharing */}
+                  <div className="pt-2 flex flex-wrap items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => onApplyExam(directCompetition)}
+                      className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-950/40 transition flex items-center gap-2 cursor-pointer"
+                    >
+                      <span>Apply / Register for this Exam</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleShareExam(directCompetition)}
+                      className="px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/20 transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Share2 className="w-4 h-4 text-indigo-300" />
+                      <span>Share / Copy Link</span>
+                    </button>
+
                     <a
-                      href={directCompetition.pdfReadingMaterialUrl || directCompetition.bookDetails?.pdfReadingMaterialUrl}
+                      href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                        `*${directCompetition.title}*\nOrganized by FATIMYAH Educational Trust India\n\nPrescribed syllabus, merit awards, and educational scholarship grants.\n\nDirect Details & Registration: ${window.location.origin}/examination/${directCompetition.id}`
+                      )}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/20 transition flex items-center justify-center gap-1.5 flex-shrink-0"
+                      className="px-4 py-3 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-white font-bold text-xs transition flex items-center gap-1.5 shadow-md"
                     >
-                      <Download className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Download Study Material</span>
+                      <MessageCircle className="w-4 h-4" />
+                      <span>Share on WhatsApp</span>
                     </a>
-                  )}
+                  </div>
                 </div>
-              )}
-
-              {/* Rewards Summary */}
-              {directCompetition.prizesSummary && directCompetition.prizesSummary.length > 0 && (
-                <div className="p-4 rounded-2xl bg-amber-950/30 border border-amber-500/20 text-xs text-amber-200">
-                  <span className="font-bold text-amber-400">Medals & Rewards: </span>
-                  {directCompetition.prizesSummary.join(' • ')}
-                </div>
-              )}
-
-              {/* Action Buttons: Apply & Share */}
-              <div className="pt-2 flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => onApplyExam(directCompetition)}
-                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-950/40 transition flex items-center gap-2 cursor-pointer"
-                >
-                  <span>Apply / Register for this Exam</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleShareExam(directCompetition)}
-                  className="px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/20 transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Share2 className="w-4 h-4 text-indigo-300" />
-                  <span>Copy Public Share Link</span>
-                </button>
-
-                <a
-                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                    `Register for ${directCompetition.title} at Fatimyah Educational Trust India. Link: ${window.location.origin}/examination/${directCompetition.id}`
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-4 py-3 rounded-xl bg-emerald-700/80 hover:bg-emerald-600 text-white font-bold text-xs transition flex items-center gap-1.5"
-                >
-                  <span>Share on WhatsApp</span>
-                </a>
               </div>
             </div>
           </div>
@@ -643,16 +782,25 @@ export const ExaminationPage: React.FC<ExaminationPageProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {(competition.pdfReadingMaterialUrl || competition.bookDetails?.pdfReadingMaterialUrl) && (
-                        <a
-                          href={competition.pdfReadingMaterialUrl || competition.bookDetails?.pdfReadingMaterialUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold transition-colors flex items-center gap-1"
+                      {(competition.pdfReadingMaterialUrl || competition.bookDetails?.pdfReadingMaterialUrl || (competition as any).pdfCloudStorageUrl) && (
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadBook(competition)}
+                          disabled={downloadingCompId === competition.id}
+                          className="px-3 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
                         >
-                          <Download className="w-3.5 h-3.5 text-slate-500" />
-                          <span>PDF Book</span>
-                        </a>
+                          {downloadingCompId === competition.id ? (
+                            <>
+                              <span className="w-3.5 h-3.5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                              <span>{downloadProgress}%</span>
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-3.5 h-3.5 text-slate-500" />
+                              <span>PDF Book</span>
+                            </>
+                          )}
+                        </button>
                       )}
 
                       {isClosed ? (
@@ -815,6 +963,14 @@ export const ExaminationPage: React.FC<ExaminationPageProps> = ({
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{shareToast}</span>
         </div>
+      )}
+
+      {/* Social Media Sharing Modal */}
+      {sharingComp && (
+        <ShareCompetitionModal
+          competition={sharingComp}
+          onClose={() => setSharingComp(null)}
+        />
       )}
     </div>
   );

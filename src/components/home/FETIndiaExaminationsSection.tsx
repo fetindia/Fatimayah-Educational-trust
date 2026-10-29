@@ -20,13 +20,16 @@ import {
   HelpCircle,
   ShieldCheck,
   ChevronRight,
-  Trophy
+  Trophy,
+  Share2
 } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Competition } from '../../types';
 import { INITIAL_COMPETITIONS } from '../../data/initialCompetitions';
 import { useConfig } from '../../contexts/ConfigContext';
+import { isPublicActiveCompetition } from '../../utils/competitionFilters';
+import { ShareCompetitionModal } from '../competitions/ShareCompetitionModal';
 
 interface FETIndiaExaminationsSectionProps {
   onApplyExam: (competition: Competition) => void;
@@ -43,6 +46,7 @@ export const FETIndiaExaminationsSection: React.FC<FETIndiaExaminationsSectionPr
   const [competitions, setCompetitions] = useState<Competition[]>(INITIAL_COMPETITIONS);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedCompId, setSelectedCompId] = useState<string>('');
+  const [sharingComp, setSharingComp] = useState<Competition | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -91,8 +95,8 @@ export const FETIndiaExaminationsSection: React.FC<FETIndiaExaminationsSectionPr
     }
   }, []);
 
-  // Filter competitions: separate test from live candidates
-  const liveCompetitions = competitions.filter(c => !c.isTestCompetition && c.environment !== 'test');
+  // Filter competitions: strictly only published, active, non-deleted competitions
+  const liveCompetitions = competitions.filter(isPublicActiveCompetition);
 
   // Filter competitions: check which are open for application
   const todayStr = new Date().toISOString().split('T')[0];
@@ -306,6 +310,16 @@ export const FETIndiaExaminationsSection: React.FC<FETIndiaExaminationsSectionPr
                         <span>Book Mastery</span>
                       </button>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => setSharingComp(activeCompetition)}
+                      className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold text-xs transition-colors cursor-pointer border border-emerald-300 flex items-center gap-1.5 shadow-2xs"
+                      title="Share this official examination link on WhatsApp, Facebook, or copy link"
+                      id="homepage-share-competition-btn"
+                    >
+                      <Share2 className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>Share Competition</span>
+                    </button>
                   </div>
 
                   {/* PROMINENT "APPLY FOR EXAMINATION" BUTTON (Mandated by Prompt) */}
@@ -361,9 +375,23 @@ export const FETIndiaExaminationsSection: React.FC<FETIndiaExaminationsSectionPr
 
                       <div className="flex items-center justify-between text-[11px] font-bold text-emerald-800 pt-1">
                         <span>{comp.maxMarks} Marks • Passing {comp.passingMarks}</span>
-                        <span className="inline-flex items-center gap-1 text-slate-600 hover:text-emerald-700">
-                          Details <ChevronRight className="w-3.5 h-3.5" />
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSharingComp(comp);
+                            }}
+                            className="px-2 py-0.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-[10px] font-extrabold flex items-center gap-1 transition cursor-pointer"
+                            title="Share Competition"
+                          >
+                            <Share2 className="w-3 h-3 text-emerald-700" />
+                            <span>Share</span>
+                          </button>
+                          <span className="inline-flex items-center gap-0.5 text-slate-600 hover:text-emerald-700">
+                            Details <ChevronRight className="w-3.5 h-3.5" />
+                          </span>
+                        </div>
                       </div>
                     </div>
                   );
@@ -384,6 +412,14 @@ export const FETIndiaExaminationsSection: React.FC<FETIndiaExaminationsSectionPr
         )}
 
       </div>
+
+      {/* Share Competition Modal */}
+      {sharingComp && (
+        <ShareCompetitionModal
+          competition={sharingComp}
+          onClose={() => setSharingComp(null)}
+        />
+      )}
     </section>
   );
 };

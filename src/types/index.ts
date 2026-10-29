@@ -220,6 +220,8 @@ export interface SystemModuleControlsDoc {
 }
 
 
+export type User = UserProfile;
+
 export interface UserProfile {
   uid: string;
   email: string;
@@ -1714,12 +1716,15 @@ export interface BookReadingDetails {
   requiredChapters?: string;
   submissionRequirements?: string;
   bookCoverUrl?: string;
+  coverImageUrl?: string;
   pdfReadingMaterialUrl?: string;
   pdfFileName?: string;
   pdfFileSizeBytes?: number;
   pdfSourceType?: 'upload' | 'external_url';
   pdfExternalUrl?: string;
   pdfStoragePath?: string;
+  pdfCloudStorageUrl?: string;
+  isPublic?: boolean;
 }
 
 export interface ExamStructureDetails {
@@ -1799,6 +1804,7 @@ export interface Competition {
   // Rich Configurations
   rules: string[];
   coverImageUrl?: string;
+  imageUrl?: string;
   bookDetails?: BookReadingDetails;
   pdfReadingMaterialUrl?: string;
   pdfFileName?: string;
@@ -1806,6 +1812,8 @@ export interface Competition {
   pdfSourceType?: 'upload' | 'external_url';
   pdfExternalUrl?: string;
   pdfStoragePath?: string;
+  pdfCloudStorageUrl?: string;
+  allowPublicBookDownload?: boolean;
   examDetails?: ExamStructureDetails;
   prizesSummary?: string[];
   prizeRewards?: CompetitionPrizeTier[];
@@ -1925,7 +1933,7 @@ export interface CompetitionRegistration {
   isPaid?: boolean;
   participationFee?: number;
   paymentFeeAmount?: number;
-  paymentStatus?: 'not_required' | 'free' | 'pending' | 'paid' | 'refunded';
+  paymentStatus?: 'not_required' | 'free' | 'pending' | 'paid' | 'refunded' | 'waived_scholarship';
   paymentId?: string;
   orderId?: string;
   paymentCompletedAt?: string;

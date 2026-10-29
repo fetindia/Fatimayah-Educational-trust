@@ -2312,6 +2312,7 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
     pdfSourceType: (initialCompetition?.pdfSourceType || initialCompetition?.bookDetails?.pdfSourceType || 'upload') as 'upload' | 'external_url',
     pdfExternalUrl: initialCompetition?.bookDetails?.pdfExternalUrl || (initialCompetition?.pdfSourceType === 'external_url' ? initialCompetition?.pdfReadingMaterialUrl : '') || '',
     pdfStoragePath: initialCompetition?.pdfStoragePath || initialCompetition?.bookDetails?.pdfStoragePath || '',
+    pdfCloudStorageUrl: (initialCompetition as any)?.pdfCloudStorageUrl || (initialCompetition as any)?.bookDetails?.pdfCloudStorageUrl || '',
     // Test vs Live environment separation
     isTestCompetition: initialCompetition?.isTestCompetition ?? (initialCompetition?.environment === 'test') ?? false,
     environment: (initialCompetition?.environment || (initialCompetition?.isTestCompetition ? 'test' : 'live')) as 'live' | 'test'
@@ -2376,7 +2377,8 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
         pdfFileName: res.fileName,
         pdfFileSizeBytes: res.sizeBytes,
         pdfSourceType: 'upload',
-        pdfStoragePath: storagePath
+        pdfStoragePath: storagePath,
+        pdfCloudStorageUrl: res.cloudStorageUrl || res.url
       }));
 
       // If editing an existing competition, immediately update the record in Firestore
@@ -2388,11 +2390,13 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
             pdfFileSizeBytes: res.sizeBytes,
             pdfSourceType: 'upload',
             pdfStoragePath: storagePath,
+            pdfCloudStorageUrl: res.cloudStorageUrl || res.url,
             'bookDetails.pdfReadingMaterialUrl': res.url,
             'bookDetails.pdfFileName': res.fileName,
             'bookDetails.pdfFileSizeBytes': res.sizeBytes,
             'bookDetails.pdfSourceType': 'upload',
             'bookDetails.pdfStoragePath': storagePath,
+            'bookDetails.pdfCloudStorageUrl': res.cloudStorageUrl || res.url,
             updatedAt: new Date().toISOString()
           });
         } catch (dbErr) {
@@ -2600,13 +2604,15 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
           pdfFileSizeBytes: resolvedSizeBytes || formData.pdfFileSizeBytes,
           pdfSourceType: formData.pdfSourceType,
           pdfExternalUrl: formData.pdfExternalUrl.trim(),
-          pdfStoragePath: resolvedStoragePath || formData.pdfStoragePath
+          pdfStoragePath: resolvedStoragePath || formData.pdfStoragePath,
+          pdfCloudStorageUrl: formData.pdfCloudStorageUrl || (formData.pdfSourceType === 'upload' ? resolvedPdfUrl : undefined)
         } : undefined,
         pdfReadingMaterialUrl: resolvedPdfUrl,
         pdfFileName: resolvedFileName || formData.pdfFileName,
         pdfFileSizeBytes: resolvedSizeBytes || formData.pdfFileSizeBytes,
         pdfSourceType: formData.pdfSourceType,
         pdfStoragePath: resolvedStoragePath || formData.pdfStoragePath,
+        pdfCloudStorageUrl: formData.pdfCloudStorageUrl || (formData.pdfSourceType === 'upload' ? resolvedPdfUrl : undefined),
         examDetails: {
           ...(initialCompetition?.examDetails || {}),
           isOnlineExam: formData.isOnlineExam,

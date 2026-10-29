@@ -238,9 +238,47 @@ const FETIndiaPlatform: React.FC = () => {
       } else if (path.startsWith('/notifications') || hash === '#notifications') {
         setDashboardInitialTab('notifications');
         setCurrentExperience('dashboard');
-      } else if (path.startsWith('/exams') || path.startsWith('/competitions') || hash === '#exams' || hash === '#competitions') {
-        setDashboardInitialTab('competitions');
-        setCurrentExperience('dashboard');
+      } else if (
+        path.startsWith('/examination') ||
+        path.startsWith('/examinations') ||
+        path.startsWith('/competitions/') ||
+        path.startsWith('/competition/') ||
+        path.startsWith('/exams/') ||
+        path.startsWith('/exam/') ||
+        hash.startsWith('#examination') ||
+        hash.startsWith('#competitions/') ||
+        hash.startsWith('#competition/') ||
+        searchParams.has('exam') ||
+        searchParams.has('competition')
+      ) {
+        let compId = '';
+        if (searchParams.has('exam') || searchParams.has('competition') || searchParams.has('id')) {
+          compId = searchParams.get('exam') || searchParams.get('competition') || searchParams.get('id') || '';
+        }
+        if (!compId) {
+          const directMatch = path.match(/^\/(examination|examinations|competitions|competition|exam|exams)\/([^/?#]+)/i);
+          if (directMatch && directMatch[2]) {
+            compId = decodeURIComponent(directMatch[2]);
+          }
+        }
+        if (!compId) {
+          const hashMatch = hash.match(/^#(examination|examinations|competitions|competition|exam|exams)\/([^/?#]+)/i);
+          if (hashMatch && hashMatch[2]) {
+            compId = decodeURIComponent(hashMatch[2]);
+          }
+        }
+        if (compId) {
+          setExaminationTargetId(compId.trim());
+        }
+        setCurrentExperience('examination');
+      } else if (path === '/competitions' || path === '/exams' || hash === '#exams' || hash === '#competitions') {
+        if (currentUser) {
+          setDashboardInitialTab('competitions');
+          setCurrentExperience('dashboard');
+        } else {
+          setExaminationTargetId('');
+          setCurrentExperience('examination');
+        }
       } else if (path.startsWith('/portal') || path.startsWith('/dashboard') || hash === '#portal' || hash === '#dashboard') {
         setCurrentExperience('dashboard');
       } else if (hash === '#privacy' || hash === '#privacy-policy' || path.startsWith('/privacy')) {
@@ -301,21 +339,6 @@ const FETIndiaPlatform: React.FC = () => {
         slug = slug.split('?')[0].split('#')[0].trim();
         setStoreTargetProductSlug(slug || '');
         setCurrentExperience('store');
-      } else if (hash.startsWith('#examinations') || hash.startsWith('#examination') || path.startsWith('/examination')) {
-        let compId = '';
-        if (searchParams.has('exam') || searchParams.has('competition') || searchParams.has('id')) {
-          compId = searchParams.get('exam') || searchParams.get('competition') || searchParams.get('id') || '';
-        }
-        if (!compId && path.startsWith('/examination/')) {
-          compId = decodeURIComponent(path.replace(/^\/examination\/?/i, ''));
-        }
-        if (!compId && hash.startsWith('#examination/')) {
-          compId = decodeURIComponent(hash.replace(/^#examination\/?/i, ''));
-        }
-        if (compId) {
-          setExaminationTargetId(compId.trim());
-        }
-        setCurrentExperience('examination');
       } else if (hash === '#chairman' || hash === '#chairman_message' || hash === '#chairmans_message') {
         setIsChairmanModalOpen(true);
         setCurrentExperience('public');
@@ -1700,6 +1723,7 @@ const FETIndiaPlatform: React.FC = () => {
 
           <main className="flex-1">
             <ExaminationPage
+              currentUser={currentUser}
               targetCompetitionId={examinationTargetId}
               onApplyExam={handleApplyExam}
               onViewExamInfo={handleViewExamInfo}

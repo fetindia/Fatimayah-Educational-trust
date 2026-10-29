@@ -30,6 +30,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { db, cleanFirestoreData } from '../../lib/firebase';
 import { doc, getDoc, setDoc, updateDoc, increment, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { initiateRazorpayContribution, PaymentVerificationResult } from '../../lib/razorpay';
+import { downloadCompetitionBook } from '../../utils/downloadBookMaterial';
 
 interface CompetitionRegistrationModalProps {
   competition: Competition;
@@ -119,17 +120,36 @@ export const CompetitionRegistrationModal: React.FC<CompetitionRegistrationModal
     setDownloadBookError(null);
 
     try {
-      const compId = competition.id || 'general';
-      const candidateUid = currentUser?.uid || '';
-      const candidateCode = competition.code || 'FET-CMP';
-      const customFilename = successData?.bookFileName || competition.pdfFileName || competition.bookDetails?.pdfFileName || `${candidateCode}_Official_Competition_Book.pdf`;
-      const safeFilename = customFilename.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const regDocId = successData?.registrationDocId || `reg-${compId}-${candidateUid}`;
-      const prtId = successData?.participantId || '';
-      const payStatus = successData?.isPaid ? 'paid' : 'free';
+      await downloadCompetitionBook({
+        competition,
+        currentUser,
+        userRegistration: successData ? {
+          id: successData.registrationDocId,
+          participantId: successData.participantId,
+          paymentStatus: successData.isPaid ? 'paid' : 'free',
+          isPaid: successData.isPaid
+        } as any : undefined,
+        onStart: () => setIsDownloadingBook(true),
+        onSuccess: () => setIsDownloadingBook(false),
+        onError: (err) => {
+          setIsDownloadingBook(false);
+          setDownloadBookError(err?.message || 'Failed to download official PDF book.');
+        },
+        onAuthRequired: (reason) => {
+          setIsDownloadingBook(false);
+          setDownloadBookError(reason);
+        }
+      });
+      return;
+    } catch (err: any) {
+      setIsDownloadingBook(false);
+      setDownloadBookError(err?.message || 'Failed to download official PDF book.');
+      return;
+    }
+  };
 
-      const targetEndpoint = `/api/competitions/${compId}/material?uid=${encodeURIComponent(candidateUid)}&regId=${encodeURIComponent(regDocId)}&prtId=${encodeURIComponent(prtId)}&payStatus=${encodeURIComponent(payStatus)}`;
-      let downloadBlob: Blob | null = null;
+  /*
+  const _legacyDownload = async () => {
 
       try {
         const resp = await fetch(targetEndpoint, {
@@ -199,6 +219,7 @@ export const CompetitionRegistrationModal: React.FC<CompetitionRegistrationModal
       setIsDownloadingBook(false);
     }
   };
+  */
 
   // Check deadline
   const isRegistrationClosed = competition.registrationEndDate 

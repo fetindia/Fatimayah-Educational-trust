@@ -19,6 +19,7 @@ export interface UploadResult {
   sizeBytes: number;
   mimeType: string;
   storagePath?: string;
+  cloudStorageUrl?: string;
 }
 
 export interface FileValidationResult {
@@ -516,6 +517,7 @@ function uploadPdfViaServerXhr(
   });
 }
 
+
 export async function uploadExamPdfMaterial(
   file: File,
   examId: string,
@@ -530,53 +532,71 @@ export async function uploadExamPdfMaterial(
 
   const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const storagePath = `examination_materials/${examId}/${Date.now()}_${sanitizedName}`;
+  let cloudStorageUrl: string | undefined = undefined;
 
-  // 1. Primary authoritative server disk upload via XHR with accurate progress
+  // 1. Authoritative durable Firebase Cloud Storage upload (persists across container restarts)
   try {
-    return await uploadPdfViaServerXhr(file, examId, onProgress);
+    const storageRef = ref(storage, storagePath);
+    const uploadTask = uploadBytesResumable(storageRef, file, {
+      contentType: file.type || 'application/pdf',
+      customMetadata: {
+        examId,
+        uploadedAt: new Date().toISOString(),
+        originalFileName: file.name,
+        purpose: 'examination_reading_material'
+      }
+    });
+
+    uploadTask.on('state_changed', (snapshot) => {
+      if (snapshot.totalBytes > 0 && onProgress) {
+        const pct = Math.min(60, Math.max(10, Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 60)));
+        onProgress(pct);
+      }
+    });
+
+    const snap = await withTimeout<UploadTaskSnapshot>(uploadTask, 60000, 'Cloud Storage upload timed out after 60 seconds');
+    cloudStorageUrl = await getDownloadURL(snap.ref);
+    if (onProgress) onProgress(65);
+  } catch (fbErr: any) {
+    console.warn('Notice: Firebase Storage upload notice, proceeding with server storage sync:', fbErr?.message || fbErr);
+  }
+
+  // 2. Synchronize to server disk storage for low-latency streaming and verification
+  try {
+    const serverResult = await uploadPdfViaServerXhr(file, examId, (serverPct) => {
+      if (onProgress) {
+        // Map 65% to 95%
+        const overall = Math.min(95, Math.max(65, 65 + Math.round((serverPct / 100) * 30)));
+        onProgress(overall);
+      }
+    });
+
+    if (onProgress) onProgress(100);
+    return {
+      url: serverResult.url,
+      fileName: file.name,
+      sizeBytes: file.size,
+      mimeType: file.type || 'application/pdf',
+      storagePath,
+      cloudStorageUrl: cloudStorageUrl || serverResult.url
+    };
   } catch (serverErr: any) {
-    console.info('Server storage notice, attempting Firebase Storage fallback:', serverErr?.message || serverErr);
-    if (onProgress) onProgress(40);
-
-    // 2. Resilient fallback to Firebase Cloud Storage if server upload is unreachable
-    try {
-      const storageRef = ref(storage, storagePath);
-      const uploadTask = uploadBytesResumable(storageRef, file, {
-        contentType: file.type || 'application/pdf',
-        customMetadata: {
-          examId,
-          uploadedAt: new Date().toISOString(),
-          originalFileName: file.name,
-          purpose: 'examination_reading_material'
-        }
-      });
-
-      uploadTask.on('state_changed', (snapshot) => {
-        if (snapshot.totalBytes > 0 && onProgress) {
-          const pct = Math.min(95, Math.max(40, Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)));
-          onProgress(pct);
-        }
-      });
-
-      const snap = await withTimeout<UploadTaskSnapshot>(uploadTask, 60000, 'Cloud Storage upload timed out after 60 seconds');
-      if (onProgress) onProgress(95);
-
-      const downloadUrl = await getDownloadURL(snap.ref);
+    console.info('Server storage notice, using persistent Cloud Storage link:', serverErr?.message || serverErr);
+    
+    if (cloudStorageUrl) {
       if (onProgress) onProgress(100);
-
       return {
-        url: downloadUrl,
+        url: cloudStorageUrl,
         fileName: file.name,
         sizeBytes: file.size,
         mimeType: file.type || 'application/pdf',
-        storagePath
+        storagePath,
+        cloudStorageUrl
       };
-    } catch (fbErr: any) {
-      console.error('All storage targets failed for examination PDF:', { serverErr, fbErr });
-      // Surface the specific error from the primary server or fallback
-      const primaryReason = serverErr?.message || fbErr?.message || 'Storage transmission error';
-      throw new Error(`Failed to upload official examination PDF: ${primaryReason}`);
     }
+
+    // Both failed
+    throw new Error(`Failed to upload official examination PDF: ${serverErr?.message || 'Storage error'}`);
   }
 }
 

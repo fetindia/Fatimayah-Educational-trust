@@ -22,12 +22,15 @@ import {
   Trophy,
   Gift,
   Lock,
-  ExternalLink
+  ExternalLink,
+  Share2
 } from 'lucide-react';
 import { Competition, CompetitionRegistration } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { db } from '../../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { downloadCompetitionBook } from '../../utils/downloadBookMaterial';
+import { ShareCompetitionModal } from './ShareCompetitionModal';
 
 interface ExaminationInfoModalProps {
   competition: Competition | null;
@@ -48,6 +51,7 @@ export const ExaminationInfoModal: React.FC<ExaminationInfoModalProps> = ({
   const [activeTab, setActiveTab] = useState<'instructions' | 'book_mastery' | 'eligibility' | 'prizes'>(initialTab);
   const [userRegistration, setUserRegistration] = useState<CompetitionRegistration | null>(null);
   const [isCheckingReg, setIsCheckingReg] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   useEffect(() => {
     if (!currentUser?.uid || !competition?.id) {
@@ -95,83 +99,25 @@ export const ExaminationInfoModal: React.FC<ExaminationInfoModalProps> = ({
     setIsDownloading(true);
     setDownloadError(null);
 
-    try {
-      const filename = pdfFileName || `${competition.code || 'FET'}_Study_Material.pdf`;
-      const safeFileName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-      
-      const regDocId = userRegistration?.id || userRegistration?.registrationId || `reg-${competition.id}-${currentUser?.uid || ''}`;
-      const prtId = userRegistration?.participantId || '';
-      const payStatus = userRegistration?.paymentStatus || (userRegistration?.isPaid ? 'paid' : (competition.isPaid ? 'pending' : 'free'));
-
-      const secureEndpoint = `/api/competitions/${competition.id}/material?uid=${encodeURIComponent(currentUser?.uid || '')}&regId=${encodeURIComponent(regDocId)}&prtId=${encodeURIComponent(prtId)}&payStatus=${encodeURIComponent(payStatus)}`;
-      let downloadBlob: Blob | null = null;
-
-      try {
-        const resp = await fetch(secureEndpoint, {
-          headers: {
-            'x-user-uid': currentUser?.uid || '',
-            'x-registration-id': regDocId,
-            'x-participant-id': prtId,
-            'x-payment-status': payStatus
-          }
-        });
-        if (resp.ok) {
-          const contentType = resp.headers.get('content-type') || '';
-          if (contentType.includes('application/pdf') || contentType.includes('application/octet-stream')) {
-            downloadBlob = await resp.blob();
-          } else {
-            const errJson = await resp.json().catch(() => null);
-            if (errJson?.error) throw new Error(errJson.error);
-          }
-        } else if (resp.status === 403) {
-          const err = await resp.json().catch(() => null);
-          throw new Error(err?.error || 'Candidate registration verification required to download official study material.');
-        } else if (!resp.ok) {
-          const err = await resp.json().catch(() => null);
-          throw new Error(err?.error || 'Official study material is being prepared by the Examination Board.');
-        }
-      } catch (e: any) {
-        if (e?.message && e.message.includes('verification')) {
-          throw e;
-        }
-        console.warn('Server download endpoint notice, attempting direct stream fallback:', e);
+    await downloadCompetitionBook({
+      competition,
+      currentUser,
+      userRegistration,
+      onStart: () => {
+        setIsDownloading(true);
+      },
+      onSuccess: () => {
+        setIsDownloading(false);
+      },
+      onError: (err) => {
+        setIsDownloading(false);
+        setDownloadError(err?.message || 'Failed to download curriculum PDF.');
+      },
+      onAuthRequired: (reason) => {
+        setIsDownloading(false);
+        setDownloadError(reason);
       }
-
-      if (!downloadBlob && (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://')) && !pdfUrl.includes('/api/competitions/')) {
-        try {
-          const directResp = await fetch(pdfUrl);
-          if (directResp.ok) {
-            downloadBlob = await directResp.blob();
-          }
-        } catch (directErr) {
-          // Handled below
-        }
-      }
-
-      if (downloadBlob) {
-        const blobUrl = window.URL.createObjectURL(downloadBlob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = safeFileName.endsWith('.pdf') ? safeFileName : `${safeFileName}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1500);
-      } else if (pdfUrl && pdfUrl.startsWith('data:application/pdf;base64,')) {
-        const link = document.createElement('a');
-        link.href = pdfUrl;
-        link.download = safeFileName.endsWith('.pdf') ? safeFileName : `${safeFileName}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } else {
-        throw new Error('Official study material is being prepared by the Examination Board. Please check back shortly.');
-      }
-    } catch (err: any) {
-      setDownloadError(err?.message || 'Failed to download curriculum PDF.');
-    } finally {
-      setIsDownloading(false);
-    }
+    });
   };
 
   return (
@@ -552,14 +498,24 @@ export const ExaminationInfoModal: React.FC<ExaminationInfoModalProps> = ({
 
         </div>
 
-        {/* Modal Footer with prominent APPLY button */}
+        {/* Modal Footer with prominent APPLY and Share buttons */}
         <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-3 shrink-0">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs cursor-pointer"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs cursor-pointer"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowShareModal(true)}
+              className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <Share2 className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Share Competition</span>
+            </button>
+          </div>
 
           <button
             onClick={() => {
@@ -574,6 +530,13 @@ export const ExaminationInfoModal: React.FC<ExaminationInfoModalProps> = ({
         </div>
 
       </div>
+
+      {showShareModal && (
+        <ShareCompetitionModal
+          competition={competition}
+          onClose={() => setShowShareModal(false)}
+        />
+      )}
     </div>
   );
 };
