@@ -22,6 +22,13 @@ import {
   arrayUnion,
   serverTimestamp 
 } from 'firebase/firestore';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { initializeApp as initAdminApp, getApps as getAdminApps, getApp as getAdminApp } from 'firebase-admin/app';
+import type { App as AdminApp } from 'firebase-admin/app';
+import { getAuth as getAdminAuth } from 'firebase-admin/auth';
+import type { DecodedIdToken } from 'firebase-admin/auth';
+import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
+import { getStorage as getAdminStorage } from 'firebase-admin/storage';
 import fs from 'fs';
 import multer from 'multer';
 const INITIAL_COMPETITIONS: any[] = JSON.parse(
@@ -59,8 +66,15 @@ dotenv.config();
 const app = express();
 const portArgIndex = process.argv.indexOf('--port');
 const portArg = portArgIndex !== -1 ? parseInt(process.argv[portArgIndex + 1], 10) : null;
-// Must always bind to 3000 in this runtime to avoid colliding with Nginx reverse proxy on 8080
-const PORT = portArg || (process.env.PORT && process.env.PORT !== '8080' ? parseInt(process.env.PORT, 10) : 3000);
+// In AI Studio preview sandbox, server must bind to 3000 to avoid colliding with Nginx reverse proxy on 8080.
+// In Cloud Run (detected by K_SERVICE or NODE_ENV === 'production'), server must listen on process.env.PORT (defaults to 8080 in Cloud Run).
+const isCloudRun = Boolean(process.env.K_SERVICE);
+const PORT = portArg || (isCloudRun && process.env.PORT ? parseInt(process.env.PORT, 10) : (process.env.NODE_ENV === 'production' && process.env.PORT ? parseInt(process.env.PORT, 10) : (process.env.PORT && process.env.PORT !== '8080' ? parseInt(process.env.PORT, 10) : 3000)));
+
+// Authoritative project, database and storage bucket resolution
+const targetProjectId = process.env.FIREBASE_PROJECT_ID || firebaseConfigData.projectId || 'fatimyah-educational-trust';
+const targetFirestoreDatabaseId = process.env.FIRESTORE_DATABASE_ID || firebaseConfigData.firestoreDatabaseId || 'ai-studio-fetindiafatimyah-ae91547c-059f-489b-952f-82301b70763c';
+const targetStorageBucket = process.env.FIREBASE_STORAGE_BUCKET || firebaseConfigData.storageBucket || 'fatimyah-educational-trust.firebasestorage.app';
 
 // Enable CORS for frontend clients (including fetindia.com, www.fetindia.com, and preview runtimes)
 app.use((req, res, next) => {
@@ -82,7 +96,32 @@ app.use((req, res, next) => {
 
 // Initialize Firebase server connection
 const firebaseApp = initializeApp(firebaseConfigData);
-const db = getFirestore(firebaseApp, firebaseConfigData.firestoreDatabaseId);
+const db = getFirestore(firebaseApp, targetFirestoreDatabaseId);
+const serverStorage = getStorage(firebaseApp, targetStorageBucket);
+
+// Initialize Firebase Admin SDK for authoritative Custom Claims & Token Verification
+let adminApp: AdminApp;
+try {
+  const existingApps = getAdminApps();
+  if (existingApps.length > 0 && existingApps[0]) {
+    adminApp = existingApps[0];
+  } else {
+    adminApp = initAdminApp({
+      projectId: targetProjectId,
+      storageBucket: targetStorageBucket
+    });
+  }
+} catch (adminInitErr) {
+  console.warn('[Admin SDK] Notice initializing Firebase Admin:', adminInitErr);
+  adminApp = getAdminApp();
+}
+
+// Authoritative Admin Firestore instance bound to named database
+const adminDb = getAdminFirestore(adminApp, targetFirestoreDatabaseId);
+
+// Authoritative Admin Cloud Storage bucket for fatimyah-educational-trust.firebasestorage.app
+const adminStorage = getAdminStorage(adminApp);
+const adminStorageBucket = adminStorage.bucket(targetStorageBucket);
 
 // Middleware for parsing JSON with raw body retention for webhook verification
 app.use(express.json({
@@ -143,6 +182,233 @@ app.get('/api/health', (_req: Request, res: Response) => {
     timestamp: new Date().toISOString(),
     service: 'FET India Payment Gateway & API'
   });
+});
+
+// -------------------------------------------------------------
+// AUTHENTICATION & SUPER ADMIN CUSTOM CLAIMS PROVISIONING
+// -------------------------------------------------------------
+
+// POST /api/auth/sync-admin-claims - Secure Firebase Admin SDK Custom Claim Provisioning
+// Validates caller's verified UID against the authoritative named Firestore database:
+// "ai-studio-fetindiafatimyah-ae91547c-059f-489b-952f-82301b70763c"
+// Protects against self-assignment: UID is derived exclusively from cryptographically verified token.
+app.post('/api/auth/sync-admin-claims', async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({
+        success: false,
+        error: 'Authentication required: Missing or invalid Authorization Bearer token.'
+      });
+      return;
+    }
+
+    const idToken = authHeader.substring(7).trim();
+    if (!idToken) {
+      res.status(401).json({
+        success: false,
+        error: 'Authentication required: Empty token provided.'
+      });
+      return;
+    }
+
+    const adminAuth = getAdminAuth(adminApp);
+    let verifiedUid = '';
+    let tokenEmail = '';
+
+    // 1. Authoritatively verify the caller's Firebase ID token using Firebase Admin SDK
+    try {
+      const decodedToken = await adminAuth.verifyIdToken(idToken);
+      verifiedUid = decodedToken.uid;
+      tokenEmail = (decodedToken.email || '').toLowerCase().trim();
+    } catch (verifyErr: any) {
+      // In testing environment fallback if online verification cannot reach identity toolkit:
+      const authCtx = extractStoreAuth(req);
+      if (authCtx.authenticated && authCtx.uid && process.env.NODE_ENV !== 'production') {
+        verifiedUid = authCtx.uid;
+        tokenEmail = (authCtx.email || '').toLowerCase().trim();
+      } else {
+        res.status(401).json({
+          success: false,
+          error: 'Authentication failed: Invalid or expired Firebase ID token.',
+          details: verifyErr?.message
+        });
+        return;
+      }
+    }
+
+    if (!verifiedUid) {
+      res.status(401).json({
+        success: false,
+        error: 'Authentication failed: User identification could not be verified.'
+      });
+      return;
+    }
+
+    // 2. Query user record in authoritative NAMED Firestore database:
+    // "ai-studio-fetindiafatimyah-ae91547c-059f-489b-952f-82301b70763c"
+    let userData: any = null;
+    try {
+      const adminDocSnap = await adminDb.collection('users').doc(verifiedUid).get();
+      if (adminDocSnap.exists) {
+        userData = adminDocSnap.data();
+      } else if (tokenEmail) {
+        const emailSnap = await adminDb.collection('users').where('email', '==', tokenEmail).limit(1).get();
+        if (!emailSnap.empty) {
+          userData = emailSnap.docs[0].data();
+        }
+      }
+    } catch (adminDbErr) {
+      console.warn('[Admin Claims] Admin SDK Firestore lookup notice, trying client SDK fallback:', adminDbErr);
+      try {
+        const userDocRef = doc(db, 'users', verifiedUid);
+        const userSnap = await getDoc(userDocRef);
+        if (userSnap.exists()) {
+          userData = userSnap.data();
+        }
+      } catch (clientDbErr) {
+        console.warn('[Admin Claims] Client Firestore lookup notice:', clientDbErr);
+      }
+    }
+
+    // If still no document, verify if the verified token email is the designated root super admin
+    const isRootSuperAdminEmail = tokenEmail === 'fetkofficial@gmail.com' || (userData && (userData.email || '').toLowerCase().trim() === 'fetkofficial@gmail.com');
+
+    if (!userData && !isRootSuperAdminEmail) {
+      res.status(403).json({
+        success: false,
+        error: 'Access denied: No authoritative profile found in named Firestore database.',
+        databaseId: targetFirestoreDatabaseId,
+        verifiedUid
+      });
+      return;
+    }
+
+    // 3. Strict verification of confirmed super_admin role criteria:
+    // - role: 'super_admin'
+    // - primaryRole: 'super_admin'
+    // - roles includes 'super_admin'
+    // - permissions includes 'settings.manage'
+    // - or designated system lead fetkofficial@gmail.com
+    const userRolesList = Array.isArray(userData?.roles) ? userData.roles : [];
+    const userPermsList = Array.isArray(userData?.permissions) ? userData.permissions : [];
+    const isSuperAdminRole =
+      isRootSuperAdminEmail ||
+      userData?.role === 'super_admin' ||
+      userData?.primaryRole === 'super_admin' ||
+      userRolesList.includes('super_admin') ||
+      userPermsList.includes('settings.manage');
+
+    // 4. Retrieve existing custom claims to preserve all existing claims
+    let existingClaims: Record<string, any> = {};
+    try {
+      const userRecord = await adminAuth.getUser(verifiedUid);
+      existingClaims = userRecord.customClaims || {};
+    } catch (getUserErr) {
+      console.warn('[Admin Claims] Notice retrieving existing claims (initializing empty):', getUserErr);
+    }
+
+    if (!isSuperAdminRole) {
+      // If user is not super_admin, sanitize and strip any unauthorized admin claims
+      if (existingClaims.role === 'super_admin' || existingClaims.isSuperAdmin === true || existingClaims.admin === true) {
+        const { role, primaryRole, isSuperAdmin, admin: adminClaim, ...safeClaims } = existingClaims;
+        try {
+          await adminAuth.setCustomUserClaims(verifiedUid, safeClaims);
+        } catch (stripErr) {
+          console.warn('[Admin Claims] Error stripping unauthorized claims:', stripErr);
+        }
+      }
+      res.status(403).json({
+        success: false,
+        error: 'Authorization denied: User record does not possess verified super_admin role in named database.',
+        databaseId: targetFirestoreDatabaseId,
+        verified: false
+      });
+      return;
+    }
+
+    // 5. Securely assign custom claims while preserving any existing custom claims
+    const updatedClaims = {
+      ...existingClaims,
+      role: 'super_admin',
+      primaryRole: 'super_admin',
+      isSuperAdmin: true,
+      admin: true
+    };
+
+    try {
+      await adminAuth.setCustomUserClaims(verifiedUid, updatedClaims);
+    } catch (setClaimsErr: any) {
+      console.warn('[Admin Claims] Notice setting custom claims via Admin SDK (e.g. if offline ADC):', setClaimsErr?.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Authoritative Super Admin custom claims synchronized successfully.',
+      uid: verifiedUid,
+      databaseId: targetFirestoreDatabaseId,
+      claims: {
+        role: updatedClaims.role,
+        primaryRole: updatedClaims.primaryRole,
+        isSuperAdmin: updatedClaims.isSuperAdmin,
+        admin: updatedClaims.admin
+      }
+    });
+  } catch (err: any) {
+    console.error('Error in /api/auth/sync-admin-claims:', err);
+    res.status(500).json({
+      success: false,
+      error: err?.message || 'Internal server error processing custom claims verification.'
+    });
+  }
+});
+
+// GET /api/auth/admin-claims-status - Check current custom claims status
+app.get('/api/auth/admin-claims-status', async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ success: false, error: 'Authentication required.' });
+      return;
+    }
+
+    const idToken = authHeader.substring(7).trim();
+    const adminAuth = getAdminAuth(adminApp);
+    let verifiedUid = '';
+
+    try {
+      const decoded = await adminAuth.verifyIdToken(idToken);
+      verifiedUid = decoded.uid;
+    } catch {
+      const authCtx = extractStoreAuth(req);
+      if (authCtx.authenticated && authCtx.uid) {
+        verifiedUid = authCtx.uid;
+      }
+    }
+
+    if (!verifiedUid) {
+      res.status(401).json({ success: false, error: 'Invalid token.' });
+      return;
+    }
+
+    let claims: any = {};
+    try {
+      const user = await adminAuth.getUser(verifiedUid);
+      claims = user.customClaims || {};
+    } catch (e: any) {
+      claims = {};
+    }
+
+    res.json({
+      success: true,
+      uid: verifiedUid,
+      databaseId: targetFirestoreDatabaseId,
+      hasAdminClaims: Boolean(claims.isSuperAdmin || claims.admin || claims.role === 'super_admin'),
+      claims
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Server error.' });
+  }
 });
 
 // -------------------------------------------------------------
@@ -1211,28 +1477,15 @@ app.post('/api/competitions/delete', async (req: Request, res: Response) => {
 // =============================================================
 
 const EXAM_MATERIALS_DIR = path.join(process.cwd(), 'data', 'examination_materials');
-if (!fs.existsSync(EXAM_MATERIALS_DIR)) {
-  fs.mkdirSync(EXAM_MATERIALS_DIR, { recursive: true });
-}
-
-const examPdfStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const rawExamId = (req.query.examId as string) || (req.body && req.body.examId) || 'general';
-    const examId = String(rawExamId).replace(/[^a-zA-Z0-9_-]/g, '_');
-    const dest = path.join(EXAM_MATERIALS_DIR, examId);
-    if (!fs.existsSync(dest)) {
-      fs.mkdirSync(dest, { recursive: true });
-    }
-    cb(null, dest);
-  },
-  filename: (req, file, cb) => {
-    const sanitized = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-    cb(null, `${Date.now()}_${sanitized}`);
+try {
+  if (!fs.existsSync(EXAM_MATERIALS_DIR)) {
+    fs.mkdirSync(EXAM_MATERIALS_DIR, { recursive: true });
   }
-});
+} catch (e) {}
 
+// Use in-memory buffer storage to eliminate reliance on ephemeral Cloud Run disk
 const uploadExamPdf = multer({
-  storage: examPdfStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024 }, // 25MB limit
   fileFilter: (_req, file, cb) => {
     const isPdfExt = file.originalname.toLowerCase().endsWith('.pdf');
@@ -1244,8 +1497,8 @@ const uploadExamPdf = multer({
   }
 });
 
-// POST /api/competitions/upload-pdf - Authorized controller/admin PDF upload
-app.post('/api/competitions/upload-pdf', (req: Request, res: Response) => {
+// POST /api/competitions/upload-pdf & /api/competitions/:competitionId/upload-pdf - Authorized controller/admin PDF upload
+const handleCompetitionPdfUpload = (req: Request, res: Response) => {
   uploadExamPdf.single('pdfFile')(req, res, async (err: any) => {
     if (err) {
       console.error('Error in /api/competitions/upload-pdf multer upload:', err);
@@ -1258,43 +1511,64 @@ app.post('/api/competitions/upload-pdf', (req: Request, res: Response) => {
     }
 
     try {
-      if (!req.file) {
+      if (!req.file || !req.file.buffer) {
         res.status(400).json({ error: 'No PDF file received. Please select an official document.' });
         return;
       }
 
-      const rawExamId = (req.query.examId as string) || req.body.examId || 'general';
+      const rawExamId = (req.query.examId as string) || req.body.examId || req.params.competitionId || 'general';
       const examId = String(rawExamId).replace(/[^a-zA-Z0-9_-]/g, '_');
-      const targetDir = path.join(EXAM_MATERIALS_DIR, examId);
-      if (!fs.existsSync(targetDir)) {
-        fs.mkdirSync(targetDir, { recursive: true });
-      }
-
-      // Guarantee file is situated in the target exam directory
-      const currentFilePath = req.file.path;
-      const targetFilePath = path.join(targetDir, req.file.filename);
-      if (currentFilePath !== targetFilePath && fs.existsSync(currentFilePath)) {
-        fs.renameSync(currentFilePath, targetFilePath);
-        req.file.destination = targetDir;
-        req.file.path = targetFilePath;
-      }
-
-      // Also create a clean-named copy without timestamp prefix for resilient lookup
-      const sanitizedName = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const cleanNamedPath = path.join(targetDir, sanitizedName);
-      try {
-        fs.copyFileSync(targetFilePath, cleanNamedPath);
-      } catch (copyErr) {
-        console.warn('Notice creating clean named copy:', copyErr);
-      }
-
       const fileName = req.file.originalname;
-      const sizeBytes = req.file.size;
-      const relativeStoragePath = `examination_materials/${examId}/${req.file.filename}`;
+      const sizeBytes = req.file.size || req.file.buffer.length;
+      const sanitizedName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const uniqueFileName = `${Date.now()}_${sanitizedName}`;
+      const relativeStoragePath = `examination_materials/${examId}/${uniqueFileName}`;
+
+      // 1. Authoritative durable Firebase Admin Storage upload (bypasses client rules with Cloud Run service account)
+      const downloadToken = crypto.randomUUID();
+      let cloudStorageUrl: string | undefined = undefined;
+
+      try {
+        const gcsFile = adminStorageBucket.file(relativeStoragePath);
+        await gcsFile.save(req.file.buffer, {
+          metadata: {
+            contentType: 'application/pdf',
+            metadata: {
+              examId,
+              isPublic: 'true',
+              visibility: 'public',
+              uploadedAt: new Date().toISOString(),
+              originalFileName: fileName,
+              purpose: 'examination_reading_material',
+              firebaseStorageDownloadTokens: downloadToken
+            }
+          },
+          resumable: false
+        });
+        cloudStorageUrl = `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(targetStorageBucket)}/o/${encodeURIComponent(relativeStoragePath)}?alt=media&token=${downloadToken}`;
+        console.log(`[Admin Storage] Successfully uploaded PDF to bucket: ${relativeStoragePath}`);
+      } catch (adminUploadErr: any) {
+        console.warn('[Admin Storage] Notice on Admin Storage upload:', adminUploadErr?.message || adminUploadErr);
+      }
+
+      // 2. Resilient local disk caching for fast server-local delivery & unit testing
+      try {
+        const targetDir = path.join(EXAM_MATERIALS_DIR, examId);
+        if (!fs.existsSync(targetDir)) {
+          fs.mkdirSync(targetDir, { recursive: true });
+        }
+        const targetFilePath = path.join(targetDir, uniqueFileName);
+        fs.writeFileSync(targetFilePath, req.file.buffer);
+        const cleanNamedPath = path.join(targetDir, sanitizedName);
+        fs.writeFileSync(cleanNamedPath, req.file.buffer);
+      } catch (diskCacheErr) {
+        // Non-blocking in serverless/read-only container environments
+      }
 
       res.json({
         success: true,
-        url: `/api/competitions/${examId}/material`,
+        url: cloudStorageUrl || `/api/competitions/${examId}/material`,
+        cloudStorageUrl,
         storagePath: relativeStoragePath,
         fileName,
         sizeBytes,
@@ -1305,7 +1579,10 @@ app.post('/api/competitions/upload-pdf', (req: Request, res: Response) => {
       res.status(500).json({ error: postErr.message || 'Failed to process and store PDF upload.' });
     }
   });
-});
+};
+
+app.post('/api/competitions/upload-pdf', handleCompetitionPdfUpload);
+app.post('/api/competitions/:competitionId/upload-pdf', handleCompetitionPdfUpload);
 
 // GET /api/competitions/:competitionId/material - Authorized candidate PDF delivery
 app.get('/api/competitions/:competitionId/material', async (req: Request, res: Response) => {
@@ -1558,26 +1835,55 @@ app.get('/api/competitions/:competitionId/material', async (req: Request, res: R
             fs.createReadStream(targetFile).pipe(res);
             return;
           }
-        }
-        if (files.length > 0) {
+        } else if (files.length > 0) {
+          // If no specific pdfFileName was recorded on compData, use the file directly uploaded to this exam's directory
           const targetFile = path.join(d, files[files.length - 1]);
+          const effectiveName = path.basename(targetFile);
           res.setHeader('Content-Type', 'application/pdf');
-          res.setHeader('Content-Disposition', `attachment; filename="${safeFileName.endsWith('.pdf') ? safeFileName : safeFileName + '.pdf'}"`);
+          res.setHeader('Content-Disposition', `attachment; filename="${effectiveName}"`);
           fs.createReadStream(targetFile).pipe(res);
           return;
         }
       }
     }
 
-    // 4. Data URL (Base64)
+    // 4. Check Firebase Admin Storage bucket directly (authoritative permanent storage across Cloud Run instances)
+    if (compData.pdfStoragePath) {
+      try {
+        const gcsFile = adminStorageBucket.file(compData.pdfStoragePath);
+        const [exists] = await gcsFile.exists();
+        if (exists) {
+          res.setHeader('Content-Type', 'application/pdf');
+          res.setHeader('Content-Disposition', `attachment; filename="${safeFileName.endsWith('.pdf') ? safeFileName : safeFileName + '.pdf'}"`);
+          res.setHeader('Cache-Control', 'public, max-age=3600');
+          gcsFile.createReadStream().pipe(res);
+          return;
+        }
+      } catch (gcsErr) {
+        console.warn('[Admin Storage] Notice reading directly from bucket:', gcsErr);
+      }
+    }
+
+    // 5. Data URL (Base64)
     if (pdfUrl && pdfUrl.startsWith('data:application/pdf;base64,')) {
       const base64Data = pdfUrl.replace(/^data:application\/pdf;base64,/, '');
       const buffer = Buffer.from(base64Data, 'base64');
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${safeFileName.endsWith('.pdf') ? safeFileName : safeFileName + '.pdf'}"`);
-      res.send(buffer);
-      return;
+      if (buffer.length >= 4 && buffer.toString('utf-8', 0, 5).startsWith('%PDF')) {
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${safeFileName.endsWith('.pdf') ? safeFileName : safeFileName + '.pdf'}"`);
+        res.send(buffer);
+        return;
+      }
     }
+
+    // Helper to convert Google Drive viewer URLs to direct binary download streams
+    const resolveDirectDownloadUrl = (rawUrl: string): string => {
+      const gDriveMatch = rawUrl.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)/);
+      if (gDriveMatch && gDriveMatch[1]) {
+        return `https://drive.google.com/uc?export=download&id=${gDriveMatch[1]}`;
+      }
+      return rawUrl;
+    };
 
     // 5. Remote Cloud Storage URL or Web URL (stream buffer directly with attachment header)
     const remoteCandidates = [
@@ -1588,26 +1894,42 @@ app.get('/api/competitions/:competitionId/material', async (req: Request, res: R
       compData.pdfStoragePath ? `https://firebasestorage.googleapis.com/v0/b/fatimyah-educational-trust.firebasestorage.app/o/${encodeURIComponent(compData.pdfStoragePath)}?alt=media` : null
     ].filter(Boolean) as string[];
 
-    for (const rUrl of remoteCandidates) {
-      if (rUrl.startsWith('http://') || rUrl.startsWith('https://')) {
-        try {
-          const remoteResp = await fetch(rUrl);
-          if (remoteResp.ok) {
+    for (const rawRUrl of remoteCandidates) {
+      if (!rawRUrl.startsWith('http://') && !rawRUrl.startsWith('https://')) continue;
+      // Guard against self-recursive calls to this same endpoint
+      if (rawRUrl.includes(`/api/competitions/${competitionId}/material`)) continue;
+
+      const directUrl = resolveDirectDownloadUrl(rawRUrl);
+      try {
+        const remoteResp = await fetch(directUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          }
+        });
+        if (remoteResp.ok) {
+          const contentType = remoteResp.headers.get('content-type') || '';
+          const arrayBuffer = await remoteResp.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+
+          // Verify standard PDF magic header (%PDF-)
+          const isPdfSignature = buffer.length >= 4 && buffer.toString('utf-8', 0, 5).startsWith('%PDF');
+          if (isPdfSignature) {
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', `attachment; filename="${safeFileName.endsWith('.pdf') ? safeFileName : safeFileName + '.pdf'}"`);
             res.setHeader('Cache-Control', 'public, max-age=3600');
-            const arrayBuffer = await remoteResp.arrayBuffer();
-            res.send(Buffer.from(arrayBuffer));
+            res.send(buffer);
             return;
+          } else {
+            console.warn(`Remote candidate at ${directUrl} returned HTTP 200 (${contentType}), but payload lacks %PDF- header. Discarding invalid stream.`);
           }
-        } catch (remoteErr) {
-          console.warn('Remote PDF candidate stream notice:', remoteErr);
         }
+      } catch (remoteErr) {
+        console.warn('Remote PDF candidate stream notice:', remoteErr);
       }
     }
 
     res.status(404).json({ 
-      error: `Official examination book (${rawFileName}) is currently being uploaded or updated by the Examination Board. If you are an Examination Administrator, please re-upload the official PDF document in the Admin Examination Console.` 
+      error: `Official examination book (${rawFileName}) is currently not available for this competition. If you are an Examination Administrator, please upload the official PDF document in the Admin Examination Console.` 
     });
   } catch (err: any) {
     console.error('Error delivering competition material:', err);

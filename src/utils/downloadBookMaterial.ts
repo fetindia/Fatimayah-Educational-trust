@@ -201,11 +201,8 @@ export async function downloadCompetitionBook(options: DownloadBookOptions): Pro
     if (onProgress) onProgress(20);
 
     // 1. MOBILE BROWSERS (iOS Safari & Android Chrome):
-    // Programmatic synthetic link.click() on fetched blobs is blocked by iOS Safari or prematurely
-    // aborted by Android Download Manager. Direct navigation to the attachment-header endpoint
-    // engages the native OS browser download manager reliably!
     if (env.isMobile) {
-      if (onProgress) onProgress(50);
+      if (onProgress) onProgress(40);
 
       // If it's a data URL, we use standard link click
       if (url.startsWith('data:')) {
@@ -220,27 +217,74 @@ export async function downloadCompetitionBook(options: DownloadBookOptions): Pro
         return;
       }
 
-      // For server proxy or external URLs on mobile:
-      // Create a transient anchor or trigger navigation to trigger native download
-      const mobileDownloadLink = document.createElement('a');
-      mobileDownloadLink.href = url;
-      mobileDownloadLink.target = '_blank';
-      mobileDownloadLink.rel = 'noopener noreferrer';
-      mobileDownloadLink.download = finalFileName;
-      mobileDownloadLink.setAttribute('download', finalFileName);
-      document.body.appendChild(mobileDownloadLink);
-      mobileDownloadLink.click();
-      
-      // Keep in DOM for 5 seconds on mobile for background OS handlers
-      setTimeout(() => {
-        try {
-          document.body.removeChild(mobileDownloadLink);
-        } catch {}
-      }, 5000);
+      // Verify the stream first so mobile users never download JSON/HTML errors as corrupt .pdf files
+      try {
+        const checkResp = await fetch(url, {
+          headers: currentUser
+            ? {
+                'x-user-uid': currentUser.uid,
+                'x-registration-id': userRegistration?.id || '',
+                'x-payment-status': userRegistration?.paymentStatus || ''
+              }
+            : {}
+        });
 
-      if (onProgress) onProgress(100);
-      if (onSuccess) onSuccess(finalFileName);
-      return;
+        if (!checkResp.ok) {
+          const errData = await checkResp.json().catch(() => null);
+          const msg = errData?.error || (checkResp.status === 404 
+            ? 'Official study material document is currently not available for this competition.' 
+            : `Download failed with status ${checkResp.status}`);
+          if (checkResp.status === 403 && onAuthRequired) {
+            onAuthRequired(msg, 'register');
+          }
+          throw new Error(msg);
+        }
+
+        const contentType = checkResp.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const json = await checkResp.json().catch(() => null);
+          throw new Error(json?.error || 'Server returned an invalid document response.');
+        }
+
+        if (onProgress) onProgress(80);
+        const blob = await checkResp.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const mobileLink = document.createElement('a');
+        mobileLink.href = blobUrl;
+        mobileLink.download = finalFileName;
+        document.body.appendChild(mobileLink);
+        mobileLink.click();
+        setTimeout(() => {
+          try {
+            document.body.removeChild(mobileLink);
+            window.URL.revokeObjectURL(blobUrl);
+          } catch {}
+        }, 15000);
+
+        if (onProgress) onProgress(100);
+        if (onSuccess) onSuccess(finalFileName);
+        return;
+      } catch (mobileErr: any) {
+        if (mobileErr.message && !mobileErr.message.includes('Failed to fetch')) {
+          throw mobileErr;
+        }
+        // If fetch was blocked by strict CORS on an external direct link, fallback to direct open
+        const fallbackLink = document.createElement('a');
+        fallbackLink.href = url;
+        fallbackLink.target = '_blank';
+        fallbackLink.rel = 'noopener noreferrer';
+        fallbackLink.download = finalFileName;
+        document.body.appendChild(fallbackLink);
+        fallbackLink.click();
+        setTimeout(() => {
+          try {
+            document.body.removeChild(fallbackLink);
+          } catch {}
+        }, 5000);
+        if (onProgress) onProgress(100);
+        if (onSuccess) onSuccess(finalFileName);
+        return;
+      }
     }
 
     // 2. DESKTOP BROWSERS:

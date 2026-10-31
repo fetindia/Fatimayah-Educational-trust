@@ -79,6 +79,7 @@ import {
 import { ROLE_DEFINITIONS, getRoleMetadata } from '../../lib/rbac';
 import { IDCardPrintDownloadModal } from '../idcard/IDCardPrintDownloadModal';
 import { FETIdentityCard } from '../idcard/FETIdentityCard';
+import { uploadUserProfilePhoto, uploadCampaignMedia, validateDocumentFile, validateImageFile } from '../../lib/storage';
 
 // Standard Trust Departments
 export const TRUST_DEPARTMENTS = [
@@ -170,6 +171,57 @@ export const AdminStaffHRMSView: React.FC = () => {
     verified: true,
     notes: ''
   });
+
+  const [isDocUploading, setIsDocUploading] = useState(false);
+  const [isPhotoUploading, setIsPhotoUploading] = useState(false);
+
+  const handleStaffDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const val = validateDocumentFile(file, 15);
+    if (!val.valid) {
+      showToast(val.error || 'Invalid document file.');
+      return;
+    }
+    setIsDocUploading(true);
+    try {
+      const res = await uploadCampaignMedia(file, 'private_documents');
+      setDocForm(prev => ({
+        ...prev,
+        fileUrl: res.url,
+        fileName: res.fileName,
+        title: prev.title || res.fileName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ')
+      }));
+      showToast('Document uploaded to Firebase Storage.');
+    } catch (err: any) {
+      showToast(`Upload failed: ${err?.message || 'Storage error'}`);
+    } finally {
+      setIsDocUploading(false);
+    }
+  };
+
+  const handleStaffPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedStaff) return;
+    const val = validateImageFile(file, 5);
+    if (!val.valid) {
+      showToast(val.error || 'Invalid photo file.');
+      return;
+    }
+    setIsPhotoUploading(true);
+    try {
+      const res = await uploadUserProfilePhoto(selectedStaff.uid, file);
+      setEditFormData(prev => ({
+        ...prev,
+        photoURL: res.url
+      }));
+      showToast('Staff photograph uploaded to Firebase Storage.');
+    } catch (err: any) {
+      showToast(`Photo upload failed: ${err?.message || 'Storage error'}`);
+    } finally {
+      setIsPhotoUploading(false);
+    }
+  };
 
   // Notification helper
   const showToast = (msg: string) => {
@@ -1231,14 +1283,24 @@ export const AdminStaffHRMSView: React.FC = () => {
                         />
                       </div>
                       <div>
-                        <label className="block text-[11px] font-bold text-slate-600 mb-1">Profile Photo URL</label>
-                        <input
-                          type="url"
-                          value={editFormData.photoURL || ''}
-                          onChange={(e) => setEditFormData({ ...editFormData, photoURL: e.target.value })}
-                          placeholder="https://example.com/photo.jpg"
-                          className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs"
-                        />
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">Profile Photo</label>
+                        <div className="space-y-1.5">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleStaffPhotoUpload}
+                            disabled={isPhotoUploading}
+                            className="block w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                          />
+                          {isPhotoUploading && <p className="text-[10px] text-indigo-600 font-bold">Uploading to Firebase Storage...</p>}
+                          <input
+                            type="url"
+                            value={editFormData.photoURL || ''}
+                            onChange={(e) => setEditFormData({ ...editFormData, photoURL: e.target.value })}
+                            placeholder="Or paste photo URL..."
+                            className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1757,14 +1819,24 @@ export const AdminStaffHRMSView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Document File URL / Cloud Reference</label>
-                <input
-                  type="url"
-                  value={docForm.fileUrl}
-                  onChange={(e) => setDocForm({ ...docForm, fileUrl: e.target.value })}
-                  placeholder="https://drive.google.com/... or https://..."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-[11px]"
-                />
+                <label className="block font-bold text-slate-700 mb-1">Official Document File (PDF / Image)</label>
+                <div className="space-y-1.5">
+                  <input
+                    type="file"
+                    accept=".pdf,image/*"
+                    onChange={handleStaffDocUpload}
+                    disabled={isDocUploading}
+                    className="block w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                  />
+                  {isDocUploading && <p className="text-[10px] text-indigo-600 font-bold">Uploading to Firebase Storage...</p>}
+                  <input
+                    type="url"
+                    value={docForm.fileUrl}
+                    onChange={(e) => setDocForm({ ...docForm, fileUrl: e.target.value })}
+                    placeholder="Or paste external document URL..."
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-[11px]"
+                  />
+                </div>
               </div>
 
               <div>

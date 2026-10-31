@@ -173,7 +173,7 @@ async function runPreDeploymentVerification() {
   // PART 3: EXAMINATION PDF UPLOAD & EXACT ORIGINAL BOOK DOWNLOAD
   // ----------------------------------------------------------------
   console.log('\n--- PART 3: Examination PDF Upload & Exact Original Book Download ---');
-  const examId = 'cmp-1792513826744-5974';
+  const examId = 'cmp-qa-test-upload';
   const uniqueSeed = `QA-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
   const originalBookBuffer = createSampleBookPdf(uniqueSeed);
   const originalSha256 = crypto.createHash('sha256').update(originalBookBuffer).digest('hex');
@@ -274,6 +274,134 @@ async function runPreDeploymentVerification() {
     );
   } catch (err: any) {
     assert(false, 'Security gate check failed', err.message);
+  }
+
+  // ----------------------------------------------------------------
+  // PART 5: MULTI-COMPETITION ISOLATION & EXACT FILE ASSOCIATION TEST
+  // ----------------------------------------------------------------
+  console.log('\n--- PART 5: Multi-Competition Isolation & File Association ---');
+  const compAlphaId = `cmp-test-alpha-${Date.now()}`;
+  const compBetaId = `cmp-test-beta-${Date.now()}`;
+  const compMissingId = `cmp-test-missing-${Date.now()}`;
+
+  const seedAlpha = `ALPHA-CURRICULUM-${crypto.randomBytes(6).toString('hex')}`;
+  const seedBeta = `BETA-CURRICULUM-${crypto.randomBytes(6).toString('hex')}`;
+
+  const bookAlphaBuffer = createSampleBookPdf(seedAlpha);
+  const bookAlphaSha256 = crypto.createHash('sha256').update(bookAlphaBuffer).digest('hex');
+
+  const bookBetaBuffer = createSampleBookPdf(seedBeta);
+  const bookBetaSha256 = crypto.createHash('sha256').update(bookBetaBuffer).digest('hex');
+
+  // Ensure test buffers are strictly different
+  assert(bookAlphaSha256 !== bookBetaSha256, 'Test Book A and Test Book B have unique cryptographic hashes');
+
+  try {
+    // 1. Upload Book A to Competition Alpha
+    const boundaryA = `----WebKitFormBoundaryAlpha${crypto.randomBytes(6).toString('hex')}`;
+    const headerA = Buffer.from(
+      `--${boundaryA}\r\nContent-Disposition: form-data; name="examId"\r\n\r\n${compAlphaId}\r\n` +
+      `--${boundaryA}\r\nContent-Disposition: form-data; name="pdfFile"; filename="Alpha_Curriculum.pdf"\r\nContent-Type: application/pdf\r\n\r\n`
+    );
+    const footerA = Buffer.from(`\r\n--${boundaryA}--\r\n`);
+    const bodyA = Buffer.concat([headerA, bookAlphaBuffer, footerA]);
+
+    const uploadRespA = await fetch(`${SERVER_BASE}/api/competitions/upload-pdf?examId=${encodeURIComponent(compAlphaId)}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': `multipart/form-data; boundary=${boundaryA}`,
+        'Content-Length': String(bodyA.length)
+      },
+      body: bodyA
+    });
+    assert(uploadRespA.ok, 'Upload Book A to Competition Alpha succeeds (HTTP 200)');
+
+    // 2. Upload Book B to Competition Beta
+    const boundaryB = `----WebKitFormBoundaryBeta${crypto.randomBytes(6).toString('hex')}`;
+    const headerB = Buffer.from(
+      `--${boundaryB}\r\nContent-Disposition: form-data; name="examId"\r\n\r\n${compBetaId}\r\n` +
+      `--${boundaryB}\r\nContent-Disposition: form-data; name="pdfFile"; filename="Beta_Curriculum.pdf"\r\nContent-Type: application/pdf\r\n\r\n`
+    );
+    const footerB = Buffer.from(`\r\n--${boundaryB}--\r\n`);
+    const bodyB = Buffer.concat([headerB, bookBetaBuffer, footerB]);
+
+    const uploadRespB = await fetch(`${SERVER_BASE}/api/competitions/upload-pdf?examId=${encodeURIComponent(compBetaId)}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': `multipart/form-data; boundary=${boundaryB}`,
+        'Content-Length': String(bodyB.length)
+      },
+      body: bodyB
+    });
+    assert(uploadRespB.ok, 'Upload Book B to Competition Beta succeeds (HTTP 200)');
+
+    // 3. Download Competition Alpha as Authorized Admin/Candidate
+    const candAlphaUid = `user_alpha_${Date.now()}`;
+    const dlRespA = await fetch(
+      `${SERVER_BASE}/api/competitions/${compAlphaId}/material?uid=${encodeURIComponent(candAlphaUid)}&regId=reg-${compAlphaId}-${candAlphaUid}&prtId=FET-PRT-ALPHA&payStatus=paid`,
+      {
+        headers: {
+          'x-user-uid': candAlphaUid,
+          'x-registration-id': `reg-${compAlphaId}-${candAlphaUid}`,
+          'x-participant-id': 'FET-PRT-ALPHA',
+          'x-payment-status': 'paid'
+        }
+      }
+    );
+    assert(dlRespA.ok, 'Download Competition Alpha returns HTTP 200 OK');
+    const dlBufA = Buffer.from(await dlRespA.arrayBuffer());
+    const dlShaA = crypto.createHash('sha256').update(dlBufA).digest('hex');
+
+    assert(dlShaA === bookAlphaSha256, 'Competition Alpha downloads exact Book A (100% SHA-256 match)');
+    assert(dlBufA.toString('utf-8').includes(seedAlpha), 'Competition Alpha contains Seed A');
+    assert(!dlBufA.toString('utf-8').includes(seedBeta), 'Competition Alpha does NOT contain Seed B (no cross-contamination)');
+
+    // 4. Download Competition Beta as Authorized Admin/Candidate
+    const candBetaUid = `user_beta_${Date.now()}`;
+    const dlRespB = await fetch(
+      `${SERVER_BASE}/api/competitions/${compBetaId}/material?uid=${encodeURIComponent(candBetaUid)}&regId=reg-${compBetaId}-${candBetaUid}&prtId=FET-PRT-BETA&payStatus=paid`,
+      {
+        headers: {
+          'x-user-uid': candBetaUid,
+          'x-registration-id': `reg-${compBetaId}-${candBetaUid}`,
+          'x-participant-id': 'FET-PRT-BETA',
+          'x-payment-status': 'paid'
+        }
+      }
+    );
+    assert(dlRespB.ok, 'Download Competition Beta returns HTTP 200 OK');
+    const dlBufB = Buffer.from(await dlRespB.arrayBuffer());
+    const dlShaB = crypto.createHash('sha256').update(dlBufB).digest('hex');
+
+    assert(dlShaB === bookBetaSha256, 'Competition Beta downloads exact Book B (100% SHA-256 match)');
+    assert(dlBufB.toString('utf-8').includes(seedBeta), 'Competition Beta contains Seed B');
+    assert(!dlBufB.toString('utf-8').includes(seedAlpha), 'Competition Beta does NOT contain Seed A (no cross-contamination)');
+
+    // 5. Verify Missing Competition Returns Clean 404 and NEVER Serves Fallback PDF
+    const candMissingUid = `user_missing_${Date.now()}`;
+    const dlRespMissing = await fetch(
+      `${SERVER_BASE}/api/competitions/${compMissingId}/material?uid=${encodeURIComponent(candMissingUid)}&regId=reg-${compMissingId}-${candMissingUid}&prtId=FET-PRT-MISSING&payStatus=paid`,
+      {
+        headers: {
+          'x-user-uid': candMissingUid,
+          'x-registration-id': `reg-${compMissingId}-${candMissingUid}`,
+          'x-payment-status': 'paid'
+        }
+      }
+    );
+    assert(dlRespMissing.status === 404, 'Competition with missing file returns HTTP 404, never a dummy or foreign book');
+    const missingJson = await dlRespMissing.json().catch(() => null);
+    assert(Boolean(missingJson?.error), 'HTTP 404 response contains explanatory error description');
+
+    // Clean up temporary test directories
+    try {
+      const dirA = path.join(process.cwd(), 'data', 'examination_materials', compAlphaId);
+      const dirB = path.join(process.cwd(), 'data', 'examination_materials', compBetaId);
+      if (fs.existsSync(dirA)) fs.rmSync(dirA, { recursive: true, force: true });
+      if (fs.existsSync(dirB)) fs.rmSync(dirB, { recursive: true, force: true });
+    } catch {}
+  } catch (multiErr: any) {
+    assert(false, 'Multi-competition isolation test failed', multiErr.message);
   }
 
   console.log('\n================================================================');

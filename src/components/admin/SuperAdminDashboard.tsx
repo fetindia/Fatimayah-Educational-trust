@@ -87,10 +87,11 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   onReturnToPublic,
   onOpenUserDashboard
 }) => {
-  const { currentUser, userProfile, isSuperAdmin, signOut } = useAuth();
+  const { currentUser, userProfile, isSuperAdmin, signOut, refreshSuperAdminClaims } = useAuth();
   const { config } = useConfig();
 
   const [activeTab, setActiveTab] = useState<SuperAdminTab>('overview');
+  const [isSyncingClaims, setIsSyncingClaims] = useState(false);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -392,6 +393,32 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     }
   };
 
+  const handleSyncClaims = async () => {
+    setIsSyncingClaims(true);
+    setStatusMessage(null);
+    try {
+      const res = await refreshSuperAdminClaims();
+      if (res.success) {
+        setStatusMessage({
+          type: 'success',
+          text: 'Super Admin custom claims verified and token refreshed. Firebase Storage authorization is active.'
+        });
+      } else {
+        setStatusMessage({
+          type: 'error',
+          text: res.error || 'Failed to sync custom claims.'
+        });
+      }
+    } catch (err: any) {
+      setStatusMessage({
+        type: 'error',
+        text: err?.message || 'Error syncing custom claims.'
+      });
+    } finally {
+      setIsSyncingClaims(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col selection:bg-amber-200 selection:text-slate-900" id="fet-super-admin-dashboard">
       
@@ -423,6 +450,16 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span className="font-mono text-[11px]">{currentUser?.email}</span>
             </div>
+
+            <button
+              onClick={handleSyncClaims}
+              disabled={isSyncingClaims}
+              title="Synchronize Super Admin custom claims with backend and refresh Firebase Auth token"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-amber-300 bg-amber-950/70 hover:bg-amber-900/80 border border-amber-700/60 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <ShieldCheck className={`w-3.5 h-3.5 text-amber-400 ${isSyncingClaims ? 'animate-spin' : ''}`} />
+              <span>{isSyncingClaims ? 'Syncing...' : 'Sync Storage Clearance'}</span>
+            </button>
 
             {onOpenUserDashboard && (
               <button

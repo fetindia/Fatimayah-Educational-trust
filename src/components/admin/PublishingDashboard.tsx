@@ -55,6 +55,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useConfig } from '../../contexts/ConfigContext';
 import { NewsArticle } from '../home/NewsBlogReaderModal';
 import { UserRole } from '../../types';
+import { uploadCmsMedia } from '../../lib/storage';
 
 interface PublishingDashboardProps {
   onNotify?: (message: string, type?: 'success' | 'info' | 'error') => void;
@@ -461,7 +462,7 @@ export const PublishingDashboard: React.FC<PublishingDashboardProps> = ({
   };
 
   // Image Upload Handler
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -470,23 +471,16 @@ export const PublishingDashboard: React.FC<PublishingDashboardProps> = ({
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      setFormError('Image size exceeds 2 MB. Please select a smaller photo or compress it.');
-      return;
-    }
-
     setIsImageUploading(true);
-    const reader = new FileReader();
-    reader.onload = (uploadEvent) => {
-      const base64Data = uploadEvent.target?.result as string;
-      setImageUrl(base64Data);
+    setFormError(null);
+    try {
+      const res = await uploadCmsMedia(file, 'articles');
+      setImageUrl(res.url);
+    } catch (err: any) {
+      setFormError(err?.message || 'Failed to upload image to Firebase Storage.');
+    } finally {
       setIsImageUploading(false);
-    };
-    reader.onerror = () => {
-      setFormError('Failed to read image file.');
-      setIsImageUploading(false);
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   // -------------------------------------------------------------

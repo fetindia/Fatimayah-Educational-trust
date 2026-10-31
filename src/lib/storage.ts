@@ -4,8 +4,8 @@
  * Handles Cover Photos, Cause Gallery, and Private Verification Documents
  */
 
-import { ref, uploadBytesResumable, getDownloadURL, UploadTaskSnapshot } from 'firebase/storage';
-import { storage } from './firebase';
+import { ref, uploadBytesResumable, uploadBytes, getDownloadURL, UploadTaskSnapshot } from 'firebase/storage';
+import { storage, auth } from './firebase';
 
 export const FIREBASE_STORAGE_BUCKET = 'fatimyah-educational-trust.firebasestorage.app';
 
@@ -235,13 +235,15 @@ export async function uploadCampaignMedia(
   // 2. Attempt Cloud Storage upload to designated bucket (fatimyah-educational-trust.firebasestorage.app)
   try {
     const storageRef = ref(storage, storagePath);
+    const currentUid = auth.currentUser?.uid || '';
     
     const uploadTask = uploadBytesResumable(storageRef, uploadFile, {
       contentType: uploadFile.type || (isImage ? 'image/jpeg' : 'application/octet-stream'),
       customMetadata: {
         folder,
         originalName: file.name,
-        uploadedAt: new Date().toISOString()
+        uploadedAt: new Date().toISOString(),
+        uploadedByUid: currentUid
       }
     });
 
@@ -263,7 +265,9 @@ export async function uploadCampaignMedia(
       url: downloadUrl,
       fileName: uploadFile.name,
       sizeBytes: uploadFile.size,
-      mimeType: uploadFile.type || 'application/octet-stream'
+      mimeType: uploadFile.type || 'application/octet-stream',
+      storagePath,
+      cloudStorageUrl: downloadUrl
     };
   } catch (storageErr: any) {
     console.info('Cloud Storage upload fallback (using optimized data stream):', storageErr?.message || storageErr);
@@ -279,7 +283,8 @@ export async function uploadCampaignMedia(
       url: finalDataUrl,
       fileName: uploadFile.name,
       sizeBytes: uploadFile.size,
-      mimeType: uploadFile.type || 'application/octet-stream'
+      mimeType: uploadFile.type || 'application/octet-stream',
+      storagePath
     };
   }
 }
@@ -399,13 +404,15 @@ export async function uploadUserProfilePhoto(
 
   try {
     const storageRef = ref(storage, storagePath);
+    const currentUid = auth.currentUser?.uid || userId;
     
     const uploadTask = uploadBytesResumable(storageRef, uploadFile, {
       contentType: uploadFile.type || 'image/jpeg',
       customMetadata: {
         userId,
         uploadedAt: new Date().toISOString(),
-        purpose: 'user_profile_photo'
+        purpose: 'user_profile_photo',
+        uploadedByUid: currentUid
       }
     });
 
@@ -426,7 +433,9 @@ export async function uploadUserProfilePhoto(
       url: downloadUrl,
       fileName: uploadFile.name,
       sizeBytes: uploadFile.size,
-      mimeType: uploadFile.type || 'image/jpeg'
+      mimeType: uploadFile.type || 'image/jpeg',
+      storagePath,
+      cloudStorageUrl: downloadUrl
     };
   } catch (storageErr: any) {
     console.info('Storage upload notice for profile photo (using optimized stream):', storageErr?.message || storageErr);
@@ -439,7 +448,88 @@ export async function uploadUserProfilePhoto(
       url: finalDataUrl,
       fileName: uploadFile.name,
       sizeBytes: uploadFile.size,
-      mimeType: uploadFile.type || 'image/jpeg'
+      mimeType: uploadFile.type || 'image/jpeg',
+      storagePath
+    };
+  }
+}
+
+/**
+ * Upload CMS and Publishing media (Chairman, Trustees, Advisors, Article covers) to Cloud Storage
+ * Path: cms_media/{section}/{timestamp}_{sanitizedName}
+ */
+export async function uploadCmsMedia(
+  file: File,
+  section: 'chairman' | 'trustees' | 'advisors' | 'articles' | 'general' = 'general',
+  onProgress?: (progressPercent: number) => void
+): Promise<UploadResult> {
+  const validation = validateImageFile(file, 10);
+  if (!validation.valid) {
+    throw new Error(validation.error || 'Invalid image file. Please upload a JPG, PNG, or WebP photo up to 10 MB.');
+  }
+
+  if (onProgress) onProgress(15);
+  let uploadFile = file;
+  let optimizedDataUrl: string | null = null;
+  try {
+    const optimized = await processAndOptimizeImage(file, 1200, 0.88);
+    uploadFile = optimized.file;
+    optimizedDataUrl = optimized.dataUrl;
+    if (onProgress) onProgress(35);
+  } catch (optErr) {
+    console.warn('CMS image optimization notice:', optErr);
+  }
+
+  const sanitizedName = uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const storagePath = `cms_media/${section}/${Date.now()}_${sanitizedName}`;
+
+  if (onProgress) onProgress(50);
+  try {
+    const storageRef = ref(storage, storagePath);
+    const currentUid = auth.currentUser?.uid || '';
+
+    const uploadTask = uploadBytesResumable(storageRef, uploadFile, {
+      contentType: uploadFile.type || 'image/jpeg',
+      customMetadata: {
+        section,
+        originalName: file.name,
+        uploadedAt: new Date().toISOString(),
+        uploadedByUid: currentUid
+      }
+    });
+
+    uploadTask.on('state_changed', (snapshot) => {
+      if (snapshot.totalBytes > 0 && onProgress) {
+        const pct = Math.min(95, Math.max(50, Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)));
+        onProgress(pct);
+      }
+    });
+
+    const snap = await withTimeout<UploadTaskSnapshot>(uploadTask, 30000, 'Cloud Storage upload timed out after 30s');
+    if (onProgress) onProgress(95);
+    const downloadUrl = await getDownloadURL(snap.ref);
+    if (onProgress) onProgress(100);
+
+    return {
+      url: downloadUrl,
+      fileName: uploadFile.name,
+      sizeBytes: uploadFile.size,
+      mimeType: uploadFile.type || 'image/jpeg',
+      storagePath,
+      cloudStorageUrl: downloadUrl
+    };
+  } catch (storageErr: any) {
+    console.info('Storage fallback for CMS media (using optimized data stream):', storageErr?.message || storageErr);
+    if (onProgress) onProgress(75);
+    const finalDataUrl = optimizedDataUrl || (await fileToDataUrl(uploadFile));
+    if (onProgress) onProgress(100);
+
+    return {
+      url: finalDataUrl,
+      fileName: uploadFile.name,
+      sizeBytes: uploadFile.size,
+      mimeType: uploadFile.type || 'image/jpeg',
+      storagePath
     };
   }
 }
@@ -457,7 +547,7 @@ function uploadPdfViaServerXhr(
   examId: string,
   onProgress?: (progressPercent: number) => void
 ): Promise<UploadResult> {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     const xhr = new XMLHttpRequest();
     const formData = new FormData();
     // Critical: append metadata fields BEFORE file so multipart parser has examId when initializing destination
@@ -477,14 +567,15 @@ function uploadPdfViaServerXhr(
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const data = JSON.parse(xhr.responseText);
-          if (data && data.success && data.url) {
+          if (data && data.success && (data.url || data.cloudStorageUrl)) {
             if (onProgress) onProgress(100);
             resolve({
-              url: data.url,
+              url: data.cloudStorageUrl || data.url,
               fileName: data.fileName || file.name,
               sizeBytes: data.sizeBytes || file.size,
               mimeType: 'application/pdf',
-              storagePath: data.storagePath
+              storagePath: data.storagePath,
+              cloudStorageUrl: data.cloudStorageUrl
             });
           } else {
             reject(new Error(data?.error || 'Invalid upload confirmation from storage service.'));
@@ -511,8 +602,21 @@ function uploadPdfViaServerXhr(
     };
 
     xhr.timeout = 180000; // 180 seconds (3 minutes) for reliable large document uploads
-    // Also include examId in the query string so it is available before the multipart body stream begins
     xhr.open('POST', `/api/competitions/upload-pdf?examId=${encodeURIComponent(examId)}`);
+
+    try {
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const token = await currentUser.getIdToken(false).catch(() => null);
+        if (token) {
+          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        }
+        xhr.setRequestHeader('x-user-uid', currentUser.uid);
+      }
+    } catch {
+      // Continue without token header if unauthenticated
+    }
+
     xhr.send(formData);
   });
 }
@@ -534,68 +638,102 @@ export async function uploadExamPdfMaterial(
   const storagePath = `examination_materials/${examId}/${Date.now()}_${sanitizedName}`;
   let cloudStorageUrl: string | undefined = undefined;
 
-  // 1. Authoritative durable Firebase Cloud Storage upload (persists across container restarts)
+  // 1. Authoritative durable Firebase Cloud Storage upload (persists in bucket fatimyah-educational-trust.firebasestorage.app)
   try {
     const storageRef = ref(storage, storagePath);
-    const uploadTask = uploadBytesResumable(storageRef, file, {
-      contentType: file.type || 'application/pdf',
+    const pdfMetadata = {
+      // Strictly enforce contentType as application/pdf to satisfy storage.rules isValidPdf()
+      contentType: 'application/pdf',
       customMetadata: {
         examId,
+        isPublic: 'true',
+        visibility: 'public',
         uploadedAt: new Date().toISOString(),
         originalFileName: file.name,
         purpose: 'examination_reading_material'
       }
-    });
+    };
 
-    uploadTask.on('state_changed', (snapshot) => {
-      if (snapshot.totalBytes > 0 && onProgress) {
-        const pct = Math.min(60, Math.max(10, Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 60)));
-        onProgress(pct);
+    const uploadTask = uploadBytesResumable(storageRef, file, pdfMetadata);
+
+    uploadTask.on(
+      'state_changed',
+      (snapshot) => {
+        if (snapshot.totalBytes > 0 && onProgress) {
+          const pct = Math.min(85, Math.max(10, Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 85)));
+          onProgress(pct);
+        }
+      },
+      (resumableErr) => {
+        console.warn('Notice: Resumable upload task state notice:', resumableErr);
       }
-    });
+    );
 
-    const snap = await withTimeout<UploadTaskSnapshot>(uploadTask, 60000, 'Cloud Storage upload timed out after 60 seconds');
+    const snap = await withTimeout<UploadTaskSnapshot>(uploadTask, 45000, 'Resumable upload session timeout');
     cloudStorageUrl = await getDownloadURL(snap.ref);
-    if (onProgress) onProgress(65);
+    if (onProgress) onProgress(95);
   } catch (fbErr: any) {
-    console.warn('Notice: Firebase Storage upload notice, proceeding with server storage sync:', fbErr?.message || fbErr);
+    console.warn('Notice: Resumable Cloud Storage upload notice, trying direct binary upload:', fbErr?.message || fbErr);
+    // Fast in-SDK fallback: try direct binary PUT via uploadBytes (avoids resumable session handshake)
+    try {
+      const storageRef = ref(storage, storagePath);
+      const snap = await uploadBytes(storageRef, file, {
+        contentType: 'application/pdf',
+        customMetadata: {
+          examId,
+          isPublic: 'true',
+          visibility: 'public',
+          uploadedAt: new Date().toISOString(),
+          originalFileName: file.name,
+          purpose: 'examination_reading_material'
+        }
+      });
+      cloudStorageUrl = await getDownloadURL(snap.ref);
+      if (onProgress) onProgress(95);
+    } catch (directErr: any) {
+      console.warn('Direct Cloud Storage upload also encountered an issue:', directErr?.message || directErr);
+    }
   }
 
-  // 2. Synchronize to server disk storage for low-latency streaming and verification
+  // CRITICAL: If Cloud Storage upload succeeded, return immediately!
+  // Do NOT make a redundant server upload request to /api/competitions/upload-pdf that returns HTTP 404
+  // on production Firebase Hosting and writes to ephemeral local disk.
+  if (cloudStorageUrl && cloudStorageUrl.startsWith('http')) {
+    if (onProgress) onProgress(100);
+    return {
+      url: cloudStorageUrl,
+      fileName: file.name,
+      sizeBytes: file.size,
+      mimeType: 'application/pdf',
+      storagePath,
+      cloudStorageUrl
+    };
+  }
+
+  // 2. Only if direct client-side Cloud Storage failed, attempt the server endpoint fallback
   try {
     const serverResult = await uploadPdfViaServerXhr(file, examId, (serverPct) => {
       if (onProgress) {
-        // Map 65% to 95%
-        const overall = Math.min(95, Math.max(65, 65 + Math.round((serverPct / 100) * 30)));
+        const overall = Math.min(95, Math.max(10, Math.round(serverPct * 0.95)));
         onProgress(overall);
       }
     });
 
+    const validCloudUrl = (serverResult.cloudStorageUrl && serverResult.cloudStorageUrl.startsWith('http'))
+      ? serverResult.cloudStorageUrl
+      : (serverResult.url.startsWith('http') && !serverResult.url.includes('/api/competitions/') ? serverResult.url : undefined);
+
     if (onProgress) onProgress(100);
     return {
-      url: serverResult.url,
+      url: validCloudUrl || serverResult.url,
       fileName: file.name,
       sizeBytes: file.size,
-      mimeType: file.type || 'application/pdf',
-      storagePath,
-      cloudStorageUrl: cloudStorageUrl || serverResult.url
+      mimeType: 'application/pdf',
+      storagePath: serverResult.storagePath || storagePath,
+      cloudStorageUrl: validCloudUrl
     };
   } catch (serverErr: any) {
-    console.info('Server storage notice, using persistent Cloud Storage link:', serverErr?.message || serverErr);
-    
-    if (cloudStorageUrl) {
-      if (onProgress) onProgress(100);
-      return {
-        url: cloudStorageUrl,
-        fileName: file.name,
-        sizeBytes: file.size,
-        mimeType: file.type || 'application/pdf',
-        storagePath,
-        cloudStorageUrl
-      };
-    }
-
-    // Both failed
+    console.error('All PDF upload channels exhausted:', serverErr?.message || serverErr);
     throw new Error(`Failed to upload official examination PDF: ${serverErr?.message || 'Storage error'}`);
   }
 }

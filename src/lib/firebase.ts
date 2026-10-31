@@ -7501,6 +7501,45 @@ export async function updateStoreOrderStatus(
   }
 }
 
+/**
+ * Synchronizes Super Admin custom claims with the backend using the user's verified token
+ * and forces an immediate token refresh so client operations (like Firebase Storage)
+ * immediately recognize the cryptographically verified role.
+ */
+export async function syncSuperAdminClaims(): Promise<{
+  success: boolean;
+  message?: string;
+  claims?: any;
+  error?: string;
+}> {
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    return { success: false, error: 'User is not currently authenticated.' };
+  }
+
+  try {
+    const idToken = await currentUser.getIdToken(false);
+    const response = await fetch('/api/auth/sync-admin-claims', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idToken}`
+      }
+    });
+
+    const data = await response.json();
+    if (response.ok && data.success) {
+      // Force refresh the Firebase Auth ID token to populate request.auth.token claims
+      await currentUser.getIdToken(true);
+      return { success: true, message: data.message, claims: data.claims };
+    }
+
+    return { success: false, error: data.error || 'Failed to synchronize Super Admin claims.' };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Network error syncing Super Admin claims.' };
+  }
+}
+
 
 
 

@@ -22,7 +22,8 @@ import {
   getOrCreateUserProfile, 
   updateUserProfileData,
   SYSTEM_SUPER_ADMIN_EMAIL, 
-  logAuditEvent 
+  logAuditEvent,
+  syncSuperAdminClaims
 } from '../lib/firebase';
 import { 
   getEffectivePermissions, 
@@ -85,6 +86,7 @@ interface AuthContextType {
   signInGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  refreshSuperAdminClaims: () => Promise<{ success: boolean; message?: string; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -106,6 +108,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUserProfile(profile);
           const initialActiveRole = profile.primaryRole || (profile.roles.includes('super_admin') ? 'super_admin' : profile.roles[0]) || 'user';
           setActiveRole(initialActiveRole);
+
+          // Synchronize authoritative custom claims if user holds super_admin clearance
+          if (profile.roles.includes('super_admin') || profile.role === 'super_admin' || user.email?.toLowerCase() === SYSTEM_SUPER_ADMIN_EMAIL.toLowerCase()) {
+            syncSuperAdminClaims().catch(claimErr => {
+              console.warn('[AuthContext] Super Admin claims background sync notice:', claimErr);
+            });
+          }
         } catch (err) {
           console.warn('Profile resolution fallback:', err);
           const isSystemSuper = user.email?.toLowerCase() === SYSTEM_SUPER_ADMIN_EMAIL.toLowerCase();
@@ -467,7 +476,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         resetPassword,
         signInGoogle,
         signOut,
-        refreshProfile
+        refreshProfile,
+        refreshSuperAdminClaims: syncSuperAdminClaims
       }}
     >
       {children}

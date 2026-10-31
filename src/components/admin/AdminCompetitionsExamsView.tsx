@@ -2371,6 +2371,10 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
 
       const storagePath = res.storagePath || `examination_materials/${draftCompId}/${res.fileName}`;
 
+      const cleanCloudStorageUrl = (res.cloudStorageUrl && res.cloudStorageUrl.startsWith('http') && !res.cloudStorageUrl.includes('/api/competitions/'))
+        ? res.cloudStorageUrl
+        : undefined;
+
       setFormData(prev => ({
         ...prev,
         pdfReadingMaterialUrl: res.url,
@@ -2378,27 +2382,30 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
         pdfFileSizeBytes: res.sizeBytes,
         pdfSourceType: 'upload',
         pdfStoragePath: storagePath,
-        pdfCloudStorageUrl: res.cloudStorageUrl || res.url
+        pdfCloudStorageUrl: cleanCloudStorageUrl
       }));
 
       // If editing an existing competition, immediately update the record in Firestore
       if (isEditing && initialCompetition?.id) {
         try {
-          await updateDoc(doc(db, 'competitions', initialCompetition.id), {
+          const updatePayload: Record<string, any> = {
             pdfReadingMaterialUrl: res.url,
             pdfFileName: res.fileName,
             pdfFileSizeBytes: res.sizeBytes,
             pdfSourceType: 'upload',
             pdfStoragePath: storagePath,
-            pdfCloudStorageUrl: res.cloudStorageUrl || res.url,
             'bookDetails.pdfReadingMaterialUrl': res.url,
             'bookDetails.pdfFileName': res.fileName,
             'bookDetails.pdfFileSizeBytes': res.sizeBytes,
             'bookDetails.pdfSourceType': 'upload',
             'bookDetails.pdfStoragePath': storagePath,
-            'bookDetails.pdfCloudStorageUrl': res.cloudStorageUrl || res.url,
             updatedAt: new Date().toISOString()
-          });
+          };
+          if (cleanCloudStorageUrl) {
+            updatePayload.pdfCloudStorageUrl = cleanCloudStorageUrl;
+            updatePayload['bookDetails.pdfCloudStorageUrl'] = cleanCloudStorageUrl;
+          }
+          await updateDoc(doc(db, 'competitions', initialCompetition.id), updatePayload);
         } catch (dbErr) {
           console.warn('Notice saving immediate PDF reference to Firestore:', dbErr);
         }
@@ -2605,14 +2612,14 @@ const CreateCompetitionModal: React.FC<CreateCompetitionModalProps> = ({ initial
           pdfSourceType: formData.pdfSourceType,
           pdfExternalUrl: formData.pdfExternalUrl.trim(),
           pdfStoragePath: resolvedStoragePath || formData.pdfStoragePath,
-          pdfCloudStorageUrl: formData.pdfCloudStorageUrl || (formData.pdfSourceType === 'upload' ? resolvedPdfUrl : undefined)
+          pdfCloudStorageUrl: (formData.pdfCloudStorageUrl && formData.pdfCloudStorageUrl.startsWith('http') && !formData.pdfCloudStorageUrl.includes('/api/competitions/')) ? formData.pdfCloudStorageUrl : undefined
         } : undefined,
         pdfReadingMaterialUrl: resolvedPdfUrl,
         pdfFileName: resolvedFileName || formData.pdfFileName,
         pdfFileSizeBytes: resolvedSizeBytes || formData.pdfFileSizeBytes,
         pdfSourceType: formData.pdfSourceType,
         pdfStoragePath: resolvedStoragePath || formData.pdfStoragePath,
-        pdfCloudStorageUrl: formData.pdfCloudStorageUrl || (formData.pdfSourceType === 'upload' ? resolvedPdfUrl : undefined),
+        pdfCloudStorageUrl: (formData.pdfCloudStorageUrl && formData.pdfCloudStorageUrl.startsWith('http') && !formData.pdfCloudStorageUrl.includes('/api/competitions/')) ? formData.pdfCloudStorageUrl : undefined,
         examDetails: {
           ...(initialCompetition?.examDetails || {}),
           isOnlineExam: formData.isOnlineExam,

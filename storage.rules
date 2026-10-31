@@ -1,76 +1,244 @@
 rules_version = '2';
 
-// Cloud Storage Security Rules for Fatimyah Educational Trust India (FET India)
-// Dedicated Bucket: fatimyah-educational-trust.firebasestorage.app
+// Authoritative Cloud Storage Security Rules for Fatimyah Educational Trust India
+// Target Storage Bucket: fatimyah-educational-trust.firebasestorage.app
+// Storage Location: asia-south1 (Mumbai)
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Helper functions
+    // -------------------------------------------------------------------------
+    // 1. Authentication & Role Authorization Helper Functions
+    // -------------------------------------------------------------------------
+
+    // Verifies that a valid authenticated session exists
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    function isSuperAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email == 'fetkofficial@gmail.com' ||
-        request.auth.token.email == 'contact@fetindia.org'
+    // Cryptographically signed claims attached to user's Firebase Auth token
+    function hasTokenAdminClaim() {
+      return isSignedIn() && request.auth.token != null && (
+        ('role' in request.auth.token && request.auth.token.role in [
+          'super_admin', 'platform_super_admin', 'administrator',
+          'exam_controller', 'exam_admin', 'examination_admin',
+          'national_admin', 'national_exam_admin',
+          'state_admin', 'state_exam_admin',
+          'district_admin', 'district_exam_admin'
+        ]) ||
+        ('isSuperAdmin' in request.auth.token && request.auth.token.isSuperAdmin == true) ||
+        ('admin' in request.auth.token && request.auth.token.admin == true)
       );
     }
 
-    function isValidImage() {
-      return request.resource.contentType.matches('image/.*')
-        && request.resource.size <= 15 * 1024 * 1024; // 15MB limit
+    // Authoritative Admin Check: Uses cryptographically verified Auth Token Custom Claims
+    // (Bypasses empty default Firestore database to support named database architecture)
+    function isAuthorizedAdmin() {
+      return hasTokenAdminClaim();
     }
 
-    function isValidDocument() {
-      return (
-        request.resource.contentType.matches('image/.*') ||
-        request.resource.contentType == 'application/pdf'
-      ) && request.resource.size <= 25 * 1024 * 1024; // 25MB limit
-    }
-
-    // Public Media Uploads (Campaign covers, gallery photos, news announcements)
-    match /fet_uploads/{folder}/{allPaths=**} {
-      // Anyone can read public media (campaigns, gallery, news, avatars)
-      allow read: if true;
-      
-      // Only authenticated users or admins can upload media
-      allow write: if isSignedIn() && (
-        (folder in ['covers', 'gallery', 'avatars', 'general'] && isValidImage()) ||
-        (folder in ['private_documents', 'id_proofs'] && isValidDocument()) ||
-        isSuperAdmin()
+    // School / Institutional Administrator Check
+    function isSchoolAdmin(schoolId) {
+      return isAuthorizedAdmin() || (
+        isSignedIn() && request.auth.token != null && (
+          ('role' in request.auth.token && (request.auth.token.role in ['school_admin', 'institution_admin', 'branch_admin'])) &&
+          (('schoolId' in request.auth.token && request.auth.token.schoolId == schoolId) ||
+           ('institutionId' in request.auth.token && request.auth.token.institutionId == schoolId))
+        )
       );
     }
 
-    // Member & Student Profile Photos
-    match /profile_photos/{userId}/{allPaths=**} {
-      // Profile avatars are publicly readable on verified credentials & ID badges
+    // -------------------------------------------------------------------------
+    // 2. File Type & Size Validation Helpers
+    // -------------------------------------------------------------------------
+
+    // Strict PDF validation (Max 25 MB)
+    function isValidPdf() {
+      return request.resource != null
+        && request.resource.contentType == 'application/pdf'
+        && request.resource.size > 0
+        && request.resource.size <= 25 * 1024 * 1024;
+    }
+
+    // Standard Image validation (JPEG, PNG, WebP; Max 10 MB)
+    function isImageFile() {
+      return request.resource != null
+        && (
+          request.resource.contentType == 'image/jpeg' ||
+          request.resource.contentType == 'image/png' ||
+          request.resource.contentType == 'image/webp' ||
+          request.resource.contentType.matches('image/.*')
+        )
+        && request.resource.size > 0
+        && request.resource.size <= 10 * 1024 * 1024;
+    }
+
+    // Profile photo image validation (Max 5 MB)
+    function isProfilePhotoFile() {
+      return request.resource != null
+        && (
+          request.resource.contentType == 'image/jpeg' ||
+          request.resource.contentType == 'image/png' ||
+          request.resource.contentType == 'image/webp' ||
+          request.resource.contentType.matches('image/.*')
+        )
+        && request.resource.size > 0
+        && request.resource.size <= 5 * 1024 * 1024;
+    }
+
+    // Verification document validation (PDF, JPEG, PNG; Max 15 MB)
+    function isValidVerificationDoc() {
+      return request.resource != null
+        && (
+          request.resource.contentType == 'application/pdf' ||
+          request.resource.contentType == 'image/jpeg' ||
+          request.resource.contentType == 'image/png' ||
+          request.resource.contentType == 'image/webp'
+        )
+        && request.resource.size > 0
+        && request.resource.size <= 15 * 1024 * 1024;
+    }
+
+    // Checks whether an object was explicitly published as public reading material
+    function isExplicitlyPublic() {
+      return resource != null
+        && resource.metadata != null
+        && (
+          ('isPublic' in resource.metadata && resource.metadata.isPublic == 'true') ||
+          ('visibility' in resource.metadata && resource.metadata.visibility == 'public')
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. Official Competition Materials & Books
+    // -------------------------------------------------------------------------
+
+    // Designated public distribution path for open/free competition materials
+    match /examination_materials/{examId}/public/{allPaths=**} {
       allow read: if true;
-      
-      // Only the account owner or super admin can upload/update their profile photo
-      allow write: if (isOwner(userId) || isSuperAdmin()) && isValidImage();
+      allow create, update: if isAuthorizedAdmin() && isValidPdf();
+      allow delete: if isAuthorizedAdmin();
     }
 
-    // Verification Documents, Financial Receipts & Beneficiary Files
-    match /documents/{folder}/{allPaths=**} {
-      // Private documents are restricted to authenticated users & admins
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && isValidDocument();
-    }
-
-    // Examination Materials, Prescribed Book PDFs & Syllabi
+    // Standard examination materials root path
+    // Public read is permitted ONLY if explicitly marked public in metadata;
+    // restricted and paid materials require authenticated server-proxy download.
     match /examination_materials/{examId}/{allPaths=**} {
-      // Registered candidates, enrolled students, exam controllers and administrators can access reading material
-      allow read: if isSignedIn();
-      // Authorized exam controllers and administrators can upload/update valid PDF documents up to 25MB
-      allow write: if isSignedIn() && isValidDocument();
+      allow read: if isExplicitlyPublic() || isAuthorizedAdmin();
+      allow create, update: if isAuthorizedAdmin() && isValidPdf();
+      allow delete: if isAuthorizedAdmin();
     }
 
-    // Default deny all other paths
+    // -------------------------------------------------------------------------
+    // 4. Student & User Profile Photographs
+    // Protected: readable by authenticated users (or when explicitly public in metadata)
+    // -------------------------------------------------------------------------
+    match /profile_photos/{userId}/{fileName} {
+      // Readable by authenticated users for badges, member directories, and identity cards
+      allow read: if isSignedIn() || isExplicitlyPublic() || isAuthorizedAdmin();
+      allow create, update: if isSignedIn() && (request.auth.uid == userId || isAuthorizedAdmin()) && isProfilePhotoFile();
+      allow delete: if isSignedIn() && (request.auth.uid == userId || isAuthorizedAdmin());
+    }
+
+    // -------------------------------------------------------------------------
+    // 5. Campaign Appeals & Initiative Media (FET Uploads)
+    // -------------------------------------------------------------------------
+
+    // Campaign Covers (Publicly visible for fundraising appeal)
+    match /fet_uploads/covers/{fileName} {
+      allow read: if true;
+      allow create, update: if isSignedIn() && isImageFile();
+      allow delete: if isAuthorizedAdmin();
+    }
+
+    // Campaign Gallery Media (Public cause gallery)
+    match /fet_uploads/gallery/{fileName} {
+      allow read: if true;
+      allow create, update: if isSignedIn() && isImageFile();
+      allow delete: if isAuthorizedAdmin();
+    }
+
+    // Private Verification Documents (STRICTLY PRIVATE: Creator and Admin only)
+    match /fet_uploads/private_documents/{fileName} {
+      allow read: if isAuthorizedAdmin() || (
+        isSignedIn() && resource != null && resource.metadata != null && resource.metadata.uploadedByUid == request.auth.uid
+      );
+      allow create: if isSignedIn() && isValidVerificationDoc() && (
+        request.resource.metadata != null && request.resource.metadata.uploadedByUid == request.auth.uid
+      );
+      allow update, delete: if isAuthorizedAdmin() || (
+        isSignedIn() && resource != null && resource.metadata != null && resource.metadata.uploadedByUid == request.auth.uid
+      );
+    }
+
+    // Private ID Proofs (STRICTLY PRIVATE: Owner and Admin only)
+    match /fet_uploads/id_proofs/{fileName} {
+      allow read: if isAuthorizedAdmin() || (
+        isSignedIn() && resource != null && resource.metadata != null && resource.metadata.uploadedByUid == request.auth.uid
+      );
+      allow create: if isSignedIn() && isValidVerificationDoc() && (
+        request.resource.metadata != null && request.resource.metadata.uploadedByUid == request.auth.uid
+      );
+      allow update, delete: if isAuthorizedAdmin() || (
+        isSignedIn() && resource != null && resource.metadata != null && resource.metadata.uploadedByUid == request.auth.uid
+      );
+    }
+
+    // Avatars folder alias
+    match /fet_uploads/avatars/{fileName} {
+      allow read: if isSignedIn() || isAuthorizedAdmin();
+      allow create, update: if isSignedIn() && isProfilePhotoFile();
+      allow delete: if isAuthorizedAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // 6. About Trust CMS & Publishing Articles Media
+    // -------------------------------------------------------------------------
+    match /cms_media/{section}/{fileName} {
+      allow read: if true;
+      allow create, update, delete: if isAuthorizedAdmin() && isImageFile();
+    }
+
+    // -------------------------------------------------------------------------
+    // 7. Store Digital Assets & Products
+    // -------------------------------------------------------------------------
+    // Product catalog images (Public)
+    match /store_products/{productId}/{fileName} {
+      allow read: if true;
+      allow create, update, delete: if isAuthorizedAdmin() && isImageFile();
+    }
+
+    // Protected digital books / curriculum downloads (Admin direct read; candidates via secure proxy)
+    match /store_digital_assets/{productId}/{fileName} {
+      allow read: if isAuthorizedAdmin();
+      allow create, update: if isAuthorizedAdmin() && (isValidPdf() || request.resource.size <= 50 * 1024 * 1024);
+      allow delete: if isAuthorizedAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // 8. Staff Photographs & HR Verification Documents
+    // -------------------------------------------------------------------------
+    match /staff/{staffId}/photos/{fileName} {
+      allow read: if isSignedIn() || isAuthorizedAdmin();
+      allow create, update, delete: if isAuthorizedAdmin() && isImageFile();
+    }
+
+    match /staff/{staffId}/documents/{fileName} {
+      // HR documents are confidential to administrators
+      allow read, create, update, delete: if isAuthorizedAdmin() && isValidVerificationDoc();
+    }
+
+    // -------------------------------------------------------------------------
+    // 9. School-Level Scoped Documents & Photographs
+    // -------------------------------------------------------------------------
+    match /schools/{schoolId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow create, update: if isSchoolAdmin(schoolId) && (isImageFile() || isValidPdf() || isValidVerificationDoc());
+      allow delete: if isSchoolAdmin(schoolId);
+    }
+
+    // -------------------------------------------------------------------------
+    // 10. Default Deny: All unspecified paths in this bucket are strictly inaccessible
+    // -------------------------------------------------------------------------
     match /{allPaths=**} {
       allow read, write: if false;
     }

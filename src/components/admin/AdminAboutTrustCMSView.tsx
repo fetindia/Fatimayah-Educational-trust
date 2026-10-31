@@ -44,7 +44,7 @@ import {
   OfficialSignatoryConfig,
   UserRole 
 } from '../../types';
-import { fileToDataUrl, validateImageFile } from '../../lib/storage';
+import { fileToDataUrl, validateImageFile, uploadCmsMedia } from '../../lib/storage';
 
 type AboutCMSTab = 
   | 'overview' 
@@ -156,13 +156,8 @@ export const AdminAboutTrustCMSView: React.FC = () => {
   const handleSealUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const val = validateImageFile(file, 5);
-    if (!val.valid) {
-      alert(val.error);
-      return;
-    }
     try {
-      const dataUrl = await fileToDataUrl(file);
+      const res = await uploadCmsMedia(file, 'general');
       setFormData(prev => ({
         ...prev,
         signatory: {
@@ -170,25 +165,20 @@ export const AdminAboutTrustCMSView: React.FC = () => {
           name: prev.signatory?.name || '',
           designation: prev.signatory?.designation || '',
           signatureEnabled: prev.signatory?.signatureEnabled ?? true,
-          officialSealUrl: dataUrl,
+          officialSealUrl: res.url,
           officialSealEnabled: true
         }
       }));
-    } catch (err) {
-      alert('Failed to read seal image. Please choose another file.');
+    } catch (err: any) {
+      alert(err?.message || 'Failed to upload official seal.');
     }
   };
 
   const handleSignatureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const val = validateImageFile(file, 5);
-    if (!val.valid) {
-      alert(val.error);
-      return;
-    }
     try {
-      const dataUrl = await fileToDataUrl(file);
+      const res = await uploadCmsMedia(file, 'general');
       setFormData(prev => ({
         ...prev,
         signatory: {
@@ -196,54 +186,44 @@ export const AdminAboutTrustCMSView: React.FC = () => {
           name: prev.signatory?.name || '',
           designation: prev.signatory?.designation || '',
           signatureEnabled: true,
-          signatureUrl: dataUrl,
+          signatureUrl: res.url,
           officialSealEnabled: prev.signatory?.officialSealEnabled ?? true
         }
       }));
-    } catch (err) {
-      alert('Failed to read signature image. Please choose another file.');
+    } catch (err: any) {
+      alert(err?.message || 'Failed to upload signatory image.');
     }
   };
 
   const handleChairmanPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const val = validateImageFile(file, 5);
-    if (!val.valid) {
-      alert(val.error);
-      return;
-    }
     try {
-      const dataUrl = await fileToDataUrl(file);
+      const res = await uploadCmsMedia(file, 'chairman');
       setFormData(prev => ({
         ...prev,
         chairmanProfile: {
           ...prev.chairmanProfile!,
-          photoUrl: dataUrl
+          photoUrl: res.url
         }
       }));
-    } catch (err) {
-      alert('Failed to read photograph.');
+    } catch (err: any) {
+      alert(err?.message || 'Failed to upload chairman photograph.');
     }
   };
 
   const handleTrusteePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const val = validateImageFile(file, 5);
-    if (!val.valid) {
-      alert(val.error);
-      return;
-    }
     try {
-      const dataUrl = await fileToDataUrl(file);
+      const res = await uploadCmsMedia(file, 'trustees');
       const list = [...(formData.trustees || [])];
       if (list[index]) {
-        list[index] = { ...list[index], photoUrl: dataUrl };
+        list[index] = { ...list[index], photoUrl: res.url };
         setFormData(prev => ({ ...prev, trustees: list }));
       }
-    } catch (err) {
-      alert('Failed to read photograph.');
+    } catch (err: any) {
+      alert(err?.message || 'Failed to upload trustee photograph.');
     }
   };
 
@@ -299,20 +279,15 @@ export const AdminAboutTrustCMSView: React.FC = () => {
   const handleAdvisoryPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const val = validateImageFile(file, 5);
-    if (!val.valid) {
-      alert(val.error);
-      return;
-    }
     try {
-      const dataUrl = await fileToDataUrl(file);
+      const res = await uploadCmsMedia(file, 'advisors');
       const list = [...(formData.advisoryMembers || [])];
       if (list[index]) {
-        list[index] = { ...list[index], photoUrl: dataUrl };
+        list[index] = { ...list[index], photoUrl: res.url };
         setFormData(prev => ({ ...prev, advisoryMembers: list }));
       }
-    } catch (err) {
-      alert('Failed to read photograph.');
+    } catch (err: any) {
+      alert(err?.message || 'Failed to upload advisory member photograph.');
     }
   };
 
